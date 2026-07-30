@@ -1,6 +1,7 @@
 namespace NetEvolve.Frameshift.Tests.Unit;
 
 using System.Reflection;
+using NetEvolve.Frameshift.Diagnostics;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -10,7 +11,7 @@ public class ScaffoldingTests
     [Test]
     public async Task Assembly_UnderTest_IsLoadable()
     {
-        var assembly = typeof(Placeholder).Assembly;
+        var assembly = typeof(DiagnosticIds).Assembly;
 
         _ = await Assert.That(assembly.GetName().Name).IsEqualTo("NetEvolve.Frameshift");
     }
