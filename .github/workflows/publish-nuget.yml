@@ -1,0 +1,28 @@
+name: NuGet Package
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  actions: read
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: publish-nuget
+  cancel-in-progress: true
+
+jobs:
+  nuget:
+    name: Publish
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.actor != 'dependabot[bot]' && github.actor != 'renovate[bot]' }}
+    uses: dailydevops/pipelines/.github/workflows/publish-nuget.yml@1328ca628f65591318b771c4e7c01794ddab583f # 2.5.140
+    with:
+      workflowName: ${{ github.event.workflow_run.name }}
+      artifactPattern: release-packages-*
+      environment: NuGet
+      runId: ${{ github.event.workflow_run.id }}
+    secrets: inherit
