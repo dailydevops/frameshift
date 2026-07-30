@@ -21,6 +21,11 @@
     <File Path="renovate.json" />
     <File Path="testEnvironments.json" />
   </Folder>
-  <Folder Name="/src/" />
-  <Folder Name="/tests/" />
+  <Folder Name="/src/">
+    <Project Path="src/NetEvolve.Frameshift/NetEvolve.Frameshift.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NetEvolve.Frameshift.Tests.Integration/NetEvolve.Frameshift.Tests.Integration.csproj" />
+    <Project Path="tests/NetEvolve.Frameshift.Tests.Unit/NetEvolve.Frameshift.Tests.Unit.csproj" />
+  </Folder>
 </Solution>

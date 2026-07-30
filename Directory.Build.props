@@ -1,11 +1,11 @@
 <Project>
   <PropertyGroup Label="Package settings">
     <Title>$(MSBuildProjectName)</Title>
-    <Description></Description>
-    <RepositoryUrl></RepositoryUrl>
-    <PackageProjectUrl></PackageProjectUrl>
+    <Description>Roslyn analyzers that surface mutation-testing gaps in .NET code at build time.</Description>
+    <RepositoryUrl>https://github.com/dailydevops/frameshift</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dailydevops/frameshift</PackageProjectUrl>
     <PackageReleaseNotes>$(PackageProjectUrl)/releases</PackageReleaseNotes>
-    <PackageTags></PackageTags>
+    <PackageTags>analyzers;mutation-testing;roslyn;tunit</PackageTags>
     <CopyrightYearStart>2024</CopyrightYearStart>
   </PropertyGroup>
   <PropertyGroup>
