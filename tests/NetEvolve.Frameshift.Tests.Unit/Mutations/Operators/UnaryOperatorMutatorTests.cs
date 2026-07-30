@@ -1,0 +1,278 @@
+namespace NetEvolve.Frameshift.Tests.Unit.Mutations.Operators;
+
+using System.Collections.Immutable;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NetEvolve.Frameshift.Mutations;
+using NetEvolve.Frameshift.Mutations.Operators;
+using NetEvolve.Frameshift.Tests.Infrastructure;
+using TUnit.Assertions;
+using TUnit.Assertions.Extensions;
+using TUnit.Core;
+
+/// <summary>
+/// Covers the unary sign mutations, the constant folding guard for literal operands and the user
+/// defined operator handling, which can suppress the sign swap but never the operator removal.
+/// </summary>
+public class UnaryOperatorMutatorTests
+{
+    private const string NegateOnlyOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator -(Money value) => new Money(0 - value.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Invert(Money value) => /*!*/-value;
+        }
+        """;
+
+    private const string NegateAndPlusOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator -(Money value) => new Money(0 - value.Amount);
+
+            public static Money operator +(Money value) => value;
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Invert(Money value) => /*!*/-value;
+        }
+        """;
+
+    private const string TriviaSource = """
+        namespace Fixtures;
+
+        internal static class Calculator
+        {
+            // Inverts a value.
+            internal static int Invert(int value)
+            {
+                /* leading */
+                return /*!*/- /* sign */ value; // tail
+            }
+        }
+        """;
+
+    [Test]
+    public async Task Metadata_Operator_ExposesIdKindAndSupportedKinds()
+    {
+        var mutator = new UnaryOperatorMutator();
+
+        _ = await Assert.That(mutator.Id).IsEqualTo("unary");
+        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.UnaryOperator);
+        _ = await Assert
+            .That(mutator.SupportedSyntaxKinds)
+            .IsEquivalentTo(new[] { SyntaxKind.UnaryMinusExpression, SyntaxKind.UnaryPlusExpression });
+    }
+
+    [Test]
+    public async Task Fixture_UnaryExpression_Compiles()
+    {
+        var (compilation, _, _) = CompilationFactory.CreateWithModel(Fixture("-value"));
+
+        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("-value", "unary.negate-to-plus,unary.remove-negate", "-x => +x,-x => x")]
+    [Arguments("+value", "unary.plus-to-negate,unary.remove-plus", "+x => -x,+x => x")]
+    public async Task CreateMutations_UnaryExpression_ProducesSwapAndRemoval(
+        string expression,
+        string expectedIds,
+        string expectedDisplayNames
+    )
+    {
+        ArgumentNullException.ThrowIfNull(expectedIds);
+        ArgumentNullException.ThrowIfNull(expectedDisplayNames);
+
+        var result = Mutate(Fixture(expression));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+            .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
+        _ = await Assert
+            .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
+            .IsEquivalentTo(new[] { MutationKind.UnaryOperator });
+    }
+
+    [Test]
+    [Arguments("-value", SyntaxKind.UnaryMinusExpression)]
+    [Arguments("+value", SyntaxKind.UnaryPlusExpression)]
+    public async Task SupportedSyntaxKinds_EveryKind_IsHandledByCreateMutations(string expression, SyntaxKind kind)
+    {
+        var mutator = new UnaryOperatorMutator();
+        var result = Mutate(Fixture(expression));
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
+        _ = await Assert.That(result.Mutations).Count().IsEqualTo(2);
+    }
+
+    [Test]
+    [Arguments("!flag")]
+    [Arguments("~value")]
+    [Arguments("value++")]
+    [Arguments("++value")]
+    public async Task CreateMutations_UnsupportedSyntaxKind_ReturnsEmpty(string expression)
+    {
+        var result = Mutate(Fixture(expression));
+
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("+5")]
+    [Arguments("+0")]
+    [Arguments("-0")]
+    public async Task CreateMutations_LiteralFoldingToTheSameConstant_ReturnsEmpty(string expression)
+    {
+        var result = Mutate(Fixture(expression));
+
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_NegatedLiteralWithDifferentConstant_ProducesBothMutations()
+    {
+        string[] expectedIds = ["unary.negate-to-plus", "unary.remove-negate"];
+        var result = Mutate(Fixture("-5"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_Replacements_SwapTheSignAndDropTheOperator()
+    {
+        var result = Mutate(Fixture("-value"));
+        var swap = Single(result.Mutations, "unary.negate-to-plus");
+        var removal = Single(result.Mutations, "unary.remove-negate");
+
+        _ = await Assert.That(swap.Replacement.ToString()).IsEqualTo("+value");
+        _ = await Assert.That(removal.Replacement.ToString()).IsEqualTo("value");
+        _ = await Assert.That(removal.Original).IsEqualTo(result.Node);
+    }
+
+    [Test]
+    public async Task ApplyTo_NegateToPlus_RewritesOperatorAndKeepsTrivia()
+    {
+        var result = Mutate(TriviaSource);
+        var mutation = Single(result.Mutations, "unary.negate-to-plus");
+
+        var mutated = mutation.ApplyTo(result.Tree).ToString();
+
+        _ = await Assert
+            .That(mutated)
+            .IsEqualTo(TriviaSource.Replace("- /* sign */", "+ /* sign */", StringComparison.Ordinal));
+        _ = await Assert.That(mutated).Contains("// Inverts a value.");
+        _ = await Assert.That(mutated).Contains("/* leading */");
+        _ = await Assert.That(mutated).Contains("return /*!*/+ /* sign */ value; // tail");
+    }
+
+    [Test]
+    public async Task ApplyTo_RemoveNegate_DropsOperatorAndKeepsSurroundingComments()
+    {
+        var result = Mutate(TriviaSource);
+        var mutation = Single(result.Mutations, "unary.remove-negate");
+
+        var mutated = mutation.ApplyTo(result.Tree).ToString();
+
+        _ = await Assert
+            .That(mutated)
+            .IsEqualTo(TriviaSource.Replace("- /* sign */ value", "value", StringComparison.Ordinal));
+        _ = await Assert.That(mutated).Contains("// Inverts a value.");
+        _ = await Assert.That(mutated).Contains("/* leading */");
+        _ = await Assert.That(mutated).Contains("return /*!*/value; // tail");
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedNegationWithoutUnaryPlus_ProducesOnlyTheRemoval()
+    {
+        string[] expectedIds = ["unary.remove-negate"];
+        string[] expectedDisplayNames = ["-x => x"];
+        var result = Mutate(NegateOnlyOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+            .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedNegationWithUnaryPlus_ProducesBothMutations()
+    {
+        string[] expectedIds = ["unary.negate-to-plus", "unary.remove-negate"];
+        var result = Mutate(NegateAndPlusOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    private static string Fixture(string expression) =>
+        $$"""
+            namespace Fixtures;
+
+            internal static class Calculator
+            {
+                internal static void Apply(int value, bool flag)
+                {
+                    _ = /*!*/{{expression}};
+                    _ = flag;
+                }
+            }
+            """;
+
+    /// <summary>
+    /// Splits a comma separated expectation of an inline data case. Reading the parameter here instead
+    /// of in the public test method keeps the null contract of the test signature simple.
+    /// </summary>
+    /// <param name="values">The comma separated expectation.</param>
+    /// <returns>The single expectations.</returns>
+    private static string[] SplitValues(string values) => values.Split(',');
+
+    private static ImmutableArray<string> Sorted(IEnumerable<string> values) =>
+        [.. values.OrderBy(value => value, StringComparer.Ordinal)];
+
+    private static Mutation Single(ImmutableArray<Mutation> mutations, string operatorId) =>
+        mutations.Single(mutation => string.Equals(mutation.OperatorId, operatorId, StringComparison.Ordinal));
+
+    private static (ImmutableArray<Mutation> Mutations, SyntaxTree Tree, ExpressionSyntax Node) Mutate(string source)
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var errors = CompilationFactory.GetCompileErrors(compilation);
+        if (!errors.IsEmpty)
+        {
+            throw new InvalidOperationException(
+                $"The fixture does not compile: {DiagnosticAssertions.Describe(errors)}"
+            );
+        }
+
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new UnaryOperatorMutator();
+
+        return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node);
+    }
+}

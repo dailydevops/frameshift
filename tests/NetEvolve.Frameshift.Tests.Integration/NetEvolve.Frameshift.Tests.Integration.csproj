@@ -12,6 +12,9 @@
   <ItemGroup>
     <ProjectReference Include="../../src/NetEvolve.Frameshift/NetEvolve.Frameshift.csproj" />
   </ItemGroup>
+  <ItemGroup Label="Shared test infrastructure">
+    <Compile Include="..\NetEvolve.Frameshift.Tests.Unit\Infrastructure\*.cs" Link="Infrastructure\%(Filename)%(Extension)" />
+  </ItemGroup>
   <ItemGroup Label="Test categorisation">
     <AssemblyAttribute Include="NetEvolve.Extensions.TUnit.IntegrationTestAttribute" />
   </ItemGroup>
