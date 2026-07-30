@@ -6,8 +6,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Builds a <see cref="TestSurfaceManifest" /> for a test compilation by walking the code that is
-/// reachable from its TUnit test methods and recording every member that comes from outside the
-/// compilation, i.e. from the production assemblies under test.
+/// reachable from its test methods and recording every member that comes from outside the compilation,
+/// i.e. from the production assemblies under test.
 /// </summary>
 /// <remarks>
 /// Only executable code is inspected: method bodies, expression bodies, constructor initializers and
@@ -26,9 +26,40 @@ internal static class TestSurfaceCollector
     /// The manifest describing all discovered test methods and the production members they reference.
     /// </returns>
     /// <exception cref="ArgumentNullException"><paramref name="compilation" /> is <see langword="null" />.</exception>
-    public static TestSurfaceManifest Collect(Compilation compilation, CancellationToken cancellationToken)
+    public static TestSurfaceManifest Collect(Compilation compilation, CancellationToken cancellationToken) =>
+        Collect(compilation, TUnitTestDiscovery.FindTestMethods(compilation, cancellationToken), cancellationToken);
+
+    /// <summary>
+    /// Collects the test surface of <paramref name="compilation" /> for the test methods
+    /// <paramref name="recognizer" /> recognises.
+    /// </summary>
+    /// <param name="compilation">The test compilation to inspect.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
+    /// <param name="cancellationToken">A token to observe while collecting.</param>
+    /// <returns>
+    /// The manifest describing all discovered test methods and the production members they reference.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="compilation" /> or <paramref name="recognizer" /> is <see langword="null" />.
+    /// </exception>
+    public static TestSurfaceManifest Collect(
+        Compilation compilation,
+        ITestMethodRecognizer recognizer,
+        CancellationToken cancellationToken
+    ) =>
+        Collect(
+            compilation,
+            TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken),
+            cancellationToken
+        );
+
+    private static TestSurfaceManifest Collect(
+        Compilation compilation,
+        ImmutableArray<IMethodSymbol> testMethods,
+        CancellationToken cancellationToken
+    )
     {
-        var results = Analyze(compilation, cancellationToken);
+        var results = Analyze(compilation, testMethods, cancellationToken);
         var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
 
@@ -64,13 +95,47 @@ internal static class TestSurfaceCollector
         Compilation compilation,
         CancellationToken cancellationToken
     ) =>
-        Analyze(compilation, cancellationToken)
+        FindTestsWithoutProductionReference(
+            compilation,
+            TUnitTestDiscovery.FindTestMethods(compilation, cancellationToken),
+            cancellationToken
+        );
+
+    /// <summary>
+    /// Finds the test methods <paramref name="recognizer" /> recognises that do not reference a single
+    /// production member, so that a caller can report <c>FSH0004</c> for them.
+    /// </summary>
+    /// <param name="compilation">The test compilation to inspect.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
+    /// <param name="cancellationToken">A token to observe while collecting.</param>
+    /// <returns>The test methods without any production reference, in declaration order.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="compilation" /> or <paramref name="recognizer" /> is <see langword="null" />.
+    /// </exception>
+    public static ImmutableArray<IMethodSymbol> FindTestsWithoutProductionReference(
+        Compilation compilation,
+        ITestMethodRecognizer recognizer,
+        CancellationToken cancellationToken
+    ) =>
+        FindTestsWithoutProductionReference(
+            compilation,
+            TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken),
+            cancellationToken
+        );
+
+    private static ImmutableArray<IMethodSymbol> FindTestsWithoutProductionReference(
+        Compilation compilation,
+        ImmutableArray<IMethodSymbol> testMethods,
+        CancellationToken cancellationToken
+    ) =>
+        Analyze(compilation, testMethods, cancellationToken)
             .Where(result => result.ReferencedMemberIds.IsEmpty)
             .Select(result => result.TestMethod)
             .ToImmutableArray();
 
     private static List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)> Analyze(
         Compilation compilation,
+        ImmutableArray<IMethodSymbol> testMethods,
         CancellationToken cancellationToken
     )
     {
@@ -82,7 +147,7 @@ internal static class TestSurfaceCollector
         var results = new List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)>();
         var semanticModels = new Dictionary<SyntaxTree, SemanticModel>();
 
-        foreach (var testMethod in TUnitTestDiscovery.FindTestMethods(compilation, cancellationToken))
+        foreach (var testMethod in testMethods)
         {
             cancellationToken.ThrowIfCancellationRequested();
 

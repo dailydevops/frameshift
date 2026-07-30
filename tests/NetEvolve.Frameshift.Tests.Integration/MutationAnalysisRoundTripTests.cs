@@ -251,7 +251,7 @@ public class MutationAnalysisRoundTripTests
 
         var diagnostics = await AnalyzerRunner
             .RunAsync(
-                new TestSurfaceAnalyzer(),
+                new TUnitTestSurfaceAnalyzer(),
                 test,
                 DiagnosticIds.InvalidTestSurfaceManifest,
                 [new InMemoryAdditionalText(manifest)]

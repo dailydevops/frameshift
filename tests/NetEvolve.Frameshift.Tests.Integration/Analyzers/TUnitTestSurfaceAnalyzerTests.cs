@@ -15,7 +15,7 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Drives <see cref="TestSurfaceAnalyzer" /> end to end against a real two-assembly setup: a
+/// Drives <see cref="TUnitTestSurfaceAnalyzer" /> end to end against a real two-assembly setup: a
 /// production assembly that is visible only as a metadata reference, and a test assembly compiled
 /// against it that carries genuine <c>[Test]</c> methods.
 /// </summary>
@@ -33,7 +33,7 @@ using TUnit.Core;
 /// <c>AD0001</c>, therefore every test in this class also asserts that the analyzer did not crash.
 /// </para>
 /// </remarks>
-public class TestSurfaceAnalyzerTests
+public class TUnitTestSurfaceAnalyzerTests
 {
     private const string ProductionAssemblyName = "ProductionAssembly";
     private const string TestAssemblyName = "TestAssembly";
@@ -42,6 +42,11 @@ public class TestSurfaceAnalyzerTests
 
     private const string CoveringTestName = "Add_ExercisesProduction";
     private const string LocalOnlyTestName = "LocalStateOnly_TouchesNoProduction";
+
+    private const string NoTestsScenario = "framework referenced, no test method";
+    private const string ForeignAttributeScenario = "test attribute of an unrelated framework";
+    private const string FrameworkLikeAssemblyScenario = "framework-like assembly name, no test method";
+    private const string FrameworkLikeAssemblyName = "TUnit.Satellite";
 
     private const string MalformedManifest = "not-a-test-surface-manifest\n";
     private const string GhostReferenceId = "M:Fixture.Ghost.Vanished";
@@ -101,6 +106,53 @@ public class TestSurfaceAnalyzerTests
             private static void Verify(int value)
             {
             }
+        }
+        """;
+
+    /// <summary>
+    /// A compilation that carries the framework reference but declares no test method at all.
+    /// </summary>
+    private const string WithoutTestsSource = """
+        namespace Tests;
+
+        public class NotATestClass
+        {
+            public int Compute() => 41;
+        }
+        """;
+
+    /// <summary>
+    /// A compilation whose <c>[Test]</c> attribute belongs to an unrelated framework, so that the probe
+    /// has to reject it on the declaring assembly rather than on the attribute name.
+    /// </summary>
+    private const string ForeignAttributeSource = """
+        namespace Tests;
+
+        using System;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class TestAttribute : Attribute
+        {
+        }
+
+        public class ForeignCases
+        {
+            [Test]
+            public void LooksLikeATest()
+            {
+            }
+        }
+        """;
+
+    /// <summary>
+    /// A satellite assembly whose name matches the framework prefix while declaring nothing a test could
+    /// be recognised by.
+    /// </summary>
+    private const string FrameworkLikeSatelliteSource = """
+        namespace Satellite;
+
+        public static class Marker
+        {
         }
         """;
 
@@ -267,6 +319,63 @@ public class TestSurfaceAnalyzerTests
     }
 
     /// <summary>
+    /// The analyzer must be down whenever it recognises no test of its own framework, and being down has
+    /// to mean absolute silence: not a single diagnostic, not even the manifest complaint that the very
+    /// same additional file provokes on a compilation whose tests it does recognise. Judging a
+    /// compilation whose tests are invisible could only ever produce false findings.
+    /// </summary>
+    /// <param name="scenario">The name of the compilation shape under test.</param>
+    [Test]
+    [Arguments(NoTestsScenario)]
+    [Arguments(ForeignAttributeScenario)]
+    [Arguments(FrameworkLikeAssemblyScenario)]
+    public async Task Analyzer_NoTestOfItsFrameworkIsRecognised_ReportsNothing(string scenario)
+    {
+        var compilation = CreateCompilationWithoutRecognisableTests(scenario);
+
+        var diagnostics = await RunAllAsync(compilation, MalformedManifest).ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
+    /// <summary>
+    /// Guards the fixtures of <see cref="Analyzer_NoTestOfItsFrameworkIsRecognised_ReportsNothing(string)" />:
+    /// each of them must compile, so that the silence of the analyzer is caused by the absence of
+    /// recognisable tests rather than by a broken compilation.
+    /// </summary>
+    /// <param name="scenario">The name of the compilation shape under test.</param>
+    [Test]
+    [Arguments(NoTestsScenario)]
+    [Arguments(ForeignAttributeScenario)]
+    [Arguments(FrameworkLikeAssemblyScenario)]
+    public async Task Fixtures_WithoutRecognisableTests_CompileWithoutErrors(string scenario)
+    {
+        var compilation = CreateCompilationWithoutRecognisableTests(scenario);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
+    private static CSharpCompilation CreateCompilationWithoutRecognisableTests(string scenario) =>
+        scenario switch
+        {
+            NoTestsScenario => CompilationFactory.Create(WithoutTestsSource, TestAssemblyName, includeTUnit: true),
+            ForeignAttributeScenario => CompilationFactory.Create(ForeignAttributeSource, TestAssemblyName),
+            FrameworkLikeAssemblyScenario => CompilationFactory.Create(
+                WithoutTestsSource,
+                TestAssemblyName,
+                additionalReferences:
+                [
+                    CompilationFactory
+                        .Create(FrameworkLikeSatelliteSource, FrameworkLikeAssemblyName, filePath: "Satellite.cs")
+                        .ToMetadataReference(),
+                ]
+            ),
+            _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown scenario."),
+        };
+
+    /// <summary>
     /// Runs every manifest shape the other tests use through the analyzer once more and proves that none
     /// of them makes it throw, which Roslyn would otherwise hide behind an <c>AD0001</c> diagnostic.
     /// </summary>
@@ -324,13 +433,13 @@ public class TestSurfaceAnalyzerTests
         Compilation compilation,
         string diagnosticId,
         string? manifest = null
-    ) => AnalyzerRunner.RunAsync(new TestSurfaceAnalyzer(), compilation, diagnosticId, AdditionalFiles(manifest));
+    ) => AnalyzerRunner.RunAsync(new TUnitTestSurfaceAnalyzer(), compilation, diagnosticId, AdditionalFiles(manifest));
 
     private static Task<ImmutableArray<Diagnostic>> RunAllAsync(
         Compilation compilation,
         string? manifest = null,
         IReadOnlyDictionary<string, string>? globalOptions = null
-    ) => AnalyzerRunner.RunAsync(new TestSurfaceAnalyzer(), compilation, AdditionalFiles(manifest), globalOptions);
+    ) => AnalyzerRunner.RunAsync(new TUnitTestSurfaceAnalyzer(), compilation, AdditionalFiles(manifest), globalOptions);
 
     private static ImmutableArray<AdditionalText> AdditionalFiles(string? manifest) =>
         manifest is null ? [] : [new InMemoryAdditionalText(manifest)];

@@ -11,108 +11,77 @@ using NetEvolve.Frameshift.Diagnostics;
 using NetEvolve.Frameshift.TestSurface;
 
 /// <summary>
-/// The test-side analyzer of Frameshift. It runs on a TUnit test project, discovers the test methods
-/// of the compilation, walks the code reachable from them and determines which production members
-/// they exercise.
+/// The framework-neutral test-side analysis of Frameshift. A framework-specific analyzer hands its
+/// <see cref="ITestFrameworkProbe" /> to <see cref="Execute(CompilationAnalysisContext, ITestFrameworkProbe)" />;
+/// everything after the probe is shared by every supported test framework.
 /// </summary>
 /// <remarks>
 /// <para>
-/// This analyzer is what makes the test-surface manifest maintainable: the manifest is a build
-/// artifact that is checked in and handed to the production compilation through
-/// <c>AdditionalFiles</c>, because a test compilation sees production code only as a metadata
-/// reference and therefore cannot mutate it, while a production compilation cannot see the tests at
-/// all. Since nothing regenerates the manifest automatically, it silently rots. Whenever a manifest
-/// is present, this analyzer compares the recorded test surface with the one it just collected and
-/// tells the developer when the two no longer match, so that a stale manifest is noticed at build
-/// time instead of quietly claiming coverage that no longer exists.
+/// The analysis switches itself off as early and as completely as it can. It does nothing unless the
+/// probe recognises its framework AND at least one test method is actually discovered. Recognising no
+/// test is treated as "this analysis has no authority over this compilation", not as "this compilation
+/// has no tests": a project whose tests cannot be seen must never be judged, because every judgement
+/// would be a false one. In that state no diagnostic of any kind is produced, not even about a manifest.
 /// </para>
 /// <para>
-/// It reports <c>FSH0004</c> for every test method that does not reference a single production
-/// member, and <c>FSH0003</c> when the manifest on disk cannot be parsed or has become stale. When
-/// no manifest is present at all it stays silent about it, because the test project is free to be
-/// the producer of the very first manifest. On a compilation that is not a TUnit test assembly the
-/// analyzer does nothing whatsoever.
+/// That rule is what keeps several framework analyzers side by side harmless: each stays silent on the
+/// compilations that are not its own.
 /// </para>
 /// </remarks>
-[DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class TestSurfaceAnalyzer : DiagnosticAnalyzer
+internal static class TestSurfaceAnalysis
 {
-    private const string TestFrameworkAssemblyPrefix = "TUnit";
-    private const string TestAttributeMetadataName = "TUnit.Core.TestAttribute";
-
-    private static readonly ImmutableArray<DiagnosticDescriptor> _supportedDiagnostics =
-    [
-        Descriptors.InvalidTestSurfaceManifest,
-        Descriptors.TestWithoutProductionReference,
-    ];
-
     /// <summary>
-    /// Gets the diagnostics this analyzer can report, namely <c>FSH0003</c> and <c>FSH0004</c>.
-    /// </summary>
-    public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
-
-    /// <summary>
-    /// Registers the analysis callbacks. All state is kept in the scope of a single compilation, so
-    /// that the analyzer stays stateless, thread-safe and free of any cached per-compilation data.
-    /// </summary>
-    /// <param name="context">The context used to register the callbacks.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="context" /> is <see langword="null" />.</exception>
-    public override void Initialize(AnalysisContext context)
-    {
-        if (context is null)
-        {
-            throw new ArgumentNullException(nameof(context));
-        }
-
-        context.EnableConcurrentExecution();
-        context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
-        context.RegisterCompilationAction(OnCompilation);
-    }
-
-    /// <summary>
-    /// Determines whether <paramref name="compilation" /> is a TUnit test assembly. Both the
-    /// referenced assembly name and the well-known test attribute must be present, so that the
-    /// analyzer remains completely silent on production projects.
-    /// </summary>
-    /// <param name="compilation">The compilation to classify.</param>
-    /// <returns>
-    /// <see langword="true" /> if the compilation is a TUnit test assembly; otherwise
-    /// <see langword="false" />.
-    /// </returns>
-    private static bool IsTestCompilation(Compilation compilation) =>
-        compilation.ReferencedAssemblyNames.Any(name =>
-            name.Name.StartsWith(TestFrameworkAssemblyPrefix, StringComparison.Ordinal)
-        ) && compilation.GetTypeByMetadataName(TestAttributeMetadataName) is not null;
-
-    /// <summary>
-    /// Decides whether the current compilation is analyzed at all and, if so, collects its test
-    /// surface, reports the tests without any production reference and compares the result with the
-    /// manifest on disk. The work runs on the whole compilation, where every syntax tree is available.
+    /// Runs the test-side analysis for the framework <paramref name="probe" /> detects.
     /// </summary>
     /// <param name="context">The context of the analyzed compilation.</param>
-    private static void OnCompilation(CompilationAnalysisContext context)
+    /// <param name="probe">The probe detecting the test framework.</param>
+    public static void Execute(CompilationAnalysisContext context, ITestFrameworkProbe probe)
     {
         var options = FrameshiftOptions.Read(context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
 
-        if (!options.IsEnabled || !IsTestCompilation(context.Compilation))
+        if (!options.IsEnabled)
         {
             return;
         }
 
-        var collected = TestSurfaceCollector.Collect(context.Compilation, context.CancellationToken);
+        var recognizer = probe.TryCreateRecognizer(context.Compilation);
 
-        ReportTestsWithoutProductionReference(context);
-        CompareWithManifestOnDisk(context, collected);
+        if (recognizer is null)
+        {
+            return;
+        }
+
+        var testMethods = TestMethodDiscovery.FindTestMethods(
+            context.Compilation,
+            recognizer,
+            context.CancellationToken
+        );
+
+        if (testMethods.IsEmpty)
+        {
+            return;
+        }
+
+        ReportTestsWithoutProductionReference(context, recognizer);
+        CompareWithManifestOnDisk(
+            context,
+            TestSurfaceCollector.Collect(context.Compilation, recognizer, context.CancellationToken)
+        );
     }
 
     /// <summary>
     /// Reports <c>FSH0004</c> once for every test method that references no production member.
     /// </summary>
-    /// <param name="context">The context of the finished compilation.</param>
-    private static void ReportTestsWithoutProductionReference(CompilationAnalysisContext context)
+    /// <param name="context">The context of the analyzed compilation.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
+    private static void ReportTestsWithoutProductionReference(
+        CompilationAnalysisContext context,
+        ITestMethodRecognizer recognizer
+    )
     {
         var testMethods = TestSurfaceCollector.FindTestsWithoutProductionReference(
             context.Compilation,
+            recognizer,
             context.CancellationToken
         );
 
@@ -152,7 +121,7 @@ public sealed class TestSurfaceAnalyzer : DiagnosticAnalyzer
     /// test project, if there is one. A missing manifest is not an error, because the test project may
     /// well be producing its very first one.
     /// </summary>
-    /// <param name="context">The context of the finished compilation.</param>
+    /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="collected">The test surface collected from the current compilation.</param>
     private static void CompareWithManifestOnDisk(CompilationAnalysisContext context, TestSurfaceManifest collected)
     {
@@ -217,7 +186,7 @@ public sealed class TestSurfaceAnalyzer : DiagnosticAnalyzer
     /// compilation. Only the id sets are compared, never the text, so that comment lines, ordering or
     /// any other formatting difference can never cause a false positive.
     /// </summary>
-    /// <param name="context">The context of the finished compilation.</param>
+    /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="path">The path of the manifest file.</param>
     /// <param name="onDisk">The manifest as it is checked in.</param>
     /// <param name="collected">The test surface collected from the current compilation.</param>
@@ -263,7 +232,7 @@ public sealed class TestSurfaceAnalyzer : DiagnosticAnalyzer
     /// Reports <c>FSH0003</c> for the manifest at <paramref name="path" />, anchored at the file
     /// itself so that the developer is pointed at the artifact that needs attention.
     /// </summary>
-    /// <param name="context">The context of the finished compilation.</param>
+    /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="path">The path of the manifest file.</param>
     /// <param name="detail">The description of the problem.</param>
     private static void ReportInvalidManifest(CompilationAnalysisContext context, string path, string detail) =>
