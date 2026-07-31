@@ -18,7 +18,9 @@ instructions: |
   TestFrameworkProbeRegistry, with everything after detection framework-neutral. The registered order is
   TUnit, xUnit v2, xUnit v3, NUnit, MSTest. Detection is fail-closed — a probe that returns null from
   TryCreateRecognizer shuts its analysis down completely instead of guessing, so a compilation is never
-  judged by a framework it does not use.
+  judged by a framework it does not use. A recogniser hooks the framework's test-marker BASE TYPE,
+  resolved as a symbol and matched along the attribute's base chain; a simple type name is never the
+  hook, only ever an assembly-guarded fallback for a metadata name that cannot be resolved.
 ---
 
 # Decision: Pluggable test framework support with fail-closed detection
@@ -45,7 +47,7 @@ Each framework marks its tests differently, and the differences are not superfic
 
 | Framework version | Declaring assembly | What marks a test method | Shape of the rule |
 | --- | --- | --- | --- |
-| TUnit | `TUnit.Core` | `TUnit.Core.TestAttribute` | The attribute is sealed, so specialised attributes derive from a *different* framework type named `TestAttribute` |
+| TUnit | `TUnit.Core` | `TUnit.Core.TestAttribute` and `TUnit.Core.DynamicTestBuilderAttribute` | Two markers, sharing the base type `BaseTestAttribute`; `TestAttribute` itself is sealed, so the base type is the only thing the markers have in common — their names have nothing in common |
 | xUnit v2 | `xunit.core` | `Xunit.FactAttribute` | A base/derived chain — `TheoryAttribute` and custom test attributes derive from `FactAttribute` |
 | xUnit v3 | `xunit.v3.core` | `Xunit.FactAttribute` | The same chain, under the same metadata name, from a different assembly |
 | NUnit | `nunit.framework` | `TestAttribute`, `TestCaseAttribute`, `TestCaseSourceAttribute` | Three *siblings*, not a base type and its derivations |
@@ -119,9 +121,10 @@ an assembly declares a metadata name at most once. It answers with the v2 type o
 "one of the two", and it keeps answering when the other version is referenced as well. The simple-name
 fallback that the combined probe needed is therefore gone from both xUnit recognisers: they match strictly
 by symbol, walking the base chain against the type their probe resolved. The remaining recognisers keep
-their name-plus-assembly rule, which they need for reasons of their own — TUnit because its attribute is
-sealed and specialisations derive from a sibling type, MSTest because its own two assemblies can make the
-metadata name ambiguous within one compilation.
+their name-plus-assembly rule, but only as a fallback for a metadata name that a compilation can fail to
+resolve — MSTest because its own two assemblies can make the name ambiguous within one compilation, TUnit
+and NUnit because a probe may have been woken by the assembly reference alone. That fallback is never the
+primary rule; see the next section.
 
 ### Every probe still accepts either signal
 
@@ -153,6 +156,54 @@ produce a false negative.
 
 `TestClassAttribute` and `TestFixtureAttribute` are deliberately not part of any rule: they mark the
 declaring type, not the method, so only an attribute on the method itself makes a method a test.
+
+### The marker's base type is the hook, not its name
+
+A recogniser identifies a test marker by the **base type the framework itself dispatches on**, resolved as
+a symbol and matched anywhere in the attribute's base chain with `SymbolEqualityComparer`. A simple type
+name is not a hook. This is a correction of a real defect, and it is recorded here because the defect was
+invisible in exactly the way this seam is supposed to prevent.
+
+**What went wrong.** The TUnit recogniser accepted an attribute when it was exactly
+`TUnit.Core.TestAttribute`, or when some type in its base chain had the *simple name* `TestAttribute` and
+came from a TUnit assembly. TUnit's marker hierarchy is `TestAttribute` → `BaseTestAttribute` →
+`TUnitAttribute`, and `DynamicTestBuilderAttribute` derives from `BaseTestAttribute` as well: a **second
+test marker**, whose name shares nothing with the first. Neither of the two rules caught it. Methods marked
+with it were not recognised as tests, the production members they exercise never reached the manifest, and
+the production analyzer consequently reported FSH0001 gaps on code that was in fact tested. The
+recogniser's own XML documentation asserted that the name rule caught the framework's derived test
+attributes, which was never true — a name rule catches attributes that happen to be named alike, which is
+not the same set.
+
+The fail-closed contract does not defend against this. It protects against judging a compilation by a
+framework it does not use; it cannot protect against a framework whose tests are only *partly* seen. A
+recogniser that misses one marker leaves the analysis awake and confidently wrong, and every FSH0001 it
+then emits is a false positive that a developer has no way to distinguish from a real gap. A missed marker
+is therefore the single most expensive mistake a plug-in can make, and the base-type hook is what removes
+the class of mistake rather than one instance of it: whatever the framework names its next specialised or
+dynamic marker, it will derive from the same base type, and the recogniser already matches it.
+
+**The same audit was applied to the other four**, by reflecting over each framework's shipped assembly and
+enumerating what actually derives from its marker:
+
+| Framework version | Marker hook after the audit | Result |
+| --- | --- | --- |
+| TUnit | the marker base type `BaseTestAttribute`, plus `TestAttribute` itself | `DynamicTestBuilderAttribute` is now recognised; this is the fix |
+| xUnit v2 | `Xunit.FactAttribute` of `xunit.core`, matched along the base chain | already correct — `TheoryAttribute` and custom test attributes derive from it, and there is no second marker outside that chain |
+| xUnit v3 | `Xunit.FactAttribute` of `xunit.v3.core`, matched along the base chain | already correct, for the same reason |
+| NUnit | the three sibling markers `TestAttribute`, `TestCaseAttribute`, `TestCaseSourceAttribute`, each matched along the base chain | already correct — the framework has no common marker base type, so the exact set of siblings *is* the hook, and specialisations derive from one of them |
+| MSTest | `TestMethodAttribute`, matched along the base chain | already correct — it is unsealed, and `DataTestMethodAttribute` as well as user-defined markers derive from it |
+
+**A data-source attribute is not a marker.** TUnit's `ArgumentsAttribute`, `MethodDataSourceAttribute`,
+`MatrixDataSourceAttribute` and `ClassDataSourceAttribute` implement `IDataSourceAttribute` and derive from
+`Attribute`; they are outside the marker hierarchy on purpose, and `[Test]` remains required next to them.
+No recogniser may accept a data source as a marker — doing so would make a method with a data source but
+no marker a test that the framework itself never runs. This mirrors the existing rule that
+`TestClassAttribute` and `TestFixtureAttribute` are not part of any recogniser: they mark the declaring
+type. Frameworks that fold the data-driven case into the marker hierarchy instead — xUnit's
+`TheoryAttribute`, MSTest's `DataTestMethodAttribute` — are covered by the base-chain walk automatically,
+and NUnit's `TestCaseAttribute` and `TestCaseSourceAttribute` are markers in their own right, which is why
+they are in its hook set.
 
 ### The registry has a fixed, documented order
 
@@ -211,6 +262,27 @@ framework costs exactly the same as a framework nobody has heard of.
    that version, walking the base chain. Add the name-plus-assembly fallback only if the version's type
    genuinely cannot be resolved exactly. The recogniser has to tolerate a `null` attribute type, because the
    probe may have woken it on the assembly reference alone.
+
+   **Before writing the rule, enumerate the framework's markers instead of assuming there is one.** Reflect
+   over the shipped assembly and answer three questions, and write the answers into the type's XML
+   documentation so the next reader does not have to repeat the work:
+
+   - **What is the base type the framework dispatches on?** Hook that, matched by symbol along the base
+     chain. Never hook a simple name — a name rule catches types that happen to be named alike, which is a
+     different set from the types that actually are markers, in both directions. TUnit's
+     `DynamicTestBuilderAttribute` is the case that proves it: a second marker sharing the base type and
+     nothing of the name, missed by a name rule, which turned tested code into false FSH0001.
+   - **Is there more than one marker?** Look for dynamic, source-generated or "builder"-style markers next
+     to the obvious one, and for sibling markers with no shared base type at all, as in NUnit — there the
+     complete set of siblings is the hook and an incomplete set is the same defect.
+   - **Which attributes are data sources rather than markers?** A data-source attribute must not be
+     accepted: if the framework requires its marker alongside the data source, so does the recogniser.
+
+   A missed marker is worse than a missed framework. A framework that is not detected produces no
+   diagnostics, which a developer notices; a marker that is not recognised leaves the analysis awake and
+   reporting gaps on code that is tested, and nothing in the fail-closed design catches that. Cover each
+   marker with its own test, including one asserting that a data-source attribute alone is *not* a test
+   method.
 3. `src/NetEvolve.FrameShift/Analyzers/<FrameworkVersion>TestSurfaceAnalyzer.cs` — a `DiagnosticAnalyzer`
    declaring FSH0003 and FSH0004 and delegating to `TestSurfaceAnalysis.Execute`.
 4. One entry in the registration region of `TestFrameworkProbeRegistry`. Append it at the end unless the
@@ -278,6 +350,12 @@ symbol rather than dropped.
   discovered means no diagnostic, including none about the manifest — but the discovery walk is paid for.
   The repository's own test projects are exactly this case: they reference every supported framework as
   compile-time metadata and run on TUnit.
+- **The complete marker set of a framework is a research obligation, and getting it wrong is not
+  fail-closed.** Hooking the marker base type removes the need to track individual marker names, but
+  somebody still has to establish what that base type is, whether the framework has sibling markers without
+  one, and which attributes are data sources. A marker missed here produces confident false FSH0001 rather
+  than silence, which is the one failure mode of this seam that a developer cannot recognise as a
+  FrameShift defect.
 - **A framework's attribute or assembly rename between major versions is a standing maintenance
   obligation.** MSTest 4 renaming its framework assembly already forced the probe to accept two identities,
   and a new xUnit major version means a new plug-in rather than a widened one. A rename that goes unnoticed
@@ -316,7 +394,11 @@ inside their own assembly are exact, need no fallback, and are conditionally com
 prefixes to maintain across renames. Rejected: a same-named attribute from an unrelated namespace would
 match. Names like `TestAttribute` are not owned by anyone, and
 `Microsoft.VisualStudio.TestTools.UnitTesting` can be declared by any project. A hand-written look-alike
-must never turn a project into a test project of a framework it does not use.
+must never turn a project into a test project of a framework it does not use. Adding the assembly guard
+fixes only one half of the problem: a guarded name rule stops accepting foreign types, but it still fails
+to accept the framework's own markers that are not named like the one that was hard-coded, which is
+precisely how TUnit's `DynamicTestBuilderAttribute` was missed. The marker base type is the hook; a name
+rule is at best a fallback for an unresolvable metadata name.
 
 **Requiring the user to configure the framework through an MSBuild property.** A property such as a
 framework name handed to the analyzer through `AnalyzerConfigOptions` would remove all detection code.
