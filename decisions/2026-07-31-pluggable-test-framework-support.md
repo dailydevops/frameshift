@@ -3,8 +3,8 @@ authors:
   - Martin Stühmer
 
 applyTo:
-  - "src/NetEvolve.Frameshift/TestSurface/**/*.cs"
-  - "src/NetEvolve.Frameshift/Analyzers/**/*.cs"
+  - "src/NetEvolve.FrameShift/TestSurface/**/*.cs"
+  - "src/NetEvolve.FrameShift/Analyzers/**/*.cs"
 
 created: 2026-07-31
 
@@ -22,7 +22,7 @@ instructions: |
 
 # Decision: Pluggable test framework support with fail-closed detection
 
-Frameshift supports more than one test framework through a single, narrow plug-in seam. Only the question
+FrameShift supports more than one test framework through a single, narrow plug-in seam. Only the question
 "what marks a method as a test method?" is framework-specific; everything after that answer — discovery,
 the reachability walk inside the test assembly, the collected test surface, the manifest and the
 diagnostics — is shared. A framework that is not detected does not fall back to a guess: the analysis for
@@ -30,7 +30,7 @@ that framework switches itself off entirely and reports nothing at all.
 
 ## Context
 
-TUnit was the first framework Frameshift targeted, but nothing about the test-side analysis is actually
+TUnit was the first framework FrameShift targeted, but nothing about the test-side analysis is actually
 tied to it. The analysis discovers test methods, walks the code reachable from them inside the test
 assembly, records the production members those paths reference, and compares that surface against the
 test-surface manifest on disk. Only the very first step depends on the framework in use.
@@ -57,7 +57,7 @@ Two further realities shaped the design:
   are plausible names for something entirely unrelated.
 
 The consequence of a wrong answer is asymmetric. A false positive — treating a project as an xUnit project
-because a same-named attribute happens to be present — makes Frameshift judge a compilation whose real
+because a same-named attribute happens to be present — makes FrameShift judge a compilation whose real
 tests it cannot see, and every FSH0001 it then reports is wrong. Detection therefore has to be able to say
 "not mine" and be believed.
 
@@ -140,16 +140,16 @@ test methods was found. There is still exactly one test-surface manifest, so:
 
 Three small files and one line:
 
-1. `src/NetEvolve.Frameshift/TestSurface/<Framework>TestFrameworkProbe.cs` — the framework name, the
+1. `src/NetEvolve.FrameShift/TestSurface/<Framework>TestFrameworkProbe.cs` — the framework name, the
    attribute metadata name(s), the accepted assembly-name prefix(es), and a `TryCreateRecognizer` that
    returns `null` when neither the attribute type resolves nor a framework assembly is referenced. Choose
    the strictness deliberately: TUnit, xUnit and NUnit accept either signal, because a resolvable
    framework attribute in an unowned namespace is evidence enough; `MSTestTestFrameworkProbe` requires
    both, because `Microsoft.VisualStudio.TestTools.UnitTesting` is an ordinary namespace that any project
    may declare a look-alike attribute in.
-2. `src/NetEvolve.Frameshift/TestSurface/<Framework>TestMethodRecognizer.cs` — the attribute rule for that
+2. `src/NetEvolve.FrameShift/TestSurface/<Framework>TestMethodRecognizer.cs` — the attribute rule for that
    framework, walking the base chain and applying the name-plus-assembly fallback.
-3. `src/NetEvolve.Frameshift/Analyzers/<Framework>TestSurfaceAnalyzer.cs` — a `DiagnosticAnalyzer`
+3. `src/NetEvolve.FrameShift/Analyzers/<Framework>TestSurfaceAnalyzer.cs` — a `DiagnosticAnalyzer`
    declaring FSH0003 and FSH0004 and delegating to `TestSurfaceAnalysis.Execute`.
 4. One entry in the registration region of `TestFrameworkProbeRegistry`, appended at the end so the
    existing order — and therefore the existing FSH0003 leadership in mixed projects — does not change.
@@ -166,7 +166,7 @@ involved.
 - The framework-neutral analysis is exercised identically by every framework, so a fix in discovery,
   collection or manifest handling benefits all of them at once.
 - The fail-closed contract makes a false positive structurally hard: the failure mode of a detection bug is
-  "Frameshift reports nothing", which a developer notices as missing output rather than acting on wrong
+  "FrameShift reports nothing", which a developer notices as missing output rather than acting on wrong
   warnings.
 - Per-framework analyzers give per-framework diagnostics for free. FSH0004 naming the framework's own test
   methods needs no extra plumbing.

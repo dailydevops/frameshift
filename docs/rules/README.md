@@ -1,6 +1,6 @@
-# Frameshift rules
+# FrameShift rules
 
-Every diagnostic Frameshift can report, with the file each `helpLinkUri` points to.
+Every diagnostic FrameShift can report, with the file each `helpLinkUri` points to.
 
 | ID                      | Severity          | Description                                                                                         |
 | ----------------------- | ----------------- | --------------------------------------------------------------------------------------------------- |
@@ -10,10 +10,10 @@ Every diagnostic Frameshift can report, with the file each `helpLinkUri` points 
 | [FSH0004](FSH0004.md)   | Info              | Test method does not reference any production member and cannot contribute to the tested surface.   |
 | [FSH0005](FSH0005.md)   | Warning (MSBuild) | No test-surface manifest reached the compiler, so the project has not been set up for the analysis. |
 
-`FSH0001` to `FSH0004` are analyzer diagnostics in the category `Frameshift`, all enabled by default,
+`FSH0001` to `FSH0004` are analyzer diagnostics in the category `FrameShift`, all enabled by default,
 configurable through `.editorconfig`, `[SuppressMessage]` and `#pragma warning`. `FSH0005` is an
 MSBuild warning from the build assets of the package and is silenced with the
-`FrameshiftSuppressSetupWarning` property instead.
+`FrameShiftSuppressSetupWarning` property instead.
 
 ---
 
