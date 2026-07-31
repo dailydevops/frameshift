@@ -312,6 +312,18 @@ dotnet_diagnostic.FSH0006.severity = warning
   informational. And it stays silent whenever a contributing count is only a lower bound - a data
   source whose length would require executing the data method, which an analyzer must not do - so a
   data-driven test that really does supply one row is not reported.
+- No operator mutates `null` on a reference type, in either direction. Introducing `null` at an
+  argument or assignment is only a meaningful probe when the dereference it reaches is unguarded, and
+  proving that requires flow-sensitive reasoning - whether a guard clause dominates every path to the
+  mutated use - that nothing in FrameShift performs today; without it, a guarded call site would
+  report a mutant any test trivially kills as if it were a real gap. Under `#nullable enable`, a
+  `null` literal placed on a non-nullable parameter is only a compiler warning, not an error, so
+  verifying the mutant by in-memory recompilation would not discard it either. Replacing an existing
+  `null` with a non-null value has no type-agnostic answer at all: unlike the closed domain the
+  nullable boolean literal operator uses for `bool?`, there is no canonical non-null instance of an
+  arbitrary reference type the way `0`, `false` and `""` are canonical replacement values for the
+  other literal operators. The family is deliberately not implemented rather than shipped
+  half-proven.
 - C# only, and reachability never leaves the analysed compilation: overrides in other assemblies are
   outside what a single compilation can observe.
 
