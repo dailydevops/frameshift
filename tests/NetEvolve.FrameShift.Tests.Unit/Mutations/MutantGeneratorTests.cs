@@ -256,6 +256,8 @@ public class MutantGeneratorTests
     [
         "conditional-expression.swap-branches",
         "conditional-expression.negate-condition",
+        "conditional-expression.force-true",
+        "conditional-expression.force-false",
         "negation.negate-condition",
     ];
 
