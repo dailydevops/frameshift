@@ -13,10 +13,10 @@ using TUnit.Core;
 public class MutationOperatorRegistryTests
 {
     /// <summary>
-    /// The number of operators the registry must expose: the fourteen expression operators plus the six
+    /// The number of operators the registry must expose: the fifteen expression operators plus the six
     /// operators of the culture sensitivity family.
     /// </summary>
-    private const int ExpectedOperatorCount = 20;
+    private const int ExpectedOperatorCount = 21;
 
     private static readonly string[] _expectedOperatorIds =
     [
@@ -36,6 +36,7 @@ public class MutationOperatorRegistryTests
         "logical",
         "negation",
         "null-coalescing",
+        "nullable-boolean",
         "numeric-literal",
         "relational",
         "string-literal",
@@ -118,7 +119,9 @@ public class MutationOperatorRegistryTests
         var booleanOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.TrueLiteralExpression);
         var conditionalOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.ConditionalExpression);
 
-        _ = await Assert.That(Join(Sort(booleanOperators.Select(item => item.Id)))).IsEqualTo("boolean-literal");
+        _ = await Assert
+            .That(Join(Sort(booleanOperators.Select(item => item.Id))))
+            .IsEqualTo("boolean-literal, nullable-boolean");
         _ = await Assert
             .That(Join(Sort(conditionalOperators.Select(item => item.Id))))
             .IsEqualTo("conditional-expression, negation");
