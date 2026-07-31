@@ -18,18 +18,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 internal static class TestSurfaceCollector
 {
     /// <summary>
-    /// Collects the test surface of <paramref name="compilation" />.
-    /// </summary>
-    /// <param name="compilation">The test compilation to inspect.</param>
-    /// <param name="cancellationToken">A token to observe while collecting.</param>
-    /// <returns>
-    /// The manifest describing all discovered test methods and the production members they reference.
-    /// </returns>
-    /// <exception cref="ArgumentNullException"><paramref name="compilation" /> is <see langword="null" />.</exception>
-    public static TestSurfaceManifest Collect(Compilation compilation, CancellationToken cancellationToken) =>
-        Collect(compilation, TUnitTestDiscovery.FindTestMethods(compilation, cancellationToken), cancellationToken);
-
-    /// <summary>
     /// Collects the test surface of <paramref name="compilation" /> for the test methods
     /// <paramref name="recognizer" /> recognises.
     /// </summary>
@@ -82,24 +70,6 @@ internal static class TestSurfaceCollector
 
         return new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
     }
-
-    /// <summary>
-    /// Finds the test methods of <paramref name="compilation" /> that do not reference a single
-    /// production member, so that a caller can report <c>FSH0004</c> for them.
-    /// </summary>
-    /// <param name="compilation">The test compilation to inspect.</param>
-    /// <param name="cancellationToken">A token to observe while collecting.</param>
-    /// <returns>The test methods without any production reference, in declaration order.</returns>
-    /// <exception cref="ArgumentNullException"><paramref name="compilation" /> is <see langword="null" />.</exception>
-    public static ImmutableArray<IMethodSymbol> FindTestsWithoutProductionReference(
-        Compilation compilation,
-        CancellationToken cancellationToken
-    ) =>
-        FindTestsWithoutProductionReference(
-            compilation,
-            TUnitTestDiscovery.FindTestMethods(compilation, cancellationToken),
-            cancellationToken
-        );
 
     /// <summary>
     /// Finds the test methods <paramref name="recognizer" /> recognises that do not reference a single

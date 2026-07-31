@@ -15,6 +15,15 @@ using Microsoft.CodeAnalysis;
 /// specialisations and user-defined ones, without hard-coding a list of attribute names.
 /// </para>
 /// <para>
+/// The name-based rule is the fallback for a compilation in which
+/// <c>Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute</c> cannot be resolved by its
+/// metadata name — because it is declared more than once and therefore ambiguous, or because the
+/// compilation only carries the MSTest assembly reference. Requiring the declaring assembly to belong to
+/// the framework keeps a look-alike <c>TestMethodAttribute</c> of the project itself from being mistaken
+/// for a test attribute, so a recogniser left with nothing but this rule fails closed: it finds no tests
+/// rather than the wrong ones.
+/// </para>
+/// <para>
 /// <c>TestClassAttribute</c> marks the declaring type, not the method, and does not derive from
 /// <c>TestMethodAttribute</c>. A method is consequently never recognised because of it — only an
 /// attribute on the method itself makes the method a test.
@@ -59,7 +68,7 @@ internal sealed class MSTestTestMethodRecognizer : ITestMethodRecognizer
                 return true;
             }
 
-            if (IsFrameworkTestAttribute(definition))
+            if (IsFrameworkTestAttributeName(definition))
             {
                 return true;
             }
@@ -68,7 +77,7 @@ internal sealed class MSTestTestMethodRecognizer : ITestMethodRecognizer
         return false;
     }
 
-    private static bool IsFrameworkTestAttribute(INamedTypeSymbol definition) =>
+    private static bool IsFrameworkTestAttributeName(INamedTypeSymbol definition) =>
         string.Equals(definition.Name, MSTestTestFrameworkProbe.TestAttributeTypeName, StringComparison.Ordinal)
         && MSTestTestFrameworkProbe.IsFrameworkAssembly(definition.ContainingAssembly);
 }
