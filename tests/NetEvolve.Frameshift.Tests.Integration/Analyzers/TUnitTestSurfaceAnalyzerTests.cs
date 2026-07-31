@@ -1,11 +1,13 @@
 namespace NetEvolve.Frameshift.Tests.Integration;
 
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using NetEvolve.Frameshift.Analyzers;
 using NetEvolve.Frameshift.Diagnostics;
 using NetEvolve.Frameshift.Tests.Infrastructure;
@@ -50,6 +52,11 @@ public class TUnitTestSurfaceAnalyzerTests
 
     private const string MalformedManifest = "not-a-test-surface-manifest\n";
     private const string UnrelatedAdditionalFilePath = "Notes.txt";
+
+    private const string MalformedHeaderDetail =
+        "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
+        + "but found 'not-a-test-surface-manifest'.";
+
     private const string GhostReferenceId = "M:Fixture.Ghost.Vanished";
     private const string ReferencePrefix = "R ";
 
@@ -157,6 +164,37 @@ public class TUnitTestSurfaceAnalyzerTests
         }
         """;
 
+    /// <summary>
+    /// A test compilation of a framework no probe in the registry knows: the attribute is declared by the
+    /// compilation itself, so not a single registered framework can be awake on it.
+    /// </summary>
+    private const string UnregisteredFrameworkSource = """
+        namespace Tests;
+
+        using System;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class CaseAttribute : Attribute
+        {
+        }
+
+        public class UnregisteredCases
+        {
+            [Case]
+            public void LocalOnly_TouchesNoProduction() => Verify(Compute());
+
+            private static int Compute() => 41;
+
+            private static void Verify(int value)
+            {
+            }
+        }
+        """;
+
+    private const string CaseAttributeMetadataName = "Tests.CaseAttribute";
+    private const string CaseAttributeName = "CaseAttribute";
+    private const string UnregisteredFrameworkName = "Fixture";
+
     [Test]
     public async Task Fixtures_BothAssemblies_CompileWithoutErrors()
     {
@@ -227,12 +265,7 @@ public class TUnitTestSurfaceAnalyzerTests
 
         _ = await Assert
             .That(DiagnosticAssertions.Describe(diagnostics))
-            .IsEqualTo(
-                DescribeManifestProblem(
-                    "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
-                        + "but found 'not-a-test-surface-manifest'."
-                )
-            );
+            .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
     }
 
     [Test]
@@ -466,12 +499,56 @@ public class TUnitTestSurfaceAnalyzerTests
 
         _ = await Assert
             .That(DiagnosticAssertions.Describe(diagnostics))
-            .IsEqualTo(
-                DescribeManifestProblem(
-                    "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
-                        + "but found 'not-a-test-surface-manifest'."
-                )
-            );
+            .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
+    }
+
+    /// <summary>
+    /// Pins the side of the leadership decision none of the registered frameworks can reach: a probe that
+    /// is not in <see cref="TestFrameworkProbeRegistry.All" /> at all leads the manifest comparison by
+    /// itself, because nothing else would ever look at the manifest on its behalf.
+    /// </summary>
+    /// <remarks>
+    /// The fixture references no test framework whatsoever, so no registered probe is awake and the list
+    /// of awake frameworks is empty. Skipping the manifest here — the behaviour of every framework that is
+    /// awake but does not lead — would leave a broken manifest completely unreported.
+    /// </remarks>
+    [Test]
+    public async Task Analyzer_ProbeIsNotRegistered_LeadsTheManifestComparisonItself()
+    {
+        var compilation = CompilationFactory.Create(UnregisteredFrameworkSource, TestAssemblyName);
+
+        var diagnostics = await AnalyzerRunner
+            .RunAsync(
+                new UnregisteredFrameworkAnalyzer(),
+                compilation,
+                DiagnosticIds.InvalidTestSurfaceManifest,
+                AdditionalFiles(MalformedManifest)
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(diagnostics))
+            .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
+    }
+
+    /// <summary>
+    /// The counterpart of the manifest expectation above: the shared analysis reports the tests of the
+    /// unregistered framework too, so the framework really is fully awake and not merely leading.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_ProbeIsNotRegistered_StillReportsItsTestsWithoutProductionReference()
+    {
+        var compilation = CompilationFactory.Create(UnregisteredFrameworkSource, TestAssemblyName);
+
+        var diagnostics = await AnalyzerRunner
+            .RunAsync(new UnregisteredFrameworkAnalyzer(), compilation, DiagnosticIds.TestWithoutProductionReference)
+            .ConfigureAwait(false);
+
+        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+        _ = await Assert.That(GetMessage(diagnostics[0]).Contains("LocalOnly", StringComparison.Ordinal)).IsTrue();
     }
 
     private static Task<ImmutableArray<Diagnostic>> RunWithFilesAsync(
@@ -574,4 +651,60 @@ public class TUnitTestSurfaceAnalyzerTests
         + InMemoryAdditionalText.DefaultPath
         + "' could not be read: "
         + detail;
+
+    /// <summary>
+    /// An analyzer for a test framework that is deliberately absent from
+    /// <see cref="TestFrameworkProbeRegistry.All" />, so that the shared analysis can be driven with a
+    /// probe nothing else knows about.
+    /// </summary>
+    [SuppressMessage(
+        "MicrosoftCodeAnalysisCorrectness",
+        "RS1001:Missing diagnostic analyzer attribute",
+        Justification = "A test-only analyzer that is never shipped; the attribute would declare this test assembly a compiler extension."
+    )]
+    private sealed class UnregisteredFrameworkAnalyzer : DiagnosticAnalyzer
+    {
+        private static readonly ImmutableArray<DiagnosticDescriptor> _supportedDiagnostics =
+        [
+            Descriptors.InvalidTestSurfaceManifest,
+            Descriptors.TestWithoutProductionReference,
+        ];
+
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
+
+        public override void Initialize(AnalysisContext context)
+        {
+            context.EnableConcurrentExecution();
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationAction(compilationContext =>
+                TestSurfaceAnalysis.Execute(compilationContext, new UnregisteredFrameworkProbe())
+            );
+        }
+    }
+
+    /// <summary>
+    /// Recognises the framework by the attribute type the fixture declares itself.
+    /// </summary>
+    private sealed class UnregisteredFrameworkProbe : ITestFrameworkProbe
+    {
+        public string FrameworkName => UnregisteredFrameworkName;
+
+        public ITestMethodRecognizer? TryCreateRecognizer(Compilation compilation) =>
+            compilation.GetTypeByMetadataName(CaseAttributeMetadataName) is null ? null : new CaseAttributeRecognizer();
+    }
+
+    /// <summary>
+    /// Treats every method carrying the fixture's own attribute as a test method.
+    /// </summary>
+    private sealed class CaseAttributeRecognizer : ITestMethodRecognizer
+    {
+        public string FrameworkName => UnregisteredFrameworkName;
+
+        public bool IsTestMethod(IMethodSymbol method) =>
+            method.GetAttributes().Any(attribute => IsCaseAttribute(attribute.AttributeClass));
+
+        private static bool IsCaseAttribute(INamedTypeSymbol? attributeClass) =>
+            attributeClass is not null
+            && string.Equals(attributeClass.Name, CaseAttributeName, StringComparison.Ordinal);
+    }
 }

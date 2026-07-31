@@ -29,19 +29,16 @@ internal sealed class UnaryOperatorMutator : MutationOperatorBase
         : base("unary", MutationKind.UnaryOperator, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No type test is needed: <see cref="MutationOperatorBase.CreateMutations" /> only forwards nodes
+    /// whose kind is one of the <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, and both the
+    /// unary minus and the unary plus are a <see cref="PrefixUnaryExpressionSyntax" />.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
-    )
-    {
-        if (node is not PrefixUnaryExpressionSyntax unary)
-        {
-            return [];
-        }
-
-        return CreateMutationsForUnary(unary, semanticModel, cancellationToken);
-    }
+    ) => CreateMutationsForUnary((PrefixUnaryExpressionSyntax)node, semanticModel, cancellationToken);
 
     private IEnumerable<Mutation> CreateMutationsForUnary(
         PrefixUnaryExpressionSyntax unary,

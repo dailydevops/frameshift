@@ -39,16 +39,18 @@ internal sealed class BitwiseOperatorMutator : MutationOperatorBase
         : base("bitwise", MutationKind.BitwiseOperator, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No type test is needed: <see cref="MutationOperatorBase.CreateMutations" /> only forwards nodes
+    /// whose kind is one of the <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, and every kind
+    /// this operator supports is a <see cref="BinaryExpressionSyntax" />.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
     )
     {
-        if (node is not BinaryExpressionSyntax binary)
-        {
-            return [];
-        }
+        var binary = (BinaryExpressionSyntax)node;
 
         var leftType = semanticModel.GetTypeInfo(binary.Left, cancellationToken).ConvertedType;
         var rightType = semanticModel.GetTypeInfo(binary.Right, cancellationToken).ConvertedType;
@@ -121,24 +123,40 @@ internal sealed class BitwiseOperatorMutator : MutationOperatorBase
             .WithTriviaFrom(binary);
     }
 
+    /// <summary>
+    /// Maps a bitwise expression kind to the name its mutation identifier is built from.
+    /// </summary>
+    /// <param name="expressionKind">One of the <see cref="_bitwiseExpressionKinds" />, which are the only
+    /// kinds both callers pass.</param>
+    /// <returns>The name of the operator, so the last arm is the exclusive or.</returns>
     private static string GetName(SyntaxKind expressionKind) =>
         expressionKind switch
         {
             SyntaxKind.BitwiseAndExpression => "and",
             SyntaxKind.BitwiseOrExpression => "or",
-            SyntaxKind.ExclusiveOrExpression => "xor",
-            _ => throw NotBitwise(expressionKind),
+            _ => "xor",
         };
 
+    /// <summary>
+    /// Maps a bitwise expression kind to the symbol its display name is built from.
+    /// </summary>
+    /// <param name="expressionKind">One of the <see cref="_bitwiseExpressionKinds" />, which are the only
+    /// kinds both callers pass.</param>
+    /// <returns>The symbol of the operator, so the last arm is the exclusive or.</returns>
     private static string GetSymbol(SyntaxKind expressionKind) =>
         expressionKind switch
         {
             SyntaxKind.BitwiseAndExpression => "&",
             SyntaxKind.BitwiseOrExpression => "|",
-            SyntaxKind.ExclusiveOrExpression => "^",
-            _ => throw NotBitwise(expressionKind),
+            _ => "^",
         };
 
+    /// <summary>
+    /// Maps an expression kind to the token the rewritten expression is written with.
+    /// </summary>
+    /// <param name="expressionKind">One of the <see cref="_bitwiseExpressionKinds" /> or one of the two
+    /// shift kinds, which are the only kinds both callers pass.</param>
+    /// <returns>The operator token, so the last arm is the right shift.</returns>
     private static SyntaxKind GetOperatorToken(SyntaxKind expressionKind) =>
         expressionKind switch
         {
@@ -146,16 +164,8 @@ internal sealed class BitwiseOperatorMutator : MutationOperatorBase
             SyntaxKind.BitwiseOrExpression => SyntaxKind.BarToken,
             SyntaxKind.ExclusiveOrExpression => SyntaxKind.CaretToken,
             SyntaxKind.LeftShiftExpression => SyntaxKind.LessThanLessThanToken,
-            SyntaxKind.RightShiftExpression => SyntaxKind.GreaterThanGreaterThanToken,
-            _ => throw NotBitwise(expressionKind),
+            _ => SyntaxKind.GreaterThanGreaterThanToken,
         };
-
-    private static ArgumentOutOfRangeException NotBitwise(SyntaxKind expressionKind) =>
-        new ArgumentOutOfRangeException(
-            nameof(expressionKind),
-            expressionKind,
-            "The syntax kind is not a bitwise or shift expression."
-        );
 
     private static bool IsIntegral(ITypeSymbol? type, bool allowEnum)
     {

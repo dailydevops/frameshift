@@ -414,6 +414,37 @@ public class EquivalenceClassifierFoldingTests
         await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Pins the <see cref="float" /> side of the not-a-number test inside the equality fold, which the
+    /// <see cref="double" /> cases above never reach: both operands are single precision values that are
+    /// numbers, so the fold proves the mutant computes the same constant.
+    /// </summary>
+    [Test]
+    public async Task Classify_EqualityFoldOverSingleOperandsThatAreNumbers_IsTrivialConstantFolding()
+    {
+        // 1.5f <= 1.5f and 1.5f == 1.5f are both true, and single precision operands have to be folded
+        // exactly like double ones, otherwise this mutant is reported as a gap that no test can close.
+        var verdict = await ClassifyAsync("1.5f", "1.5f", "<=", "==").ConfigureAwait(false);
+
+        await AssertTrivialFoldAsync(verdict).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The other side of the same test: a single precision not-a-number operand makes the fold report
+    /// the operands as different, which is what <see cref="object.Equals(object)" /> alone would get
+    /// wrong.
+    /// </summary>
+    [Test]
+    public async Task Classify_EqualityFoldOverSingleOperandsThatAreNotANumber_IsNotTrivial()
+    {
+        // float.NaN != float.NaN is true while its mutant float.NaN == float.NaN is false, so the
+        // mutant is observable. Folding through Equals would report both as NaN.Equals(NaN), call the
+        // mutant equivalent and swallow the gap.
+        var verdict = await ClassifyAsync("float.NaN", "float.NaN", "!=", "==").ConfigureAwait(false);
+
+        await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
+    }
+
     [Test]
     public async Task Classify_EqualityOperandIsANullConstant_IsNotTrivialBecauseFoldingIsImpossible()
     {

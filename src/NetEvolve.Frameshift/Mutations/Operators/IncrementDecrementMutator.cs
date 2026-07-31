@@ -48,12 +48,11 @@ internal sealed class IncrementDecrementMutator : MutationOperatorBase
             return [];
         }
 
-        return node switch
-        {
-            PrefixUnaryExpressionSyntax prefix => CreatePrefixMutations(prefix, isIncrement),
-            PostfixUnaryExpressionSyntax postfix => CreatePostfixMutations(postfix, isIncrement),
-            _ => [],
-        };
+        // The base class only forwards nodes of the supported kinds: both pre-forms are a prefix unary
+        // expression and both post-forms are a postfix unary expression, so no other shape arrives here.
+        return node is PrefixUnaryExpressionSyntax prefix
+            ? CreatePrefixMutations(prefix, isIncrement)
+            : CreatePostfixMutations((PostfixUnaryExpressionSyntax)node, isIncrement);
     }
 
     /// <summary>

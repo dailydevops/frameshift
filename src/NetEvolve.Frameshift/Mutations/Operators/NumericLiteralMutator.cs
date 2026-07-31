@@ -29,7 +29,12 @@ internal sealed class NumericLiteralMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is not LiteralExpressionSyntax literal || IsConstantRequired(literal))
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and SyntaxKind.NumericLiteralExpression is always a literal expression, so the cast cannot fail
+        // and no type test is needed here.
+        var literal = (LiteralExpressionSyntax)node;
+
+        if (IsConstantRequired(literal))
         {
             return [];
         }
@@ -192,12 +197,24 @@ internal sealed class NumericLiteralMutator : MutationOperatorBase
         return SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, token);
     }
 
+    /// <summary>
+    /// Creates the <c>1</c> literal that replaces a floating point zero, written the way the type of
+    /// <paramref name="originalValue" /> requires it.
+    /// </summary>
+    /// <param name="originalValue">The constant value of the original literal.</param>
+    /// <param name="suffix">The literal suffix of the original literal, possibly empty.</param>
+    /// <returns>The replacement literal.</returns>
+    /// <remarks>
+    /// Only a <see cref="double" /> literal can be written without a suffix, because a real literal
+    /// without one is a <see cref="double" />. A <see cref="float" /> or a <see cref="decimal" /> value
+    /// therefore always brings its own suffix along.
+    /// </remarks>
     private static LiteralExpressionSyntax CreateFloatingOneLiteral(object originalValue, string suffix)
     {
         var token = originalValue switch
         {
-            float => SyntaxFactory.Literal(suffix.Length == 0 ? "1f" : "1" + suffix, 1F),
-            decimal => SyntaxFactory.Literal(suffix.Length == 0 ? "1m" : "1" + suffix, 1M),
+            float => SyntaxFactory.Literal("1" + suffix, 1F),
+            decimal => SyntaxFactory.Literal("1" + suffix, 1M),
             _ => SyntaxFactory.Literal(suffix.Length == 0 ? "1.0" : "1" + suffix, 1D),
         };
 

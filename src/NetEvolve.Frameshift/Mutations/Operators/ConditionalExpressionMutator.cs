@@ -25,10 +25,10 @@ internal sealed class ConditionalExpressionMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is not ConditionalExpressionSyntax conditional)
-        {
-            yield break;
-        }
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and SyntaxKind.ConditionalExpression is always a conditional expression, so the cast cannot fail
+        // and no type test is needed here.
+        var conditional = (ConditionalExpressionSyntax)node;
 
         if (SyntaxFactory.AreEquivalent(conditional.WhenTrue, conditional.WhenFalse))
         {
@@ -81,6 +81,10 @@ internal sealed class ConditionalExpressionMutator : MutationOperatorBase
     /// </summary>
     /// <param name="condition">The condition to inspect.</param>
     /// <returns><see langword="true" /> if parentheses are required.</returns>
+    /// <remarks>
+    /// A logical negation never reaches this method, because <see cref="Negate" /> unwraps it instead of
+    /// prefixing a second negation.
+    /// </remarks>
     private static bool RequiresParentheses(ExpressionSyntax condition) =>
         condition.Kind() switch
         {
@@ -94,7 +98,6 @@ internal sealed class ConditionalExpressionMutator : MutationOperatorBase
             SyntaxKind.ParenthesizedExpression => false,
             SyntaxKind.TrueLiteralExpression => false,
             SyntaxKind.FalseLiteralExpression => false,
-            SyntaxKind.LogicalNotExpression => false,
             SyntaxKind.ThisExpression => false,
             SyntaxKind.BaseExpression => false,
             SyntaxKind.SuppressNullableWarningExpression => false,

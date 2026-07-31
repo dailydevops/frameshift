@@ -10,9 +10,17 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// by each of the remaining four compound arithmetic assignments.
 /// </summary>
 /// <remarks>
+/// <para>
 /// String appends written with <c>+=</c> as well as event and delegate subscriptions are left
-/// untouched. An assignment bound to a user defined operator is only mutated into operators the
-/// declaring type actually provides, so that the mutant still binds.
+/// untouched. They are already excluded by the operand check: a string append has a
+/// <see cref="string" /> on the left, and the type of an event or of a delegate variable is a delegate
+/// type, which <c>IsArithmeticOperand</c> rejects. The C# language requires the type of an event to be
+/// a delegate type, so an event subscription can never look arithmetic.
+/// </para>
+/// <para>
+/// An assignment bound to a user defined operator is only mutated into operators the declaring type
+/// actually provides, so that the mutant still binds.
+/// </para>
 /// </remarks>
 internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
 {
@@ -32,19 +40,16 @@ internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
         : base("arithmetic-assignment", MutationKind.ArithmeticAssignment, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No type check is needed: the base class only forwards a node whose kind is one of
+    /// <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, and every kind this operator supports is
+    /// an assignment expression, so the cast cannot fail.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
-    )
-    {
-        if (node is not AssignmentExpressionSyntax assignment)
-        {
-            return [];
-        }
-
-        return CreateMutationsForAssignment(assignment, semanticModel, cancellationToken);
-    }
+    ) => CreateMutationsForAssignment((AssignmentExpressionSyntax)node, semanticModel, cancellationToken);
 
     private IEnumerable<Mutation> CreateMutationsForAssignment(
         AssignmentExpressionSyntax assignment,
@@ -59,18 +64,7 @@ internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
             yield break;
         }
 
-        var boundSymbol = semanticModel.GetSymbolInfo(assignment, cancellationToken).Symbol;
-        if (boundSymbol is IEventSymbol)
-        {
-            yield break;
-        }
-
-        var boundOperator = boundSymbol as IMethodSymbol;
-        if (IsStringConcatenation(boundOperator) || IsEventAccessor(boundOperator))
-        {
-            yield break;
-        }
-
+        var boundOperator = semanticModel.GetSymbolInfo(assignment, cancellationToken).Symbol as IMethodSymbol;
         var userDefined = boundOperator?.MethodKind == MethodKind.UserDefinedOperator ? boundOperator : null;
         var originalKind = assignment.Kind();
 
@@ -157,24 +151,13 @@ internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
             "The syntax kind is not a compound arithmetic assignment."
         );
 
-    private static bool IsStringConcatenation(IMethodSymbol? boundOperator)
-    {
-        if (boundOperator is null)
-        {
-            return false;
-        }
-
-        if (boundOperator.ContainingType?.SpecialType == SpecialType.System_String)
-        {
-            return true;
-        }
-
-        return string.Equals(boundOperator.Name, "Concat", StringComparison.Ordinal);
-    }
-
-    private static bool IsEventAccessor(IMethodSymbol? boundOperator) =>
-        boundOperator?.MethodKind is MethodKind.EventAdd or MethodKind.EventRemove;
-
+    /// <summary>
+    /// Decides whether a side of the assignment can take part in an arithmetic mutation. A
+    /// <see cref="string" /> or an <see cref="object" /> side means a string append, a delegate side means
+    /// an event subscription or a delegate combination, and neither belongs to this operator family.
+    /// </summary>
+    /// <param name="type">The converted type of the side, or <see langword="null" /> if unknown.</param>
+    /// <returns><see langword="true" /> if the side is arithmetic.</returns>
     private static bool IsArithmeticOperand(ITypeSymbol? type)
     {
         if (type is null || type.TypeKind is TypeKind.Error or TypeKind.Delegate or TypeKind.Pointer)

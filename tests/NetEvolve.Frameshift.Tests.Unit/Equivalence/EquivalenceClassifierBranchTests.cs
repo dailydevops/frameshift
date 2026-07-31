@@ -156,6 +156,43 @@ public class EquivalenceClassifierBranchTests
         await AssertTrivialAsync(verdict, ConstantFoldingReason).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Pins the <see cref="float" /> arm of the constant comparison: a replacement literal spelled
+    /// differently but carrying the very same single precision value is trivial.
+    /// </summary>
+    [Test]
+    public async Task Classify_ReplacementLiteralIsTheSameSingleValueSpelledDifferently_IsTrivialConstantFolding()
+    {
+        var (_, model, tree) = CompilationFactory.CreateWithModel(WrapExpression("1.5f"));
+        var original = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        var replacement = SyntaxFactory.ParseExpression("1.50f");
+
+        var verdict = Classify(original, replacement, model);
+
+        await AssertTrivialAsync(verdict, ConstantFoldingReason).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The other side of that arm: the two single precision zeros are compared by their bit pattern, not
+    /// by <see cref="object.Equals(object)" />, which reports them as equal.
+    /// </summary>
+    [Test]
+    public async Task Classify_ReplacementLiteralFlipsTheSignOfSingleZero_IsNotTrivial()
+    {
+        // 1.0f / +0.0f is positive infinity while 1.0f / -0.0f is negative infinity, so a test can tell
+        // this mutant from the original and it must never be folded away.
+        var (_, model, tree) = CompilationFactory.CreateWithModel(WrapExpression("0.0f"));
+        var original = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        var replacement = SyntaxFactory.LiteralExpression(
+            SyntaxKind.NumericLiteralExpression,
+            SyntaxFactory.Literal("-0.0f", -0.0f)
+        );
+
+        var verdict = Classify(original, replacement, model);
+
+        await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
+    }
+
     [Test]
     public async Task Classify_ReplacementLiteralCarriesNoValue_IsNotTrivial()
     {

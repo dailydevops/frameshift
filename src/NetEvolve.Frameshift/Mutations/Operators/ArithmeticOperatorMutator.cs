@@ -10,9 +10,19 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// of the remaining four arithmetic operators, which also covers the <c>+</c> and <c>-</c> pairing.
 /// </summary>
 /// <remarks>
+/// <para>
 /// String concatenations written with <c>+</c> are left untouched, they belong to the string
-/// operators. An expression bound to a user defined operator is only mutated into operators the
-/// declaring type actually provides, so that the mutant still binds.
+/// operators. They are already excluded by the operand check: every overload of the string
+/// concatenation takes a <see cref="string" /> or an <see cref="object" /> on at least one side, so
+/// the converted type of at least one operand is one of those two and
+/// <c>IsArithmeticOperand</c> rejects it. That also holds for operands that only reach the
+/// concatenation through an implicit conversion to <see cref="string" />, because the converted type
+/// is the one after that conversion.
+/// </para>
+/// <para>
+/// An expression bound to a user defined operator is only mutated into operators the declaring type
+/// actually provides, so that the mutant still binds.
+/// </para>
 /// </remarks>
 internal sealed class ArithmeticOperatorMutator : MutationOperatorBase
 {
@@ -32,19 +42,16 @@ internal sealed class ArithmeticOperatorMutator : MutationOperatorBase
         : base("arithmetic", MutationKind.ArithmeticOperator, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No type check is needed: the base class only forwards a node whose kind is one of
+    /// <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, and every kind this operator supports is
+    /// a binary expression, so the cast cannot fail.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
-    )
-    {
-        if (node is not BinaryExpressionSyntax binary)
-        {
-            return [];
-        }
-
-        return CreateMutationsForBinary(binary, semanticModel, cancellationToken);
-    }
+    ) => CreateMutationsForBinary((BinaryExpressionSyntax)node, semanticModel, cancellationToken);
 
     private IEnumerable<Mutation> CreateMutationsForBinary(
         BinaryExpressionSyntax binary,
@@ -60,11 +67,6 @@ internal sealed class ArithmeticOperatorMutator : MutationOperatorBase
         }
 
         var boundOperator = semanticModel.GetSymbolInfo(binary, cancellationToken).Symbol as IMethodSymbol;
-        if (IsStringConcatenation(boundOperator))
-        {
-            yield break;
-        }
-
         var userDefined = boundOperator?.MethodKind == MethodKind.UserDefinedOperator ? boundOperator : null;
         var originalKind = binary.Kind();
 
@@ -151,21 +153,13 @@ internal sealed class ArithmeticOperatorMutator : MutationOperatorBase
             "The syntax kind is not a binary arithmetic expression."
         );
 
-    private static bool IsStringConcatenation(IMethodSymbol? boundOperator)
-    {
-        if (boundOperator is null)
-        {
-            return false;
-        }
-
-        if (boundOperator.ContainingType?.SpecialType == SpecialType.System_String)
-        {
-            return true;
-        }
-
-        return string.Equals(boundOperator.Name, "Concat", StringComparison.Ordinal);
-    }
-
+    /// <summary>
+    /// Decides whether an operand can take part in an arithmetic mutation. A <see cref="string" /> or an
+    /// <see cref="object" /> operand means a string concatenation, a delegate operand means a delegate
+    /// combination, and neither belongs to this operator family.
+    /// </summary>
+    /// <param name="type">The converted type of the operand, or <see langword="null" /> if unknown.</param>
+    /// <returns><see langword="true" /> if the operand is arithmetic.</returns>
     private static bool IsArithmeticOperand(ITypeSymbol? type)
     {
         if (type is null || type.TypeKind is TypeKind.Error or TypeKind.Delegate or TypeKind.Pointer)

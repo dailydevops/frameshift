@@ -85,6 +85,57 @@ public class BitwiseOperatorMutatorTests
         }
         """;
 
+    private const string AndOnlyUserDefinedSource = """
+        namespace Fixtures;
+
+        internal readonly struct Mask
+        {
+            internal Mask(int bits) => Bits = bits;
+
+            internal int Bits { get; }
+
+            public static Mask operator &(Mask left, Mask right) => new Mask(left.Bits & right.Bits);
+        }
+
+        internal static class Masks
+        {
+            internal static Mask Combine(Mask left, Mask right) => /*!*/left & right;
+        }
+        """;
+
+    private const string BooleanShiftCountSource = """
+        namespace Fixtures;
+
+        internal static class Bits
+        {
+            internal static object Shift(int left, bool flag) => /*!*/left << flag;
+        }
+        """;
+
+    private const string MixedIntegralAndBooleanSource = """
+        namespace Fixtures;
+
+        internal static class Bits
+        {
+            internal static object Combine(int left, bool flag) => /*!*/left & flag;
+        }
+        """;
+
+    private const string EnumShiftCountSource = """
+        namespace Fixtures;
+
+        internal enum Flags
+        {
+            None = 0,
+            First = 1,
+        }
+
+        internal static class Bits
+        {
+            internal static object Shift(int left, Flags count) => /*!*/left << count;
+        }
+        """;
+
     private const string OperatorPlaceholder = "OPERATOR";
 
     private const string TriviaSource = """
@@ -332,6 +383,126 @@ public class BitwiseOperatorMutatorTests
         _ = await Assert.That(mutations).IsEmpty();
     }
 
+    /// <summary>
+    /// The enum operand of the exclusive or completes the enum matrix, whose remaining two operators are
+    /// covered by <see cref="CreateMutations_EnumOperands_ProducesTheBitwiseCounterparts" />.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EnumOperandsOfAnExclusiveOr_ProducesTheBitwiseCounterparts()
+    {
+        string[] expectedIds = ["bitwise.xor-to-and", "bitwise.xor-to-or"];
+        var result = Mutate(Fixture("firstFlag ^ secondFlag"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// The right operand of a shift is converted to <see langword="int" /> whenever it is a smaller
+    /// integral type, so a <see langword="byte" /> or a <see langword="char" /> count is shifted as well.
+    /// </summary>
+    [Test]
+    [Arguments("left << byteCount", "left >> byteCount")]
+    [Arguments("left << charCount", "left >> charCount")]
+    [Arguments("left >> byteCount", "left << byteCount")]
+    public async Task CreateMutations_ShiftCountThatIsNotAnInt_SwapsTheDirection(
+        string expression,
+        string expectedReplacement
+    )
+    {
+        var result = Mutate(Fixture(expression));
+
+        _ = await Assert.That(result.Mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+        _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");
+    }
+
+    [Test]
+    public async Task CreateMutations_NullableIntegralShiftOperand_SwapsTheDirection()
+    {
+        string[] expectedIds = ["bitwise.left-shift-to-right-shift"];
+        var result = Mutate(Fixture("nullableLeft << right"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("nullableLeft >> right");
+    }
+
+    /// <summary>
+    /// A boolean shift count is rejected by the same operand guard that rejects a boolean left operand.
+    /// C# rejects the fixture, which is the only way to bind a shift to a boolean count at all.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_BooleanShiftCount_ReturnsEmpty()
+    {
+        var (mutations, _, node, model) = MutateAllowingErrors(BooleanShiftCountSource);
+        var binary = (BinaryExpressionSyntax)node;
+
+        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
+        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// An enum is integral enough for the three bitwise operators, but never for a shift count either.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EnumShiftCount_ReturnsEmpty()
+    {
+        var (mutations, _, node, model) = MutateAllowingErrors(EnumShiftCountSource);
+        var binary = (BinaryExpressionSyntax)node;
+
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
+        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// An integral left operand passes the guard, so only the boolean right operand can reject this
+    /// expression. C# rejects the fixture, which is the only way to bind such a pair of operands.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_IntegralLeftAndBooleanRightOperand_ReturnsEmpty()
+    {
+        var (mutations, _, node, model) = MutateAllowingErrors(MixedIntegralAndBooleanSource);
+        var binary = (BinaryExpressionSyntax)node;
+
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
+        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A user defined operator without any counterpart is rejected for the same reason as one that
+    /// declares all three: its result type is the declaring struct, which is not integral.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_UserDefinedBitwiseOperatorWithoutCounterparts_ReturnsEmpty()
+    {
+        var result = Mutate(AndOnlyUserDefinedSource);
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Fixture("left & right"));
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new BitwiseOperatorMutator();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
+    }
+
     private static string CreateSource(string template, string symbol) =>
         template.Replace(OperatorPlaceholder, symbol, StringComparison.Ordinal);
 
@@ -360,7 +531,9 @@ public class BitwiseOperatorMutatorTests
                     Flags? nullableFirstFlag,
                     Flags? nullableSecondFlag,
                     int? nullableLeft,
-                    int? nullableRight
+                    int? nullableRight,
+                    byte byteCount,
+                    char charCount
                 )
                 {
                     _ = /*!*/{{expression}};

@@ -1,6 +1,7 @@
 namespace NetEvolve.Frameshift.Tests.Unit.Mutations.Operators;
 
 using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -177,6 +178,161 @@ public class ArithmeticOperatorMutatorTests
         }
         """;
 
+    private const string ImplicitStringConversionSource = """
+        namespace Fixtures;
+
+        internal readonly struct Slug
+        {
+            internal Slug(string value) => Value = value;
+
+            internal string Value { get; }
+
+            public static implicit operator string(Slug value) => value.Value;
+        }
+
+        internal static class Slugs
+        {
+            internal static string Combine(Slug left, Slug right) => /*!*/left + right;
+        }
+        """;
+
+    private const string MismatchedResultTypeOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static int operator +(Money left, Money right) => left.Amount + right.Amount;
+
+            public static string operator -(Money left, Money right) => "money";
+        }
+
+        internal static class Wallet
+        {
+            internal static int Combine(Money left, Money right) => /*!*/left + right;
+        }
+        """;
+
+    private const string CheckedOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator checked +(Money left, Money right) => new Money(0);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+
+            public static Money operator checked -(Money left, Money right) => new Money(0);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Combine(Money left, Money right) => checked(/*!*/left + right);
+        }
+        """;
+
+    private const string ReservedMemberNameOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal static readonly int op_Multiply = 2;
+
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            internal static Money op_Division(Money left, Money right) => left;
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Combine(Money left, Money right) => /*!*/left + right;
+        }
+        """;
+
+    private const string UnaryAndBinaryMinusSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator -(Money value) => new Money(-value.Amount);
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+        """;
+
+    private const string EnumOperandSource = """
+        namespace Fixtures;
+
+        internal enum Color
+        {
+            None = 0,
+            Red = 1,
+        }
+
+        internal static class Colors
+        {
+            internal static Color Next(Color color) => /*!*/color + 1;
+        }
+        """;
+
+    private const string DynamicOperandSource = """
+        namespace Fixtures;
+
+        internal static class Calculator
+        {
+            internal static dynamic Combine(dynamic left, dynamic right) => /*!*/left + right;
+        }
+        """;
+
+    private const string ConstrainedGenericSource = """
+        namespace Fixtures;
+
+        internal static class Calculator
+        {
+            internal static TValue Combine<TValue>(TValue left, TValue right)
+                where TValue : System.Numerics.INumber<TValue> => /*!*/left + right;
+        }
+        """;
+
+    private const string PointerOperandSource = """
+        namespace Fixtures;
+
+        internal static class Pointers
+        {
+            internal static unsafe int* Advance(int* pointer, int offset) => /*!*/pointer + offset;
+        }
+        """;
+
+    private const string ErrorTypeOperandSource = """
+        namespace Fixtures;
+
+        internal static class Calculator
+        {
+            internal static Missing Combine(Missing left, Missing right) => /*!*/left + right;
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -190,6 +346,12 @@ public class ArithmeticOperatorMutatorTests
             }
         }
         """;
+
+    private static readonly string[] _pointerErrorIds = ["CS0227"];
+
+    private static readonly string[] _errorTypeErrorIds = ["CS0246"];
+
+    private static readonly string[] _arithmeticNames = ["add", "subtract", "multiply", "divide", "modulo"];
 
     [Test]
     public async Task Metadata_Operator_ExposesIdKindAndSupportedKinds()
@@ -420,6 +582,255 @@ public class ArithmeticOperatorMutatorTests
             .IsEquivalentTo(expectedIds);
     }
 
+    /// <summary>
+    /// Only one side of the expression is a <see cref="string" />, the other one is a number or an
+    /// <see cref="object" />. Every overload of the string concatenation converts the other side to
+    /// <see cref="string" /> or to <see cref="object" />, which the operand check rejects.
+    /// </summary>
+    /// <param name="expression">The expression the case exercises.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments("text + number")]
+    [Arguments("number + text")]
+    [Arguments("text + value")]
+    [Arguments("value + text")]
+    public async Task CreateMutations_StringOnOneSideOnly_ReturnsEmpty(string expression)
+    {
+        var result = Mutate(ConcatFixture(expression));
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// Both operands are a user defined struct that converts implicitly to <see cref="string" />, so the
+    /// expression binds to the string concatenation. The converted operand type is the one after that
+    /// conversion, which is what keeps the concatenation out of this operator family.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OperandsConvertedToStringImplicitly_ReturnsEmpty()
+    {
+        var result = Mutate(ImplicitStringConversionSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(ImplicitStringConversionSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+        _ = await Assert
+            .That(semanticModel.GetTypeInfo(binary.Left).ConvertedType?.SpecialType)
+            .IsEqualTo(SpecialType.System_String);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("decimal", "decimal", "/*!*/left + right", "add")]
+    [Arguments("char", "int", "/*!*/left + right", "add")]
+    [Arguments("int?", "int?", "/*!*/left + right", "add")]
+    [Arguments("double", "double", "/*!*/left * right", "multiply")]
+    [Arguments("int", "int", "checked(/*!*/left % right)", "modulo")]
+    [Arguments("int", "int", "unchecked(/*!*/left - right)", "subtract")]
+    [Arguments("System.IntPtr", "System.IntPtr", "/*!*/left / right", "divide")]
+    public async Task CreateMutations_ArithmeticOperandType_ProducesEveryCounterpart(
+        string operandType,
+        string resultType,
+        string expression,
+        string originalName
+    )
+    {
+        var result = Mutate(OperandFixture(operandType, resultType, expression));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(AllCounterparts(originalName));
+    }
+
+    /// <summary>
+    /// An enum operand is arithmetic as far as this operator is concerned, even though only the additive
+    /// mutants of <c>color + 1</c> bind. Whether a mutant compiles is decided when the mutant is built,
+    /// not here, so all four counterparts are offered.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EnumOperand_ProducesEveryCounterpart()
+    {
+        var result = Mutate(EnumOperandSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(AllCounterparts("add"));
+    }
+
+    /// <summary>
+    /// A dynamic expression binds to the built-in operator of <c>dynamic</c> rather than to a user defined
+    /// one, so the user defined operator filter cannot narrow the result and every counterpart is offered.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_DynamicOperands_ProducesEveryCounterpart()
+    {
+        var result = Mutate(DynamicOperandSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(DynamicOperandSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.BuiltinOperator);
+        _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("dynamic.operator +(dynamic, dynamic)");
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(AllCounterparts("add"));
+    }
+
+    /// <summary>
+    /// The result type of the user defined operator is unrelated to the result type of its counterpart,
+    /// and neither is looked at: only the declared counterpart decides.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorWithAnotherResultType_ProducesThatCounterpart()
+    {
+        string[] expectedIds = ["arithmetic.add-to-subtract"];
+        var result = Mutate(MismatchedResultTypeOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// In a checked context the expression binds to <c>op_CheckedAddition</c>. The counterpart is still
+    /// looked up under the unchecked metadata name, which a type declaring a checked operator always has
+    /// to provide as well.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CheckedUserDefinedOperator_ProducesTheDeclaredCounterpart()
+    {
+        string[] expectedIds = ["arithmetic.add-to-subtract"];
+        var result = Mutate(CheckedOperatorSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CheckedOperatorSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.MetadataName).IsEqualTo("op_CheckedAddition");
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// A member that carries the metadata name of an operator without being one is no counterpart: the
+    /// field named <c>op_Multiply</c> and the ordinary method named <c>op_Division</c> are both skipped.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MembersNamedLikeOperators_AreNoCounterparts()
+    {
+        string[] expectedIds = ["arithmetic.add-to-subtract"];
+        var result = Mutate(ReservedMemberNameOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// The operator is declared on the constraint interface, and that interface declares nothing but its
+    /// own operator, so no counterpart is found. The expression stays unmutated.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OperatorOfAConstraintInterface_ReturnsEmpty()
+    {
+        var result = Mutate(ConstrainedGenericSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(ConstrainedGenericSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A pointer operand is not arithmetic here, because pointer arithmetic scales by the element size
+    /// and none of the other four operators is even defined for it.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_PointerOperands_ReturnsEmpty()
+    {
+        var result = MutateWithoutFixtureCheck(PointerOperandSource);
+
+        _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_pointerErrorIds);
+        _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Pointer);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// An operand whose type could not be resolved is not mutated, so that a broken build does not turn
+    /// into a flood of mutants.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ErrorTypeOperands_ReturnsEmpty()
+    {
+        var result = MutateWithoutFixtureCheck(ErrorTypeOperandSource);
+
+        _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_errorTypeErrorIds);
+        _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Error);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(BinaryFixture("+"));
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new ArithmeticOperatorMutator();
+        using var cancellation = new CancellationTokenSource();
+
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToArray()
+        );
+
+        _ = await Assert.That(exception.CancellationToken).IsEqualTo(cancellation.Token);
+    }
+
+    /// <summary>
+    /// The mapping tables of this operator only ever see the five kinds it supports, which the base class
+    /// guarantees. Their default arm cannot be removed, because the compiler demands an exhaustive switch,
+    /// so it is invoked directly to pin the exception it produces.
+    /// </summary>
+    /// <param name="mapperName">The name of the mapping method under test.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments("GetName")]
+    [Arguments("GetSymbol")]
+    [Arguments("GetOperatorToken")]
+    [Arguments("GetMetadataName")]
+    public async Task Mapper_SyntaxKindIsNotArithmetic_ThrowsArgumentOutOfRangeException(string mapperName)
+    {
+        var exception = InvokeMapper(mapperName, SyntaxKind.BitwiseAndExpression);
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("expressionKind");
+        _ = await Assert.That(exception.ActualValue).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+        _ = await Assert.That(exception.Message).Contains("The syntax kind is not a binary arithmetic expression.");
+    }
+
+    /// <summary>
+    /// A counterpart has to take as many operands as the operator it replaces. The unary minus of the
+    /// fixture carries the metadata name <c>op_UnaryNegation</c>, so the binary <c>op_Subtraction</c> is no
+    /// counterpart of it.
+    /// </summary>
+    [Test]
+    public async Task HasCounterpart_OperandCountDiffers_ReturnsFalse()
+    {
+        var (compilation, _, _) = CompilationFactory.CreateWithModel(UnaryAndBinaryMinusSource);
+        var money =
+            compilation.GetTypeByMetadataName("Fixtures.Money")
+            ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Money'.");
+        var unaryMinus = money.GetMembers("op_UnaryNegation").OfType<IMethodSymbol>().Single();
+        var binaryMinus = money.GetMembers("op_Subtraction").OfType<IMethodSymbol>().Single();
+
+        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+        _ = await Assert.That(unaryMinus.Parameters.Length).IsEqualTo(1);
+        _ = await Assert.That(InvokeHasCounterpart(unaryMinus, "op_Subtraction")).IsFalse();
+        _ = await Assert.That(InvokeHasCounterpart(binaryMinus, "op_Addition")).IsTrue();
+    }
+
     private static string BinaryFixture(string symbol) =>
         $$"""
             namespace Fixtures;
@@ -442,6 +853,100 @@ public class ArithmeticOperatorMutatorTests
                 }
             }
             """;
+
+    /// <summary>
+    /// Builds a fixture whose marked expression mixes a <see cref="string" /> with a value of another type.
+    /// </summary>
+    /// <param name="expression">The expression to mark, written over the parameters of the fixture.</param>
+    /// <returns>The fixture source.</returns>
+    private static string ConcatFixture(string expression) =>
+        $$"""
+            namespace Fixtures;
+
+            internal static class Text
+            {
+                internal static string Combine(int number, string text, object value) => /*!*/{{expression}};
+            }
+            """;
+
+    /// <summary>
+    /// Builds a fixture over two operands of the same type. The expression carries the marker itself, so
+    /// that a case can wrap the marked expression into a <c>checked</c> or <c>unchecked</c> context.
+    /// </summary>
+    /// <param name="operandType">The declared type of both operands.</param>
+    /// <param name="resultType">The declared result type of the fixture method.</param>
+    /// <param name="expression">The expression, containing the marker in front of the binary expression.</param>
+    /// <returns>The fixture source.</returns>
+    private static string OperandFixture(string operandType, string resultType, string expression) =>
+        $$"""
+            namespace Fixtures;
+
+            internal static class Calculator
+            {
+                internal static {{resultType}} Combine({{operandType}} left, {{operandType}} right) =>
+                    {{expression}};
+            }
+            """;
+
+    /// <summary>
+    /// The operator identifiers of all four counterparts of <paramref name="originalName" />.
+    /// </summary>
+    /// <param name="originalName">The name of the original operator, e.g. <c>add</c>.</param>
+    /// <returns>The expected operator identifiers, sorted.</returns>
+    private static ImmutableArray<string> AllCounterparts(string originalName) =>
+        Sorted(
+            _arithmeticNames
+                .Where(name => !string.Equals(name, originalName, StringComparison.Ordinal))
+                .Select(name => $"arithmetic.{originalName}-to-{name}")
+        );
+
+    /// <summary>
+    /// Invokes one of the private mapping tables of the operator. Their default arm is unreachable through
+    /// the public path, but the compiler requires it, so a test can only reach it directly.
+    /// </summary>
+    /// <param name="mapperName">The name of the mapping method.</param>
+    /// <param name="expressionKind">The syntax kind to map.</param>
+    /// <returns>The exception the mapping method produced.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The mapping method no longer exists or accepted the syntax kind.
+    /// </exception>
+    private static ArgumentOutOfRangeException InvokeMapper(string mapperName, SyntaxKind expressionKind)
+    {
+        var mapper =
+            typeof(ArithmeticOperatorMutator).GetMethod(mapperName, BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException($"The mapping method '{mapperName}' no longer exists.");
+
+        try
+        {
+            _ = mapper.Invoke(null, [expressionKind]);
+        }
+        catch (TargetInvocationException exception)
+            when (exception.InnerException is ArgumentOutOfRangeException expected)
+        {
+            return expected;
+        }
+
+        throw new InvalidOperationException(
+            $"The mapping method '{mapperName}' accepted the syntax kind '{expressionKind}'."
+        );
+    }
+
+    /// <summary>
+    /// Invokes the private counterpart lookup of the operator, which is the only way to reach it with an
+    /// operator the language cannot produce for one of the five supported syntax kinds.
+    /// </summary>
+    /// <param name="userDefinedOperator">The operator to find a counterpart for.</param>
+    /// <param name="metadataName">The metadata name of the wanted counterpart.</param>
+    /// <returns>Whether the declaring type provides such a counterpart.</returns>
+    /// <exception cref="InvalidOperationException">The lookup no longer exists.</exception>
+    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
+    {
+        var lookup =
+            typeof(ArithmeticOperatorMutator).GetMethod("HasCounterpart", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The counterpart lookup no longer exists.");
+
+        return (bool)lookup.Invoke(null, [userDefinedOperator, metadataName])!;
+    }
 
     private static string SymbolOf(string name) =>
         name switch
@@ -483,5 +988,35 @@ public class ArithmeticOperatorMutatorTests
         var mutator = new ArithmeticOperatorMutator();
 
         return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node);
+    }
+
+    /// <summary>
+    /// Mutates a fixture that cannot compile, which is the only way to hand an operand of an error type or
+    /// of a pointer type to the operator. The reported error identifiers are part of the result, so that a
+    /// test can prove its fixture fails for exactly the intended reason.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>The produced mutations, the distinct error identifiers and the left operand type.</returns>
+    private static (
+        ImmutableArray<Mutation> Mutations,
+        ImmutableArray<string> ErrorIds,
+        ITypeSymbol? LeftType
+    ) MutateWithoutFixtureCheck(string source)
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var mutator = new ArithmeticOperatorMutator();
+        var errorIds = Sorted(
+            CompilationFactory
+                .GetCompileErrors(compilation)
+                .Select(diagnostic => diagnostic.Id)
+                .Distinct(StringComparer.Ordinal)
+        );
+
+        return (
+            [.. mutator.CreateMutations(binary, semanticModel, CancellationToken.None)],
+            errorIds,
+            semanticModel.GetTypeInfo(binary.Left).ConvertedType
+        );
     }
 }

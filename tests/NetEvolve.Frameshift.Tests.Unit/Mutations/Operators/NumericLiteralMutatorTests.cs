@@ -130,6 +130,13 @@ public class NumericLiteralMutatorTests
     [Arguments("double", "0e0")]
     [Arguments("double", "1.5e3")]
     [Arguments("decimal", "0.0m")]
+    [Arguments("int", "0B1010")]
+    [Arguments("long", "0XFFL")]
+    [Arguments("long", "1_000L")]
+    [Arguments("uint", "0x10u")]
+    [Arguments("uint", "0xFFu")]
+    [Arguments("ulong", "0xFFul")]
+    [Arguments("ulong", "0b1010UL")]
     public async Task Fixture_LiteralFormat_Compiles(string type, string literal)
     {
         var (compilation, _, _) = CompilationFactory.CreateWithModel(Fixture(type, literal));
@@ -305,6 +312,13 @@ public class NumericLiteralMutatorTests
     [Arguments("int", "0b1010", "11", "9")]
     [Arguments("int", "1_000", "1001", "999")]
     [Arguments("long", "0xFFL", "256L", "254L")]
+    [Arguments("int", "0B1010", "11", "9")]
+    [Arguments("long", "0XFFL", "256L", "254L")]
+    [Arguments("long", "1_000L", "1001L", "999L")]
+    [Arguments("uint", "0x10u", "17u", "15u")]
+    [Arguments("uint", "0xFFu", "256u", "254u")]
+    [Arguments("ulong", "0xFFul", "256ul", "254ul")]
+    [Arguments("ulong", "0b1010UL", "11UL", "9UL")]
     public async Task CreateMutations_LiteralWithinRange_OffersBothNeighbours(
         string type,
         string literal,
@@ -384,6 +398,68 @@ public class NumericLiteralMutatorTests
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
         _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
         _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
+    }
+
+    /// <summary>
+    /// The target type is wide enough for the incremented value, but the literal's own type is not, so the
+    /// increment is dropped by the token type instead of by the target type.
+    /// </summary>
+    /// <param name="type">The declared type the literal is converted to.</param>
+    /// <param name="literal">The literal at the upper bound of its own type.</param>
+    /// <param name="expected">The expected replacement text of the surviving decrement.</param>
+    /// <returns>A task representing the test.</returns>
+    [Test]
+    [Arguments("long", "2147483647", "2147483646")]
+    [Arguments("ulong", "4294967295u", "4294967294u")]
+    public async Task CreateMutations_MaximumOfTheTokenTypeInAWiderTarget_OffersOnlyTheDecrement(
+        string type,
+        string literal,
+        string expected
+    )
+    {
+        var (tree, mutations) = Run(Fixture(type, literal));
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
+        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+    }
+
+    /// <summary>
+    /// A literal that does not fit its target type at all has no neighbour inside that range either, so
+    /// neither candidate survives. The fixture deliberately does not compile.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ValueOutsideTheTargetRange_ReturnsEmpty()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Fixture("byte", "300"));
+        var literal = (LiteralExpressionSyntax)FindNumericLiteral(tree);
+        var mutator = new NumericLiteralMutator();
+        Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
+
+        _ = await Assert
+            .That(semanticModel.GetTypeInfo(literal).ConvertedType?.SpecialType)
+            .IsEqualTo(SpecialType.System_Byte);
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A field declaration without the <see langword="const" /> modifier is an ordinary initializer, so the
+    /// walk up the parent chain has to continue past it instead of treating it as a constant context.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NonConstantFieldInitializer_IsMutated()
+    {
+        var (tree, mutations) = Run("public class Sample { private int _value = 42; }");
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(2);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+        _ = await Assert
+            .That(Rewrite(tree, mutations[0]))
+            .IsEqualTo("public class Sample { private int _value = 43; }");
     }
 
     /// <summary>

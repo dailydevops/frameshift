@@ -158,6 +158,43 @@ public class LogicalNegationMutatorTests
         }
         """;
 
+    private const string MethodGroupConditionSource = """
+        internal static class Conditions
+        {
+            public static bool Flag() => true;
+
+            public static int Classify()
+            {
+                /*!*/if (Flag)
+                {
+                    return 1;
+                }
+
+                return 0;
+            }
+        }
+        """;
+
+    private const string NegatedWhileSource = """
+        internal static class Conditions
+        {
+            public static void Spin(bool flag)
+            {
+                /*!*/while (!flag)
+                {
+                    return;
+                }
+            }
+        }
+        """;
+
+    private const string NegatedConditionalSource = """
+        internal static class Conditions
+        {
+            public static int Classify(bool flag) => /*!*/!flag ? 1 : 0;
+        }
+        """;
+
     private static readonly LogicalNegationMutator _mutator = new LogicalNegationMutator();
 
     [Test]
@@ -353,6 +390,54 @@ public class LogicalNegationMutatorTests
         _ = await Assert.That(errors).IsEqualTo(string.Empty);
         _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type?.ToDisplayString()).IsEqualTo("Flag");
         _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// The wrapping guard rejects an already negated condition of every supported node, not only of an
+    /// <c>if</c> statement, because <c>!(!x)</c> is no useful mutant.
+    /// </summary>
+    [Test]
+    [Arguments(NegatedWhileSource)]
+    [Arguments(NegatedConditionalSource)]
+    public async Task CreateMutations_AlreadyNegatedConditionOfEveryNode_ReturnsEmpty(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var (mutations, _, _, errors) = Mutate(source);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// A method group has no type at all, so the wrapping guard has to reject a <see langword="null" />
+    /// condition type instead of assuming every condition carries one. C# rejects the fixture, which is
+    /// exactly what makes the condition typeless.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_TypelessCondition_ReturnsEmpty()
+    {
+        var (mutations, tree, model, _) = Mutate(MethodGroupConditionSource);
+        var ifStatement = SyntaxNodeLocator.FindMarked<IfStatementSyntax>(tree);
+
+        _ = await Assert.That(ifStatement.Condition.ToString()).IsEqualTo("Flag");
+        _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type).IsNull();
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(IfSource);
+        var node = SyntaxNodeLocator.FindMarked(tree);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = _mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
     }
 
     private static string[] DisplayNames(ImmutableArray<Mutation> mutations) =>

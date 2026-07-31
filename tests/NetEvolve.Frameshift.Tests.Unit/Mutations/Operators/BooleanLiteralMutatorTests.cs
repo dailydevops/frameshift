@@ -24,6 +24,9 @@ public class BooleanLiteralMutatorTests
     private const string ConstLocalSource =
         "public class Sample { public bool Get() { const bool flag = true; return flag; } }";
     private const string DefaultParameterSource = "public class Sample { public bool Get(bool flag = true) => flag; }";
+    private const string LocalDeclarationSource =
+        "public class Sample { public bool Get() { bool flag = true; return flag; } }";
+    private const string ConstantPatternSource = "public class Sample { public bool Get(bool flag) => flag is true; }";
 
     private const string AttributeSource = """
         public class Sample
@@ -112,6 +115,29 @@ public class BooleanLiteralMutatorTests
 
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
         _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+    }
+
+    /// <summary>
+    /// A local declaration without the <see langword="const" /> modifier is an ordinary initializer, so
+    /// the walk up the parent chain has to continue past it instead of treating it as a constant context.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NonConstantLocalDeclaration_IsMutated()
+    {
+        var expected = LocalDeclarationSource.Replace("= true", "= false", StringComparison.Ordinal);
+        var (tree, mutations) = Run(LocalDeclarationSource);
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task CreateMutations_ConstantPattern_ReturnsEmpty()
+    {
+        var (_, mutations) = Run(ConstantPatternSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
     }
 
     [Test]

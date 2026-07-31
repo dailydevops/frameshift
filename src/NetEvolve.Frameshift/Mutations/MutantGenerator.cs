@@ -110,12 +110,17 @@ internal static class MutantGenerator
     /// <param name="root">The root node of the tree to inspect.</param>
     /// <param name="cancellationToken">A token to observe.</param>
     /// <returns><see langword="true" /> if the whole tree must be skipped; otherwise <see langword="false" />.</returns>
+    /// <remarks>
+    /// The owning tree is never checked for <see langword="null" />, because
+    /// <see cref="SyntaxNode.SyntaxTree" /> always answers with a tree: a node that was created
+    /// detached gets one on demand. A detached node reports an empty file path, which
+    /// <see cref="HasGeneratedFileName" /> already treats as not generated.
+    /// </remarks>
     private static bool IsGeneratedTree(SyntaxNode root, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var tree = root.SyntaxTree;
-        if (tree is not null && HasGeneratedFileName(tree.FilePath))
+        if (HasGeneratedFileName(root.SyntaxTree.FilePath))
         {
             return true;
         }

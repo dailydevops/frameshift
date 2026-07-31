@@ -25,10 +25,10 @@ internal sealed class NullCoalescingMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is not BinaryExpressionSyntax coalesce)
-        {
-            yield break;
-        }
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and SyntaxKind.CoalesceExpression is always a binary expression, so the cast cannot fail and no
+        // type test is needed here.
+        var coalesce = (BinaryExpressionSyntax)node;
 
         var targetType = semanticModel.GetTypeInfo(coalesce, cancellationToken).ConvertedType;
 

@@ -959,9 +959,13 @@ internal static class EquivalenceClassifier
     /// Determines whether <paramref name="semanticModel" /> can answer questions about
     /// <paramref name="node" />, which requires the node to belong to the model's syntax tree.
     /// </summary>
+    /// <remarks>
+    /// <see cref="SyntaxNode.SyntaxTree" /> is never <see langword="null" /> — every node belongs to a
+    /// tree, even one that was only parsed — so the tree identity is the whole test.
+    /// </remarks>
     /// <param name="node">The node to query.</param>
     /// <param name="semanticModel">The semantic model to query.</param>
     /// <returns><see langword="true" /> if the node can be queried; otherwise <see langword="false" />.</returns>
     private static bool CanQuery(SyntaxNode node, SemanticModel semanticModel) =>
-        node.SyntaxTree is not null && ReferenceEquals(node.SyntaxTree, semanticModel.SyntaxTree);
+        ReferenceEquals(node.SyntaxTree, semanticModel.SyntaxTree);
 }

@@ -32,10 +32,10 @@ internal sealed class RelationalOperatorMutator : MutationOperatorBase
         CancellationToken cancellationToken
     )
     {
-        if (node is not BinaryExpressionSyntax binary)
-        {
-            yield break;
-        }
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and every relational kind is a binary expression, so the cast cannot fail and no type test is
+        // needed here.
+        var binary = (BinaryExpressionSyntax)node;
 
         var originalKind = binary.Kind();
         foreach (var candidate in _supportedSyntaxKinds)

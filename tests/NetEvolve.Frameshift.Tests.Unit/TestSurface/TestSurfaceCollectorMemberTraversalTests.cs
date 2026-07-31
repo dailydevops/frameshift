@@ -68,12 +68,51 @@ public class TestSurfaceCollectorMemberTraversalTests
 
             public static int FromUnreachableProperty() => 19;
         }
+
+        public static class Extras
+        {
+            public static int FromReducedExtension(this int value) => 20;
+        }
+        """;
+
+    private const string InaccessibleProductionAssemblyName = "InaccessibleProductionAssembly";
+
+    private const string UnreducedExtensionId = "M:Production.Extras.FromReducedExtension(System.Int32)~System.Int32";
+
+    private const string ReducedExtensionId = "M:Production.Extras.FromReducedExtension~System.Int32";
+
+    private const string InaccessibleMemberId = "M:Production.Hidden.FromProtectedMember~System.Int32";
+
+    /// <summary>
+    /// A production assembly whose member is protected, so that a call to it from the test assembly does
+    /// not bind — CS0122 — while the compiler still offers it as the single candidate of the call.
+    /// </summary>
+    private const string InaccessibleProductionSource = """
+        namespace Production;
+
+        public class Hidden
+        {
+            protected static int FromProtectedMember() => 21;
+        }
+        """;
+
+    private const string InaccessibleTestSource = """
+        namespace Tests;
+
+        using TUnit.Core;
+
+        public class HiddenAccessTests
+        {
+            [Test]
+            public void CallsProtectedMember() => _ = Production.Hidden.FromProtectedMember();
+        }
         """;
 
     private const string TestSource = """
         namespace Tests;
 
         using System;
+        using Production;
         using TUnit.Core;
 
         public class MemberShapeTests
@@ -209,6 +248,9 @@ public class TestSurfaceCollectorMemberTraversalTests
 
                 _ = anonymous.Value;
             }
+
+            [Test]
+            public void CallsExtensionMethodInReducedForm() => _ = 7.FromReducedExtension();
 
             [Test]
             public void OnlyTouchesAutoProperties()
@@ -350,6 +392,46 @@ public class TestSurfaceCollectorMemberTraversalTests
         await AssertRecorded("M:Production.Signals.FromAnonymousType~System.Int32").ConfigureAwait(false);
 
     /// <summary>
+    /// Pins the reduced side of the symbol normalisation: an extension method called in reduced form is
+    /// recorded under the id of the static method it really is, never under the reduced signature.
+    /// </summary>
+    /// <remarks>
+    /// The reduced symbol has no parameter for the receiver, so recording it would produce
+    /// <c>M:Production.Extras.FromReducedExtension~System.Int32</c>. That id names no member of the
+    /// production assembly, so the production side would resolve nothing and report the whole method as
+    /// unreachable.
+    /// </remarks>
+    [Test]
+    public async Task Collect_ExtensionMethodCalledInReducedForm_RecordsTheUnreducedDefinition()
+    {
+        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+
+        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(UnreducedExtensionId)).IsTrue();
+        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(ReducedExtensionId)).IsFalse();
+    }
+
+    /// <summary>
+    /// Pins the candidate side of the symbol lookup: a call that does not bind, but that the compiler can
+    /// name exactly one candidate for, still contributes that member to the surface.
+    /// </summary>
+    /// <remarks>
+    /// The collector runs inside an analyzer, so it constantly sees code that does not compile yet. A
+    /// call to an inaccessible member is the reproducible shape of that state: dropping it would make the
+    /// manifest shrink while the developer is typing, and the production side would report gaps that
+    /// disappear again on the next keystroke.
+    /// </remarks>
+    [Test]
+    public async Task Collect_CallDoesNotBindButHasExactlyOneCandidate_RecordsTheCandidate()
+    {
+        var test = CreateInaccessibleTest();
+
+        var manifest = TestSurfaceCollector.Collect(test, CancellationToken.None);
+
+        _ = await Assert.That(DiagnosticAssertions.Ids(CompilationFactory.GetCompileErrors(test))).Contains("CS0122");
+        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(InaccessibleMemberId)).IsTrue();
+    }
+
+    /// <summary>
     /// Auto property accessors have a declaring syntax but no body, and a get-only property has no
     /// setter to walk at all. Neither may throw, and neither may invent a production reference.
     /// </summary>
@@ -410,6 +492,19 @@ public class TestSurfaceCollectorMemberTraversalTests
             includeTUnit: true,
             additionalReferences: [production.ToMetadataReference()],
             filePath: "MemberShapeTests.cs"
+        );
+
+    private static CSharpCompilation CreateInaccessibleTest() =>
+        CompilationFactory.Create(
+            InaccessibleTestSource,
+            includeTUnit: true,
+            additionalReferences:
+            [
+                CompilationFactory
+                    .Create(InaccessibleProductionSource, InaccessibleProductionAssemblyName, filePath: "Hidden.cs")
+                    .ToMetadataReference(),
+            ],
+            filePath: "HiddenAccessTests.cs"
         );
 
     private static string Join(IEnumerable<string> values) =>

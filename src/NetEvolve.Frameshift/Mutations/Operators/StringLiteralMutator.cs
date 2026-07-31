@@ -27,10 +27,10 @@ internal sealed class StringLiteralMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is not LiteralExpressionSyntax literal)
-        {
-            yield break;
-        }
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and SyntaxKind.StringLiteralExpression is always a literal expression, so the cast cannot fail
+        // and no type test is needed here.
+        var literal = (LiteralExpressionSyntax)node;
 
         if (IsConstantRequired(literal) || IsNameOfArgument(literal))
         {

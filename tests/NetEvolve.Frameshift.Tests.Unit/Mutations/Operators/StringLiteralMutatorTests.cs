@@ -21,6 +21,22 @@ public class StringLiteralMutatorTests
     private const string VerbatimSource = "public class Sample { public string Get() => @\"abc\"; }";
     private const string NameOfSource = "public class Sample { public string Get() => nameof(\"abc\"); }";
     private const string InterpolatedSource = "public class Sample { public string Get(int v) => $\"a{v}\"; }";
+    private const string RawSource = "public class Sample { public string Get() => \"\"\"abc\"\"\"; }";
+    private const string Utf8Source = "public class Sample { public System.ReadOnlySpan<byte> Get() => \"abc\"u8; }";
+    private const string InstanceFieldSource =
+        "public class Sample { private string _text = \"abc\"; public string Get() => _text; }";
+    private const string LocalDeclarationSource =
+        "public class Sample { public string Get() { string text = \"abc\"; return text; } }";
+
+    private const string MultiLineRawSource = """"
+        public class Sample
+        {
+            public string Get() =>
+                """
+                abc
+                """;
+        }
+        """";
 
     private const string AttributeSource = """
         public class Sample
@@ -109,6 +125,80 @@ public class StringLiteralMutatorTests
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
         _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+    }
+
+    /// <summary>
+    /// A raw literal is a plain string literal expression, only its token differs, so it is mutated like
+    /// any other literal and the replacement is written as a plain literal.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_SingleLineRawLiteral_ReplacesItByAPlainEmptyLiteral()
+    {
+        var (tree, mutations) = Run(RawSource);
+        var literal = (LiteralExpressionSyntax)FindStringLiteral(tree);
+
+        _ = await Assert.That(literal.Token.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)).IsTrue();
+        _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+    }
+
+    /// <summary>
+    /// A multi-line raw literal keeps its own layout out of the replacement, which is the plain empty
+    /// literal. The rewritten source is not compared as a whole, because its line endings belong to the
+    /// fixture and not to the mutation.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MultiLineRawLiteral_ReplacesItByAPlainEmptyLiteral()
+    {
+        var (tree, mutations) = Run(MultiLineRawSource);
+        var literal = (LiteralExpressionSyntax)FindStringLiteral(tree);
+
+        _ = await Assert.That(literal.Token.IsKind(SyntaxKind.MultiLineRawStringLiteralToken)).IsTrue();
+        _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        _ = await Assert.That(mutations[0].Replacement.ToString()).IsEqualTo("\"\"");
+    }
+
+    /// <summary>
+    /// A UTF-8 literal is a syntax kind of its own and the operator is not offered for it, because the
+    /// replacement would change the type of the expression.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_Utf8Literal_ReturnsEmpty()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Utf8Source);
+        var literal = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree);
+        var mutations = Mutate(new StringLiteralMutator(), literal, semanticModel);
+
+        _ = await Assert.That(literal.Kind()).IsEqualTo(SyntaxKind.Utf8StringLiteralExpression);
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_NonConstantFieldInitializer_IsMutated()
+    {
+        var (tree, mutations) = Run(InstanceFieldSource);
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        _ = await Assert
+            .That(Rewrite(tree, mutations[0]))
+            .IsEqualTo(InstanceFieldSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
+    }
+
+    [Test]
+    public async Task CreateMutations_NonConstantLocalDeclaration_IsMutated()
+    {
+        var (tree, mutations) = Run(LocalDeclarationSource);
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        _ = await Assert
+            .That(Rewrite(tree, mutations[0]))
+            .IsEqualTo(LocalDeclarationSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
     }
 
     [Test]

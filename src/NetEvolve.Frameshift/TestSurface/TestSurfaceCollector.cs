@@ -133,17 +133,24 @@ internal static class TestSurfaceCollector
             .Select(result => result.TestMethod)
             .ToImmutableArray();
 
+    /// <summary>
+    /// Walks the code reachable from every test method and records the production members it references.
+    /// </summary>
+    /// <param name="compilation">The test compilation to inspect.</param>
+    /// <param name="testMethods">The discovered test methods.</param>
+    /// <param name="cancellationToken">A token to observe while collecting.</param>
+    /// <returns>One entry per test method, in discovery order.</returns>
+    /// <remarks>
+    /// <paramref name="compilation" /> needs no null check here: every public overload passes it to the
+    /// test-method discovery first, which rejects a <see langword="null" /> compilation under the very
+    /// same parameter name before this method is entered.
+    /// </remarks>
     private static List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)> Analyze(
         Compilation compilation,
         ImmutableArray<IMethodSymbol> testMethods,
         CancellationToken cancellationToken
     )
     {
-        if (compilation is null)
-        {
-            throw new ArgumentNullException(nameof(compilation));
-        }
-
         var results = new List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)>();
         var semanticModels = new Dictionary<SyntaxTree, SemanticModel>();
 
@@ -307,9 +314,17 @@ internal static class TestSurfaceCollector
     /// <param name="symbol">The referenced member.</param>
     /// <returns>The member itself and, for a property or an event, its accessors.</returns>
     /// <remarks>
+    /// <para>
     /// The member itself is part of the result, because the declaration of a property or a field can
     /// carry an initializer, and that initializer runs whenever the declaring type is created. Only
     /// walking the accessors would miss it.
+    /// </para>
+    /// <para>
+    /// An event contributes its add and its remove accessor. The raise accessor of
+    /// <see cref="IEventSymbol.RaiseMethod" /> is deliberately not consulted: C# has no syntax for one,
+    /// and this traversal only ever reaches symbols declared in the C# syntax of the analysed
+    /// compilation, so it is always <see langword="null" /> here.
+    /// </para>
     /// </remarks>
     private static IEnumerable<ISymbol> GetTraversableMembers(ISymbol symbol)
     {
@@ -342,11 +357,6 @@ internal static class TestSurfaceCollector
                 if (IsTraversable(@event.RemoveMethod))
                 {
                     yield return @event.RemoveMethod!.OriginalDefinition;
-                }
-
-                if (IsTraversable(@event.RaiseMethod))
-                {
-                    yield return @event.RaiseMethod!.OriginalDefinition;
                 }
 
                 break;

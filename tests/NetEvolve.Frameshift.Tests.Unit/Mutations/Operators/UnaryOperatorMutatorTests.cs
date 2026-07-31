@@ -111,6 +111,35 @@ public class UnaryOperatorMutatorTests
         }
         """;
 
+    private const string BorrowedOperatorNameSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator -(Money value) => new Money(0 - value.Amount);
+
+            internal static Money op_UnaryPlus(Money value) => value;
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Invert(Money value) => /*!*/-value;
+        }
+        """;
+
+    private const string NonConstantLiteralSource = """
+        namespace Fixtures;
+
+        internal static class Calculator
+        {
+            internal static object Invert() => /*!*/-"text";
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -333,6 +362,55 @@ public class UnaryOperatorMutatorTests
             .IsEquivalentTo(expectedIds);
     }
 
+    /// <summary>
+    /// A member that only borrows the metadata name of the unary plus operator is no counterpart: it is an
+    /// ordinary method, not a user defined operator, so the sign swap stays out of the mutation set.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MemberWithTheCounterpartNameThatIsNoOperator_ProducesOnlyTheRemoval()
+    {
+        string[] expectedIds = ["unary.remove-negate"];
+        var result = Mutate(BorrowedOperatorNameSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo("-x => x");
+    }
+
+    /// <summary>
+    /// The constant folding guard only skips a literal operand whose constant value survives the operator.
+    /// A literal the operator cannot be applied to has no constant value at all, so both mutations are
+    /// offered. C# rejects the fixture, which is the only way to negate a string literal.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiteralOperandWithoutAConstantResult_ProducesBothMutations()
+    {
+        string[] expectedIds = ["unary.negate-to-plus", "unary.remove-negate"];
+        var (mutations, _, node, model) = MutateAllowingErrors(NonConstantLiteralSource);
+        var unary = (PrefixUnaryExpressionSyntax)node;
+
+        _ = await Assert.That(model.GetConstantValue(unary).HasValue).IsFalse();
+        _ = await Assert.That(model.GetConstantValue(unary.Operand).HasValue).IsTrue();
+        _ = await Assert.That(Sorted(mutations.Select(mutation => mutation.OperatorId))).IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Fixture("-value"));
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new UnaryOperatorMutator();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
+    }
+
     private static string Fixture(string expression) =>
         $$"""
             namespace Fixtures;
@@ -376,5 +454,26 @@ public class UnaryOperatorMutatorTests
         var mutator = new UnaryOperatorMutator();
 
         return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node);
+    }
+
+    /// <summary>
+    /// Mutates a fixture that deliberately does not compile, which is the only way to bind a literal
+    /// operand the unary operator cannot fold. The test using this overload pins the shape of the fixture
+    /// through the semantic model instead of through its compile errors.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>The created mutations, the tree, the marked node and the semantic model.</returns>
+    private static (
+        ImmutableArray<Mutation> Mutations,
+        SyntaxTree Tree,
+        ExpressionSyntax Node,
+        SemanticModel Model
+    ) MutateAllowingErrors(string source)
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new UnaryOperatorMutator();
+
+        return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node, semanticModel);
     }
 }

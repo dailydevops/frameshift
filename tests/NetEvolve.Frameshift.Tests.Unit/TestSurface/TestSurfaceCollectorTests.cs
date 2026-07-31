@@ -269,6 +269,36 @@ public class TestSurfaceCollectorTests
         _ = await Assert.That(threw).IsTrue();
     }
 
+    /// <summary>
+    /// The overloads taking a recogniser reject a <see langword="null" /> compilation as well. They do so
+    /// through the test-method discovery they evaluate first, which is the reason the shared analysis
+    /// carries no null check of its own.
+    /// </summary>
+    [Test]
+    public async Task Collect_CompilationIsNullWithARecognizer_ThrowsArgumentNullException()
+    {
+        var recognizer = new TUnitTestMethodRecognizer(testAttributeType: null);
+
+        var threw = ThrowsArgumentNull(() =>
+            _ = TestSurfaceCollector.Collect(null!, recognizer, CancellationToken.None)
+        );
+
+        _ = await Assert.That(threw).IsTrue();
+    }
+
+    /// <inheritdoc cref="Collect_CompilationIsNullWithARecognizer_ThrowsArgumentNullException" />
+    [Test]
+    public async Task FindTestsWithoutProductionReference_CompilationIsNullWithARecognizer_ThrowsArgumentNullException()
+    {
+        var recognizer = new TUnitTestMethodRecognizer(testAttributeType: null);
+
+        var threw = ThrowsArgumentNull(() =>
+            _ = TestSurfaceCollector.FindTestsWithoutProductionReference(null!, recognizer, CancellationToken.None)
+        );
+
+        _ = await Assert.That(threw).IsTrue();
+    }
+
     private static CSharpCompilation CreateProduction() =>
         CompilationFactory.Create(ProductionSource, ProductionAssemblyName, filePath: "Production.cs");
 

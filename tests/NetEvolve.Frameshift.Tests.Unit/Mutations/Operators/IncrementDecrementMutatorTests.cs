@@ -17,6 +17,10 @@ using TUnit.Core;
 /// </summary>
 public class IncrementDecrementMutatorTests
 {
+    private const string ExpressionPlaceholder = "EXPRESSION";
+
+    private const string KeywordPlaceholder = "KEYWORD";
+
     private const string IncrementOnlyOperatorSource = """
         namespace Fixtures;
 
@@ -180,6 +184,69 @@ public class IncrementDecrementMutatorTests
                 var current = value;
                 _ = /*!*/current++;
                 return current;
+            }
+        }
+        """;
+
+    private const string BorrowedOperatorNameSource = """
+        namespace Fixtures;
+
+        internal readonly struct Ticks
+        {
+            internal Ticks(int count) => Count = count;
+
+            internal int Count { get; }
+
+            public static Ticks operator ++(Ticks value) => new Ticks(value.Count + 1);
+
+            internal static Ticks op_Decrement(Ticks value) => value;
+        }
+
+        internal static class Clock
+        {
+            internal static Ticks Advance(Ticks value)
+            {
+                var current = value;
+                _ = /*!*/current++;
+                return current;
+            }
+        }
+        """;
+
+    private const string MemberTemplate = """
+        namespace Fixtures;
+
+        internal sealed class Counter
+        {
+            private readonly int[] _values = new int[4];
+
+            internal int Field = 0;
+
+            internal int Property { get; set; }
+
+            internal int this[int index]
+            {
+                get => _values[index];
+                set => _values[index] = value;
+            }
+
+            internal int Advance(int index)
+            {
+                _ = /*!*/EXPRESSION;
+                return Field + Property + this[index];
+            }
+        }
+        """;
+
+    private const string CheckedTemplate = """
+        namespace Fixtures;
+
+        internal static class Counter
+        {
+            internal static int Advance(int value)
+            {
+                _ = KEYWORD(/*!*/value++);
+                return value;
             }
         }
         """;
@@ -380,6 +447,84 @@ public class IncrementDecrementMutatorTests
         _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
         _ = await Assert.That(result.Mutations).IsEmpty();
     }
+
+    /// <summary>
+    /// The operand of an increment is not restricted to a local: a field, an auto property and an indexer
+    /// element are mutated exactly the same way, in both fixities.
+    /// </summary>
+    [Test]
+    [Arguments("Field++", "increment-decrement.postfix-increment-to-decrement", "Field--")]
+    [Arguments("++Field", "increment-decrement.prefix-increment-to-decrement", "--Field")]
+    [Arguments("Property++", "increment-decrement.postfix-increment-to-decrement", "Property--")]
+    [Arguments("++Property", "increment-decrement.prefix-increment-to-decrement", "--Property")]
+    [Arguments("Property--", "increment-decrement.postfix-decrement-to-increment", "Property++")]
+    [Arguments("this[index]++", "increment-decrement.postfix-increment-to-decrement", "this[index]--")]
+    [Arguments("++this[index]", "increment-decrement.prefix-increment-to-decrement", "--this[index]")]
+    public async Task CreateMutations_FieldPropertyOrIndexerOperand_SwapsTheOperator(
+        string expression,
+        string expectedId,
+        string expectedReplacement
+    )
+    {
+        var result = Mutate(CreateSource(MemberTemplate, expression, ExpressionPlaceholder));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(new[] { expectedId });
+        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+        _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+    }
+
+    /// <summary>
+    /// A <c>checked</c> or <c>unchecked</c> context changes what the mutant does at run time, but not
+    /// whether it is created: the swap is offered in both contexts.
+    /// </summary>
+    [Test]
+    [Arguments("checked")]
+    [Arguments("unchecked")]
+    public async Task CreateMutations_CheckedOrUncheckedContext_SwapsTheOperator(string keyword)
+    {
+        string[] expectedIds = ["increment-decrement.postfix-increment-to-decrement"];
+        var result = Mutate(CreateSource(CheckedTemplate, keyword, KeywordPlaceholder));
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("value--");
+    }
+
+    /// <summary>
+    /// A member that only borrows the metadata name of the decrement operator is no counterpart: it is an
+    /// ordinary method, not a user defined operator, so the swap is suppressed.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MemberWithTheCounterpartNameThatIsNoOperator_ReturnsEmpty()
+    {
+        var result = Mutate(BorrowedOperatorNameSource);
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Fixture("value++"));
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new IncrementDecrementMutator();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
+    }
+
+    private static string CreateSource(string template, string value, string placeholder) =>
+        template.Replace(placeholder, value, StringComparison.Ordinal);
 
     private static string Fixture(string expression) =>
         $$"""

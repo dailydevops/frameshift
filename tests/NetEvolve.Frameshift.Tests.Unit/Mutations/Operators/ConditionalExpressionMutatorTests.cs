@@ -664,6 +664,36 @@ public class ConditionalExpressionMutatorTests
         _ = await Assert.That(exception).IsNotNull();
     }
 
+    /// <summary>
+    /// A member binding expression never becomes the condition of a conditional expression in parsed
+    /// source, because the conditional access it belongs to always becomes the condition as a whole. The
+    /// negation still has to accept it, which a constructed conditional proves.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MemberBindingCondition_NegatesItWithoutParentheses()
+    {
+        var (_, semanticModel, _) = CompilationFactory.CreateWithModel(TernarySource);
+        var conditional = SyntaxFactory.ConditionalExpression(
+            SyntaxFactory.MemberBindingExpression(SyntaxFactory.IdentifierName("Flag")),
+            NumericLiteral(1),
+            NumericLiteral(2)
+        );
+        var mutator = new ConditionalExpressionMutator();
+        Mutation[] mutations = [.. mutator.CreateMutations(conditional, semanticModel, CancellationToken.None)];
+        var swapped = (ConditionalExpressionSyntax)mutations[0].Replacement;
+
+        _ = await Assert.That(conditional.Condition.Kind()).IsEqualTo(SyntaxKind.MemberBindingExpression);
+        _ = await Assert.That(mutations.Length).IsEqualTo(2);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("conditional-expression.swap-branches");
+        _ = await Assert.That(swapped.WhenTrue.ToString()).IsEqualTo("2");
+        _ = await Assert.That(swapped.WhenFalse.ToString()).IsEqualTo("1");
+        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("conditional-expression.negate-condition");
+        _ = await Assert.That(NegatedCondition(mutations[1])).IsEqualTo("!.Flag");
+    }
+
+    private static LiteralExpressionSyntax NumericLiteral(int value) =>
+        SyntaxFactory.LiteralExpression(SyntaxKind.NumericLiteralExpression, SyntaxFactory.Literal(value));
+
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindConditional);
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source, Func<SyntaxTree, SyntaxNode> select)

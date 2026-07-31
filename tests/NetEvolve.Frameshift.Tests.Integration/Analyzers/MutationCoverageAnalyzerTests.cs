@@ -31,6 +31,10 @@ public class MutationCoverageAnalyzerTests
     private const string AlphaMemberId = "M:Fixture.First.Alpha(System.Int32)";
     private const string BetaMemberId = "M:Fixture.Second.Beta(System.Int32)";
     private const string DescribeMemberId = "M:Toolbox.Describe(System.Int32)";
+    private const string GhostMemberId = "M:Fixture.Ghost.Vanished(System.Int32)~System.Int32";
+
+    private const string BrokenManifestPath = "Broken.frameshift-tests";
+    private const string UnrelatedAdditionalFilePath = "Notes.txt";
 
     private const string DiscardedTrivialMessage =
         "Mutation '+ => -' cannot change observable behaviour (the mutated value is assigned to a discard)";
@@ -299,10 +303,7 @@ public class MutationCoverageAnalyzerTests
     public async Task Analyze_ManifestHeaderIsMalformed_ReportsTheParseProblemOnce()
     {
         var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
-        var manifest = new InMemoryAdditionalText(
-            "Broken.frameshift-tests",
-            "not-a-manifest\nR " + CoveredMemberId + "\n"
-        );
+        var manifest = new InMemoryAdditionalText(BrokenManifestPath, "not-a-manifest\nR " + CoveredMemberId + "\n");
 
         var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
         var problems = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest);
@@ -504,6 +505,95 @@ public class MutationCoverageAnalyzerTests
         _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
         _ = await Assert.That(lines).Contains(TopLevelStatementLine);
         _ = await Assert.That(lines.Where(line => line is >= DescribeFirstLine and <= DescribeLastLine)).IsEmpty();
+    }
+
+    [Test]
+    public async Task Initialize_ContextIsNull_ThrowsArgumentNullException()
+    {
+        var analyzer = new MutationCoverageAnalyzer();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => analyzer.Initialize(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("context");
+    }
+
+    /// <summary>
+    /// Pins the unreadable side of reading a manifest file: the file is recognised as a manifest, but its
+    /// content is not available at all. Staying silent would let the whole compilation be judged against
+    /// an empty surface.
+    /// </summary>
+    [Test]
+    public async Task Analyze_ManifestContentIsNotAvailable_ReportsTheUnreadableFileInsteadOfGaps()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+
+        var diagnostics = await RunAsync(compilation, [InMemoryAdditionalText.WithoutContent()]).ConfigureAwait(false);
+        var problems = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest);
+
+        _ = await Assert.That(problems).Count().IsEqualTo(1);
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(problems))
+            .Contains("the content of the additional file is not available to the analyzer");
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint)).IsEmpty();
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.TrivialMutant)).IsEmpty();
+    }
+
+    /// <summary>
+    /// Pins the second reason of an unusable manifest, the one an empty manifest never produces: the
+    /// manifest parses and does record members, but not one of them exists in this compilation.
+    /// </summary>
+    [Test]
+    public async Task Analyze_RecordedMembersResolveToNothing_ExplainsTheForeignManifestInsteadOfBlamingTheCode()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+
+        var diagnostics = await RunAsync(compilation, [CreateManifest(GhostMemberId)]).ConfigureAwait(false);
+        var problems = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest);
+
+        _ = await Assert.That(problems).Count().IsEqualTo(1);
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(problems))
+            .Contains("belongs to a different project or is stale");
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint)).IsEmpty();
+    }
+
+    /// <summary>
+    /// The one combination the other manifest tests never produce: a problem to report <em>and</em> a
+    /// usable reachable set. The broken file must be named without the good one losing its effect.
+    /// </summary>
+    [Test]
+    public async Task Analyze_OneManifestIsMalformedAndOneIsUsable_ReportsTheBrokenFileAndStillUsesTheGoodOne()
+    {
+        var compilation = CompilationFactory.Create(MergeSource, ProductionAssemblyName);
+        var broken = new InMemoryAdditionalText(BrokenManifestPath, "not-a-manifest\n");
+        var usable = CreateManifestAt("Usable.frameshift-tests", AlphaMemberId);
+
+        var diagnostics = await RunAsync(compilation, [broken, usable]).ConfigureAwait(false);
+        var problems = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest);
+
+        _ = await Assert.That(problems).Count().IsEqualTo(1);
+        _ = await Assert.That(DiagnosticAssertions.Describe(problems)).Contains(BrokenManifestPath);
+        _ = await Assert
+            .That(GapLines(diagnostics).Distinct())
+            .IsEquivalentTo(new[] { BetaMemberLine, GammaMemberLine });
+    }
+
+    /// <summary>
+    /// Additional files are shared by everything the build hands to the analyzers, so a file that is not
+    /// a manifest must not opt the project in: the analysis stays as silent as it is without any file.
+    /// </summary>
+    [Test]
+    public async Task Analyze_AdditionalFileIsNotAManifest_ReportsNothing()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+        var unrelated = new InMemoryAdditionalText(
+            UnrelatedAdditionalFilePath,
+            TestSurfaceManifestFormat.Header + "\n"
+        );
+
+        var diagnostics = await RunAsync(compilation, [unrelated]).ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
 
     [Test]

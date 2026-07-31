@@ -27,16 +27,18 @@ internal sealed class LogicalOperatorMutator : MutationOperatorBase
         : base("logical", MutationKind.LogicalOperator, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// No type test is needed: <see cref="MutationOperatorBase.CreateMutations" /> only forwards nodes
+    /// whose kind is one of the <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, and every kind
+    /// this operator supports is a <see cref="BinaryExpressionSyntax" />.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
     )
     {
-        if (node is not BinaryExpressionSyntax binary)
-        {
-            return [];
-        }
+        var binary = (BinaryExpressionSyntax)node;
 
         cancellationToken.ThrowIfCancellationRequested();
 

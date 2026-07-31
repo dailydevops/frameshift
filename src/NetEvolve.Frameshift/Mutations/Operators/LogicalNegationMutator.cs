@@ -28,6 +28,12 @@ internal sealed class LogicalNegationMutator : MutationOperatorBase
         : base("negation", MutationKind.LogicalNegation, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The <see cref="MutationOperatorBase.CreateMutations" /> of the base class only forwards nodes whose
+    /// kind is one of the <see cref="MutationOperatorBase.SupportedSyntaxKinds" />, so every node that
+    /// arrives here is either the logical not expression or one of the four nodes that carry a condition.
+    /// The last arm is therefore the conditional expression, and no node without a condition exists.
+    /// </remarks>
     protected override IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode node,
         SemanticModel semanticModel,
@@ -36,29 +42,19 @@ internal sealed class LogicalNegationMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is PrefixUnaryExpressionSyntax negation)
+        return node switch
         {
-            return CreateRemoval(negation, semanticModel, cancellationToken);
-        }
-
-        var condition = GetCondition(node);
-        if (condition is null)
-        {
-            return [];
-        }
-
-        return CreateWrapping(condition, semanticModel, cancellationToken);
-    }
-
-    private static ExpressionSyntax? GetCondition(SyntaxNode node) =>
-        node switch
-        {
-            IfStatementSyntax ifStatement => ifStatement.Condition,
-            WhileStatementSyntax whileStatement => whileStatement.Condition,
-            DoStatementSyntax doStatement => doStatement.Condition,
-            ConditionalExpressionSyntax conditional => conditional.Condition,
-            _ => null,
+            PrefixUnaryExpressionSyntax negation => CreateRemoval(negation, semanticModel, cancellationToken),
+            IfStatementSyntax ifStatement => CreateWrapping(ifStatement.Condition, semanticModel, cancellationToken),
+            WhileStatementSyntax whileStatement => CreateWrapping(
+                whileStatement.Condition,
+                semanticModel,
+                cancellationToken
+            ),
+            DoStatementSyntax doStatement => CreateWrapping(doStatement.Condition, semanticModel, cancellationToken),
+            _ => CreateWrapping(((ConditionalExpressionSyntax)node).Condition, semanticModel, cancellationToken),
         };
+    }
 
     private IEnumerable<Mutation> CreateRemoval(
         PrefixUnaryExpressionSyntax negation,

@@ -42,6 +42,13 @@ public class LogicalOperatorMutatorTests
         }
         """;
 
+    private const string MixedNullableBooleanTemplate = """
+        internal static class Combinations
+        {
+            public static bool? Combine(bool left, bool? right) => /*!*/left OPERATOR right;
+        }
+        """;
+
     private const string TriviaSource = """
         internal static class Combinations
         {
@@ -237,6 +244,45 @@ public class LogicalOperatorMutatorTests
         _ = await Assert.That(binary.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
         _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
         _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// One nullable and one non-nullable boolean operand are both lifted to <see langword="bool" />?, so
+    /// the mixed pair is mutated exactly like a pair of plain boolean operands.
+    /// </summary>
+    [Test]
+    [Arguments("&", "& => |", "logical.boolean-and-to-boolean-or")]
+    [Arguments("|", "| => &", "logical.boolean-or-to-boolean-and")]
+    public async Task CreateMutations_MixedNullableAndPlainBooleanOperands_ProducesTheOppositeOperator(
+        string source,
+        string expectedName,
+        string expectedId
+    )
+    {
+        string[] expected = [expectedName];
+        var (mutations, tree, model, errors) = Mutate(CreateSource(MixedNullableBooleanTemplate, source));
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("bool");
+        _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.ToDisplayString()).IsEqualTo("bool?");
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
+    }
+
+    [Test]
+    public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateSource(BooleanTemplate, "&&"));
+        var node = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsync().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = _mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
     }
 
     private static string CreateSource(string template, string source) =>

@@ -34,10 +34,10 @@ internal sealed class EqualityOperatorMutator : MutationOperatorBase
         CancellationToken cancellationToken
     )
     {
-        if (node is not BinaryExpressionSyntax binary)
-        {
-            return [];
-        }
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and both equality kinds are binary expressions, so the cast cannot fail and no type test is
+        // needed here.
+        var binary = (BinaryExpressionSyntax)node;
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -84,6 +84,8 @@ internal sealed class EqualityOperatorMutator : MutationOperatorBase
             return true;
         }
 
+        // A user-defined operator is always declared inside a type, so this branch is not reachable. The
+        // null check stays because ISymbol.ContainingType is declared as a nullable reference.
         var containingType = method.ContainingType;
         if (containingType is null)
         {

@@ -29,7 +29,12 @@ internal sealed class BooleanLiteralMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (node is not LiteralExpressionSyntax literal || IsConstantRequired(literal))
+        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
+        // and both boolean literal kinds are literal expressions, so the cast cannot fail and no type test
+        // is needed here.
+        var literal = (LiteralExpressionSyntax)node;
+
+        if (IsConstantRequired(literal))
         {
             yield break;
         }
