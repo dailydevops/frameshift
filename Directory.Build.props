@@ -5,11 +5,11 @@
     <RepositoryUrl>https://github.com/dailydevops/frameshift</RepositoryUrl>
     <PackageProjectUrl>https://github.com/dailydevops/frameshift</PackageProjectUrl>
     <PackageReleaseNotes>$(PackageProjectUrl)/releases</PackageReleaseNotes>
-    <PackageTags>analyzers;mutation-testing;roslyn;tunit</PackageTags>
-    <CopyrightYearStart>2024</CopyrightYearStart>
+    <PackageTags>analyzers;mutation-testing;roslyn;tunit;xunit;nunit;mstest</PackageTags>
+    <CopyrightYearStart>2026</CopyrightYearStart>
   </PropertyGroup>
   <PropertyGroup>
     <!-- Workaround, until https://github.com/GitTools/GitVersion/pull/4206 is released -->
-    <GitVersionTargetFramework>net8.0</GitVersionTargetFramework>
+    <GitVersionTargetFramework>net10.0</GitVersionTargetFramework>
   </PropertyGroup>
 </Project>

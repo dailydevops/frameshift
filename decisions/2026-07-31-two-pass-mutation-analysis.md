@@ -3,11 +3,11 @@ authors:
   - Martin Stühmer
 
 applyTo:
-  - "src/NetEvolve.Frameshift/Analyzers/**/*.cs"
-  - "src/NetEvolve.Frameshift/Generation/**/*.cs"
-  - "src/NetEvolve.Frameshift/TestSurface/**/*.cs"
-  - "src/NetEvolve.Frameshift/Reachability/**/*.cs"
-  - "src/NetEvolve.Frameshift/build/*"
+  - "src/NetEvolve.FrameShift/Analyzers/**/*.cs"
+  - "src/NetEvolve.FrameShift/Generation/**/*.cs"
+  - "src/NetEvolve.FrameShift/TestSurface/**/*.cs"
+  - "src/NetEvolve.FrameShift/Reachability/**/*.cs"
+  - "src/NetEvolve.FrameShift/build/*"
 
 created: 2026-07-31
 
@@ -16,12 +16,12 @@ lastModified: 2026-07-31
 state: accepted
 
 instructions: |
-  Frameshift detects mutation-testing gaps by static analysis at build time and never executes a test.
+  FrameShift detects mutation-testing gaps by static analysis at build time and never executes a test.
   The analysis is split across two compilations, because a test compilation sees production code only as
   a metadata reference and owns no syntax tree to mutate, while a production compilation cannot see the
   tests. The test compilation records its test methods and the production members they reference; the
   `TestSurfaceManifestGenerator` emits that as a generated source file and the MSBuild target
-  `FrameshiftWriteTestSurfaceManifest` writes it to `$(MSBuildProjectName).frameshift-tests` next to the
+  `FrameShiftWriteTestSurfaceManifest` writes it to `$(MSBuildProjectName).frameshift-tests` next to the
   test project, where it is committed. The production compilation reads that manifest through
   `AdditionalFiles`, seeds `ReachabilityClosure` with the recorded member ids, closes the set over the
   production call graph — which only this side can see — generates mutants by rewriting syntax, verifies
@@ -34,7 +34,7 @@ instructions: |
 
 # Decision: Two-pass, build-time mutation analysis bridged by a committed test-surface manifest
 
-Frameshift reports mutation-testing gaps as compiler diagnostics during a normal build and never
+FrameShift reports mutation-testing gaps as compiler diagnostics during a normal build and never
 executes a test. The analysis cannot live in a single compilation, so it is split into a test-side pass
 that records which production members the tests touch and a production-side pass that mutates the code
 and decides which mutation points no test can reach. A committed plain-text *test-surface manifest* is
@@ -90,13 +90,13 @@ committed to the repository.
   as source: the whole emitted file is one block comment whose first line is exactly `/*`, whose last
   line is exactly `*/` and whose intermediate lines are verbatim manifest lines. Such a file is valid C#
   that contributes nothing to the compilation.
-- The packaged target `FrameshiftWriteTestSurfaceManifest` runs `AfterTargets="CoreCompile"`, reads that
+- The packaged target `FrameShiftWriteTestSurfaceManifest` runs `AfterTargets="CoreCompile"`, reads that
   generated file, drops its first and last line and writes the remainder to
-  `$(FrameshiftTestSurfaceManifestFile)`, which defaults to
+  `$(FrameShiftTestSurfaceManifestFile)`, which defaults to
   `$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests`. The sibling target
-  `FrameshiftConfigureTestSurfaceManifest` decides whether this project writes a manifest at all (based
+  `FrameShiftConfigureTestSurfaceManifest` decides whether this project writes a manifest at all (based
   on a referenced TUnit, xunit, NUnit or MSTest package unless
-  `FrameshiftWriteTestSurfaceManifest` is set explicitly), elects exactly one inner build of a
+  `FrameShiftWriteTestSurfaceManifest` is set explicitly), elects exactly one inner build of a
   multi-targeting project as the writer, turns on `EmitCompilerGeneratedFiles`, and removes the test
   project's own manifest from its `@(AdditionalFiles)` so that a test project is never judged against
   itself. The file is written with `WriteOnlyWhenDifferent="true"`, so an unchanged surface does not
@@ -169,7 +169,7 @@ flowchart TD
         C --> E["TestSurfaceAnalysis<br/>FSH0003 stale manifest · FSH0004 test without reference"]
     end
 
-    D --> F["MSBuild target FrameshiftWriteTestSurfaceManifest<br/>drops '/*' and '*/'"]
+    D --> F["MSBuild target FrameShiftWriteTestSurfaceManifest<br/>drops '/*' and '*/'"]
     F --> G[("&lt;TestProject&gt;.frameshift-tests<br/>committed to the repository")]
     G -->|"AdditionalFiles"| H
 
@@ -192,12 +192,12 @@ flowchart TD
   diagnostics — the same on a developer machine as on a build agent.
 - **Fast enough for a normal build.** No process is started per mutant. The most expensive step,
   verification, re-binds only the mutated tree, and results are memoised per mutation identity;
-  `FrameshiftMaxMutantsPerMember` (default 64) caps a pathological member.
+  `FrameShiftMaxMutantsPerMember` (default 64) caps a pathological member.
 - **Works everywhere a compiler runs.** The findings are ordinary diagnostics, so they appear in the
   IDE's error list, in `dotnet build` output and in CI logs, and they can be escalated or suppressed with
   `.editorconfig` and `TreatWarningsAsErrors` like any other analyzer diagnostic.
 - **No phantom findings from impossible mutants.** Every candidate is verified by recompilation before it
-  is reported, so a rewrite that does not build is never presented as a gap. (`FrameshiftVerifyMutantCompilation`
+  is reported, so a rewrite that does not build is never presented as a gap. (`FrameShiftVerifyMutantCompilation`
   can turn this off; the default is `true`.)
 - **The manifest is reviewable.** A change to the tested surface shows up as a readable diff in a pull
   request.
@@ -225,10 +225,10 @@ flowchart TD
   the whole compilation, which keeps the cost linear at the price of accepting a mutant that would break
   code in a *different* file as viable. The manifest generator depends on the whole `Compilation` and
   therefore cannot be incremental; it re-runs on every build and every keystroke in the IDE.
-  `FrameshiftEnabled=false` switches the analysis off, `FrameshiftWriteTestSurfaceManifest=false`
+  `FrameShiftEnabled=false` switches the analysis off, `FrameShiftWriteTestSurfaceManifest=false`
   keeps the analysis but stops the writing.
 - **No surviving-versus-killed distinction, and therefore no mutation score.** Deciding whether a test
-  *fails* for a mutant requires running that test against that mutant. Frameshift never does, so it
+  *fails* for a mutant requires running that test against that mutant. FrameShift never does, so it
   cannot and does not report a mutation score, a kill rate or a survivor list. What it reports instead is
   reachability — can any test reach this mutation point at all — and triviality — could this mutant
   change observable behaviour at all. An unreachable mutation point is a guaranteed survivor; a reachable

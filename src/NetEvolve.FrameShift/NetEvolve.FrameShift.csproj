@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+  </PropertyGroup>
+  <PropertyGroup Label="Analyzer packaging">
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- The assembly ships as an analyzer asset, so there is no lib/ folder to describe. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- Symbols travel next to the analyzer assembly; a separate symbol package would be empty. -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerAssets</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+  <Target Name="PackAnalyzerAssets">
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="@(IntermediateAssembly)" PackagePath="analyzers/dotnet/cs/" />
+      <TfmSpecificPackageFile Include="@(DocFileItem)" PackagePath="analyzers/dotnet/cs/" />
+    </ItemGroup>
+  </Target>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" />
+  </ItemGroup>
+  <ItemGroup Label="Test visibility">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Tests.Integration</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+  <ItemGroup Label="Package build assets">
+    <!-- Shipped under build/ for direct references and buildTransitive/ so project references inherit them. -->
+    <None Update="build\NetEvolve.FrameShift.props" Pack="true" PackagePath="build\NetEvolve.FrameShift.props;buildTransitive\NetEvolve.FrameShift.props" />
+    <None Update="build\NetEvolve.FrameShift.targets" Pack="true" PackagePath="build\NetEvolve.FrameShift.targets;buildTransitive\NetEvolve.FrameShift.targets" />
+  </ItemGroup>
+  <ItemGroup Label="Package build assets (without default items)" Condition="'$(EnableDefaultItems)' == 'false' Or '$(EnableDefaultNoneItems)' == 'false'">
+    <None Include="build\NetEvolve.FrameShift.props" Pack="true" PackagePath="build\NetEvolve.FrameShift.props;buildTransitive\NetEvolve.FrameShift.props" />
+    <None Include="build\NetEvolve.FrameShift.targets" Pack="true" PackagePath="build\NetEvolve.FrameShift.targets;buildTransitive\NetEvolve.FrameShift.targets" />
+  </ItemGroup>
+</Project>

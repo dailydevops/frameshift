@@ -1,16 +1,16 @@
-# NetEvolve.Frameshift
+# NetEvolve.FrameShift
 
 [![License](https://img.shields.io/github/license/dailydevops/frameshift.svg)](LICENSE)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/dailydevops/frameshift/cicd.yml?branch=main)](https://github.com/dailydevops/frameshift/actions)
 [![Contributors](https://img.shields.io/github/contributors/dailydevops/frameshift.svg)](https://github.com/dailydevops/frameshift/graphs/contributors)
 
-This repository contains `NetEvolve.Frameshift`, a Roslyn analyzer package that reports mutation-testing gaps at build time without executing a single test. It generates mutants by rewriting the syntax tree of the production code, checks whether any discovered test can reach the mutated member, and reports the points where a surviving mutant would go unnoticed as ordinary compiler diagnostics. This README is for contributors to the repository itself; if you only want to use the package in your own solution, read the [package README](src/NetEvolve.Frameshift/README.md) instead.
+This repository contains `NetEvolve.FrameShift`, a Roslyn analyzer package that reports mutation-testing gaps at build time without executing a single test. It generates mutants by rewriting the syntax tree of the production code, checks whether any discovered test can reach the mutated member, and reports the points where a surviving mutant would go unnoticed as ordinary compiler diagnostics. This README is for contributors to the repository itself; if you only want to use the package in your own solution, read the [package README](src/NetEvolve.FrameShift/README.md) instead.
 
 ## Overview
 
 The analysis has to run in two passes, and that constraint shapes the whole solution. A test compilation references the production assembly as metadata only: it can name the production members its test methods touch, but it owns no production syntax tree it could mutate. A production compilation owns every syntax tree and the complete call graph, but it cannot see a single test. Neither side alone knows enough.
 
-The **test side** therefore runs first. A test-framework specific analyzer discovers the test methods of the project, walks the code reachable from them inside the test assembly and records every production member they reference. A source generator serialises that list into a _test-surface manifest_ and emits it as a generated source file; the packaged MSBuild target `FrameshiftWriteTestSurfaceManifest` turns that file into `<ProjectName>.frameshift-tests` next to the test project. The manifest is a plain, line-based text file beginning with `frameshift-test-surface/1`, with one documentation comment id per line, prefixed `T` for a test method and `R` for a referenced production member. It is meant to be checked in and diffed.
+The **test side** therefore runs first. A test-framework specific analyzer discovers the test methods of the project, walks the code reachable from them inside the test assembly and records every production member they reference. A source generator serialises that list into a _test-surface manifest_ and emits it as a generated source file; the packaged MSBuild target `FrameShiftWriteTestSurfaceManifest` turns that file into `<ProjectName>.frameshift-tests` next to the test project. The manifest is a plain, line-based text file beginning with `frameshift-test-surface/1`, with one documentation comment id per line, prefixed `T` for a test method and `R` for a referenced production member. It is meant to be checked in and diffed.
 
 The **production side** consumes the manifest through `AdditionalFiles`. `MutationCoverageAnalyzer` seeds the reachable set from the recorded member ids, closes it transitively over the production call graph — which only this side can see — walks every syntax tree, generates the candidate mutants, verifies by in-memory recompilation that each one still compiles, and classifies those that cannot change observable behaviour. What remains is reported: `FSH0001` for a meaningful mutant in an unreachable member, `FSH0002` for a mutant without observable effect, `FSH0003` for a manifest that is missing, malformed or stale, and `FSH0004` for a test method that references no production member at all. A project without a manifest stays silent, because it has not opted in; the MSBuild warning `FSH0005` reports the missing setup instead.
 
@@ -38,7 +38,7 @@ flowchart TB
     M -->|"AdditionalFiles"| P1
 ```
 
-Inside `src/NetEvolve.Frameshift` the code is organised by layer, and each layer is the place to look for exactly one concern:
+Inside `src/NetEvolve.FrameShift` the code is organised by layer, and each layer is the place to look for exactly one concern:
 
 - **`Analyzers`** — the diagnostic analyzers: one test-surface analyzer per supported test framework, plus `MutationCoverageAnalyzer` for the production side.
 - **`TestSurface`** — the manifest format, reader and writer, the framework probes and test-method recognisers, and the registry that makes framework support pluggable.
@@ -54,12 +54,12 @@ Inside `src/NetEvolve.Frameshift` the code is organised by layer, and each layer
 
 ### Analyzer
 
-- **NetEvolve.Frameshift** (`netstandard2.0`) — the analyzers, the source generator and the packaged MSBuild assets. Built with `EnforceExtendedAnalyzerRules`, packed as a development dependency with the assembly under `analyzers/dotnet/cs` and the build assets under `build/` and `buildTransitive/`. See the [package README](src/NetEvolve.Frameshift/README.md).
+- **NetEvolve.FrameShift** (`netstandard2.0`) — the analyzers, the source generator and the packaged MSBuild assets. Built with `EnforceExtendedAnalyzerRules`, packed as a development dependency with the assembly under `analyzers/dotnet/cs` and the build assets under `build/` and `buildTransitive/`. See the [package README](src/NetEvolve.FrameShift/README.md).
 
 ### Tests
 
-- **NetEvolve.Frameshift.Tests.Unit** (`net8.0`, `net9.0`, `net10.0`) — TUnit unit tests for the operators, the equivalence classifier, the reachability closure, the manifest format and the option parsing. Also hosts the shared test infrastructure.
-- **NetEvolve.Frameshift.Tests.Integration** (`net8.0`, `net9.0`, `net10.0`) — TUnit tests that drive whole compilations through the analyzers and the generator end to end, including the manifest round trip.
+- **NetEvolve.FrameShift.Tests.Unit** (`net8.0`, `net9.0`, `net10.0`) — TUnit unit tests for the operators, the equivalence classifier, the reachability closure, the manifest format and the option parsing. Also hosts the shared test infrastructure.
+- **NetEvolve.FrameShift.Tests.Integration** (`net8.0`, `net9.0`, `net10.0`) — TUnit tests that drive whole compilations through the analyzers and the generator end to end, including the manifest round trip.
 
 Both test projects reference the analyzer by project reference and run on TUnit. They additionally reference `xunit.core`, `xunit.v3.core`, `NUnit` and `MSTest.TestFramework` as compile-time-only metadata (`PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers"`), so the framework probes can be exercised against the real attribute types without a competing test platform extension entering the run.
 
@@ -127,7 +127,7 @@ Package versions are managed centrally in `Directory.Packages.props`; project fi
 dotnet test
 
 # Run a single test project on a single target framework
-dotnet test ./tests/NetEvolve.Frameshift.Tests.Unit/NetEvolve.Frameshift.Tests.Unit.csproj -f net10.0
+dotnet test ./tests/NetEvolve.FrameShift.Tests.Unit/NetEvolve.FrameShift.Tests.Unit.csproj -f net10.0
 ```
 
 The test projects declare their kind through assembly-level categorisation attributes in the project file — `NetEvolve.Extensions.TUnit.UnitTestAttribute` and `NetEvolve.Extensions.TUnit.IntegrationTestAttribute` — so `--filter` can select unit or integration tests by category instead of by project path.
@@ -137,7 +137,7 @@ The test projects declare their kind through assembly-level categorisation attri
 Coverage is collected through `Microsoft.Testing.Extensions.CodeCoverage`, which both test projects reference:
 
 ```bash
-dotnet test ./tests/NetEvolve.Frameshift.Tests.Unit/NetEvolve.Frameshift.Tests.Unit.csproj -f net10.0 -- --coverage --coverage-output-format cobertura --coverage-output unit.cobertura.xml
+dotnet test ./tests/NetEvolve.FrameShift.Tests.Unit/NetEvolve.FrameShift.Tests.Unit.csproj -f net10.0 -- --coverage --coverage-output-format cobertura --coverage-output unit.cobertura.xml
 ```
 
 Measure each test project separately, with its own `--coverage-output` file name. Running both in one invocation makes them write to the same output file, and the second run overwrites the first. Pin a single target framework as well, for the same reason. Merge the resulting Cobertura files afterwards if you need a combined number.
@@ -146,8 +146,8 @@ Measure each test project separately, with its own `--coverage-output` file name
 
 Both gates are enforced by the build itself, so measure them instead of trusting a number written down here:
 
-- `dotnet build ./Frameshift.slnx -c Release` must be free of errors **and** warnings. `NetEvolve.Defaults` turns on `TreatWarningsAsErrors` for `Release`, so a single analyzer warning fails it — and the repository's `.editorconfig` raises several analyzer rules to `error`, which fails `Debug` as well.
-- `dotnet test ./Frameshift.slnx` must be green on all three target frameworks of both test projects.
+- `dotnet build ./FrameShift.slnx -c Release` must be free of errors **and** warnings. `NetEvolve.Defaults` turns on `TreatWarningsAsErrors` for `Release`, so a single analyzer warning fails it — and the repository's `.editorconfig` raises several analyzer rules to `error`, which fails `Debug` as well.
+- `dotnet test ./FrameShift.slnx` must be green on all three target frameworks of both test projects.
 
 Run both before opening a pull request; CI runs the same commands.
 
@@ -164,7 +164,7 @@ CSharpier also runs as part of the build, through the `CSharpier.MSBuild` packag
 
 ```txt
 src/                                          # Production code
-└── NetEvolve.Frameshift/                     # The analyzer package
+└── NetEvolve.FrameShift/                     # The analyzer package
     ├── Analyzers/                            # Diagnostic analyzers, test side and production side
     ├── Configuration/                        # MSBuild-backed options and their keys
     ├── Diagnostics/                          # Diagnostic ids and descriptors
@@ -179,8 +179,8 @@ src/                                          # Production code
     └── AnalyzerReleases.Unshipped.md         # Diagnostics not yet released
 
 tests/                                        # Test projects
-├── NetEvolve.Frameshift.Tests.Unit/          # Unit tests and shared test infrastructure
-└── NetEvolve.Frameshift.Tests.Integration/   # End-to-end analyzer and generator tests
+├── NetEvolve.FrameShift.Tests.Unit/          # Unit tests and shared test infrastructure
+└── NetEvolve.FrameShift.Tests.Integration/   # End-to-end analyzer and generator tests
 
 docs/
 └── rules/                                    # One document per diagnostic, target of the help links
@@ -219,7 +219,7 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 ## Documentation
 
-- **[Package README](src/NetEvolve.Frameshift/README.md)** - Installation, setup and configuration for consumers
+- **[Package README](src/NetEvolve.FrameShift/README.md)** - Installation, setup and configuration for consumers
 - **[Rule Documentation](docs/rules/README.md)** - One document per diagnostic, with causes and remedies
 - **[Architecture Decision Records](decisions/)** - Detailed architectural decisions and rationale
 - **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to this project
