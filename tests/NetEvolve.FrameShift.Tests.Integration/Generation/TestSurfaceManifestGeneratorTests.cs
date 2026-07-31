@@ -24,9 +24,24 @@ using TUnit.Core;
 /// than through the constants of the generator.
 /// </para>
 /// <para>
-/// Every framework gets the same three questions: is exactly one source generated, does the text between
-/// the comment markers parse back into the manifest <see cref="TestSurfaceCollector" /> produces for the
-/// same compilation, and does the emitted file still compile once it is part of the compilation.
+/// The questions split into two kinds. What the generator emitted for a given compilation is a snapshot:
+/// the manifest of each of the four frameworks, the union a compilation referencing two of them produces,
+/// and the documentation comment ids of the most awkward members a C# API can offer. A snapshot states
+/// the answer in full and lets a reviewer read it, which no assertion over counts and prefixes can.
+/// </para>
+/// <para>
+/// Everything a snapshot would weaken into "something changed" stays an explicit assertion: the contract
+/// with the MSBuild target that the first line is <c>/*</c> and the last one <c>*/</c>, that a production
+/// compilation generates nothing at all, that <c>FrameShiftEnabled=false</c> switches the generator off,
+/// that two runs are byte identical, and that every emitted id resolves back to a symbol. None of those
+/// is a statement about one particular output, so none of them belongs in a file that is regenerated
+/// whenever the output legitimately changes.
+/// </para>
+/// <para>
+/// The snapshots are identical on all eight target frameworks of the matrix, because everything in them
+/// comes from the fixtures rather than from the executing runtime. The xUnit fixture is the single
+/// exception, and only in that it does not exist on net6.0 and net7.0, where xUnit.net v3 ships no assets
+/// at all; the snapshot it compares against on the other six is the same file for all of them.
 /// </para>
 /// </remarks>
 public class TestSurfaceManifestGeneratorTests
@@ -76,6 +91,7 @@ public class TestSurfaceManifestGeneratorTests
         }
         """;
 
+#if FRAMESHIFT_XUNIT_V3
     private const string XunitSource = """
         namespace Tests;
 
@@ -90,6 +106,7 @@ public class TestSurfaceManifestGeneratorTests
             }
         }
         """;
+#endif
 
     private const string NUnitSource = """
         namespace Tests;
@@ -250,7 +267,9 @@ public class TestSurfaceManifestGeneratorTests
         List<string> described = [Describe(production), Describe(CreateAwkwardProduction())];
 
         described.Add(Describe(CreateTest(TestFramework.TUnit, TUnitSource, production)));
+#if FRAMESHIFT_XUNIT_V3
         described.Add(Describe(CreateTest(TestFramework.XunitV3, XunitSource, production)));
+#endif
         described.Add(Describe(CreateTest(TestFramework.NUnit, NUnitSource, production)));
         described.Add(Describe(CreateTest(TestFramework.MSTest, MSTestSource, production)));
         described.Add(Describe(CreateTest(TestFramework.All, MixedFrameworkSource, production)));
@@ -312,57 +331,55 @@ public class TestSurfaceManifestGeneratorTests
     }
 
     /// <summary>
-    /// The TUnit manifest parses back into exactly what the collector produces, and the emitted file is
-    /// valid C#.
+    /// Everything the generator emits for a TUnit test project, verbatim.
     /// </summary>
     [Test]
-    public async Task Generate_TUnitCompilation_MatchesTheCollectorAndCompiles() =>
-        await AssertMatchesCollectorAsync(TestFramework.TUnit, TUnitSource).ConfigureAwait(false);
+    public async Task Generate_TUnitCompilation_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction()))
+            .ConfigureAwait(false);
 
+#if FRAMESHIFT_XUNIT_V3
     /// <summary>
-    /// The same for xUnit, which reaches the generator through a different probe.
+    /// The same for xUnit, which reaches the generator through a different probe. The fixture and this
+    /// test are compiled out on net6.0 and net7.0, where xUnit.net v3 ships no assets at all; the other
+    /// six frameworks of the matrix compare the very same snapshot.
     /// </summary>
     [Test]
-    public async Task Generate_XunitCompilation_MatchesTheCollectorAndCompiles() =>
-        await AssertMatchesCollectorAsync(TestFramework.XunitV3, XunitSource).ConfigureAwait(false);
+    public async Task Generate_XunitCompilation_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.XunitV3, XunitSource, CreateProduction()))
+            .ConfigureAwait(false);
+#endif
 
     /// <summary>
     /// The same for NUnit.
     /// </summary>
     [Test]
-    public async Task Generate_NUnitCompilation_MatchesTheCollectorAndCompiles() =>
-        await AssertMatchesCollectorAsync(TestFramework.NUnit, NUnitSource).ConfigureAwait(false);
+    public async Task Generate_NUnitCompilation_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.NUnit, NUnitSource, CreateProduction()))
+            .ConfigureAwait(false);
 
     /// <summary>
     /// The same for MSTest.
     /// </summary>
     [Test]
-    public async Task Generate_MSTestCompilation_MatchesTheCollectorAndCompiles() =>
-        await AssertMatchesCollectorAsync(TestFramework.MSTest, MSTestSource).ConfigureAwait(false);
+    public async Task Generate_MSTestCompilation_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.MSTest, MSTestSource, CreateProduction()))
+            .ConfigureAwait(false);
 
     /// <summary>
     /// A project in the middle of a migration references two frameworks at once. Preferring one of them
     /// would drop half of the tests from the manifest and make the production side report gaps for code
     /// that is covered, so the single manifest carries the union of both surfaces.
     /// </summary>
+    /// <remarks>
+    /// The snapshot is what makes the union visible: the TUnit test, the NUnit test and both of the
+    /// production methods they exercise stand in one file, so a manifest that silently preferred one of
+    /// the two frameworks shows up as the missing half rather than as a changed count.
+    /// </remarks>
     [Test]
-    public async Task Generate_CompilationUsingTwoFrameworks_ContainsTheUnionOfBothSurfaces()
-    {
-        var test = CreateTest(TestFramework.All, MixedFrameworkSource, CreateProduction());
-        var (_, error, manifest) = Read(Generate(test));
-
-        var union = Union(
-            Collect(test, TestFramework.TUnit),
-            Collect(test, TestFramework.NUnit),
-            Collect(test, TestFramework.XunitV3)
-        );
-
-        _ = await Assert.That(error).IsEqualTo(string.Empty);
-        _ = await Assert.That(Canonical(manifest)).IsEqualTo(TestSurfaceManifestWriter.Write(union));
-        _ = await Assert.That(manifest.TestMethodIds.Count).IsEqualTo(2);
-        _ = await Assert.That(Contains(manifest.ReferencedMemberIds, "M:Fixture.Calculator.Add")).IsTrue();
-        _ = await Assert.That(Contains(manifest.ReferencedMemberIds, "M:Fixture.Calculator.Subtract")).IsTrue();
-    }
+    public async Task Generate_CompilationUsingTwoFrameworks_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.All, MixedFrameworkSource, CreateProduction()))
+            .ConfigureAwait(false);
 
     /// <summary>
     /// Switching FrameShift off has to switch the generator off as well, otherwise the promised escape
@@ -469,6 +486,23 @@ public class TestSurfaceManifestGeneratorTests
     }
 
     /// <summary>
+    /// Every documentation comment id the awkward fixture produces, verbatim: the arity suffix of a
+    /// generic type, the double backtick arity of a generic method with its type parameters in the
+    /// signature, the parameter list of an indexer, the mangled name of an operator, the interface member
+    /// behind an explicit implementation and the dotted name of a nested type.
+    /// </summary>
+    /// <remarks>
+    /// This snapshot is the readable counterpart of
+    /// <see cref="Generate_AwkwardMemberNames_ProducesIdsThatResolveBackToSymbols" />: that test proves
+    /// every id resolves, which a snapshot cannot, and this one states which ids there are, which the
+    /// resolution test cannot. Both are needed — an id that silently disappeared from the walk would
+    /// still resolve for the ones that remain.
+    /// </remarks>
+    [Test]
+    public async Task Generate_AwkwardMemberNames_MatchesTheSnapshot() =>
+        await VerifyGeneratedSourcesAsync(CreateAwkwardTest()).ConfigureAwait(false);
+
+    /// <summary>
     /// The defensive guard of the generator: not one emitted line may contain the sequence that closes
     /// the block comment, because such a line would end the comment in the middle of the file and turn
     /// the rest of the manifest into code that cannot compile.
@@ -492,25 +526,51 @@ public class TestSurfaceManifestGeneratorTests
     }
 
     /// <summary>
-    /// Generates the manifest for <paramref name="source" /> and compares it with the surface the
-    /// collector produces for the same compilation and the same framework.
+    /// Runs the generator over <paramref name="compilation" /> and verifies everything it produced —
+    /// the driver diagnostics and the generated sources — against the snapshot of the calling test.
     /// </summary>
-    /// <param name="framework">The framework the test compilation references.</param>
-    /// <param name="source">The source of the test compilation.</param>
-    /// <returns>A task that completes when every expectation has been checked.</returns>
-    private static async Task AssertMatchesCollectorAsync(TestFramework framework, string source)
+    /// <param name="compilation">The compilation the generator sees.</param>
+    /// <returns>A task that completes when the snapshot has been compared.</returns>
+    /// <remarks>
+    /// <para>
+    /// Both collections are sorted before they are handed to the snapshot. Neither the driver nor the
+    /// generator promises an order — a source output callback may run concurrently with the callbacks of
+    /// other generators — so an unsorted snapshot would fail at random instead of when the output
+    /// changes. The manifest text inside a generated source is already ordered by the writer.
+    /// </para>
+    /// <para>
+    /// The diagnostics are rendered into one string rather than snapshotted as a collection. Verify ships
+    /// a different assembly per target framework and they do not agree on how an empty collection is
+    /// written — some omit the member, others write <c>null</c> — which would make the eight runs of the
+    /// matrix disagree about a snapshot none of them changed. A rendered string is the same everywhere and
+    /// still fails the day the generator starts reporting something.
+    /// </para>
+    /// <para>
+    /// The generated file still has to compile, which no snapshot can express, so that stays an explicit
+    /// assertion next to the snapshot.
+    /// </para>
+    /// </remarks>
+    private static async Task VerifyGeneratedSourcesAsync(Compilation compilation)
     {
-        var test = CreateTest(framework, source, CreateProduction());
-        var output = Run(test);
-        var (success, error, manifest) = Read(output.TextOf(TestSurfaceManifestGenerator.HintName));
-        var expected = Canonical(Collect(test, framework));
+        var output = Run(compilation);
 
-        _ = await Assert.That(output.HintNames).IsEqualTo(TestSurfaceManifestGenerator.HintName);
-        _ = await Assert.That(error).IsEqualTo(string.Empty);
-        _ = await Assert.That(success).IsTrue();
-        _ = await Assert.That(manifest.IsEmpty).IsFalse();
-        _ = await Assert.That(Canonical(manifest)).IsEqualTo(expected);
+        var diagnostics = output.Diagnostics.IsEmpty
+            ? DiagnosticAssertions.NoDiagnostics
+            : string.Join(
+                "\n",
+                output
+                    .Diagnostics.OrderBy(diagnostic => diagnostic.Id, StringComparer.Ordinal)
+                    .ThenBy(diagnostic => diagnostic.Location.SourceSpan.Start)
+                    .Select(DiagnosticAssertions.Describe)
+            );
+
+        var sources = output
+            .Sources.OrderBy(source => source.HintName, StringComparer.Ordinal)
+            .Select(source => source.Text.ToString())
+            .ToImmutableArray();
+
         _ = await Assert.That(Describe(output.Compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Verify(new { diagnostics, sources }).ConfigureAwait(false);
     }
 
     private static GeneratorRunner.Output Run(
@@ -548,51 +608,6 @@ public class TestSurfaceManifestGeneratorTests
             additionalReferences: [production.ToMetadataReference()],
             filePath: TestPath
         );
-
-    /// <summary>
-    /// Collects the surface of <paramref name="test" /> through the probe of one framework, which is the
-    /// per-framework half of what the generator unites.
-    /// </summary>
-    /// <param name="test">The test compilation.</param>
-    /// <param name="framework">The framework whose probe is used.</param>
-    /// <returns>The collected manifest.</returns>
-    /// <exception cref="InvalidOperationException">The probe does not recognise the compilation.</exception>
-    private static TestSurfaceManifest Collect(Compilation test, TestFramework framework)
-    {
-        var probe = ProbeFor(framework);
-        var recognizer =
-            probe.TryCreateRecognizer(test)
-            ?? throw new InvalidOperationException(
-                "The probe of " + probe.FrameworkName + " does not recognise the fixture compilation."
-            );
-
-        return TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None);
-    }
-
-    private static ITestFrameworkProbe ProbeFor(TestFramework framework) =>
-        framework switch
-        {
-            TestFramework.TUnit => TUnitTestFrameworkProbe.Instance,
-            TestFramework.XunitV3 => XunitTestFrameworkProbe.Instance,
-            TestFramework.XunitV2 => XunitTestFrameworkProbe.Instance,
-            TestFramework.NUnit => NUnitTestFrameworkProbe.Instance,
-            TestFramework.MSTest => MSTestTestFrameworkProbe.Instance,
-            _ => throw new ArgumentOutOfRangeException(nameof(framework)),
-        };
-
-    private static TestSurfaceManifest Union(params TestSurfaceManifest[] manifests)
-    {
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-
-        foreach (var manifest in manifests)
-        {
-            testMethodIds.UnionWith(manifest.TestMethodIds);
-            referencedMemberIds.UnionWith(manifest.ReferencedMemberIds);
-        }
-
-        return new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
-    }
 
     /// <summary>
     /// Parses the generated file the way the MSBuild target does: drop the first and the last line, hand

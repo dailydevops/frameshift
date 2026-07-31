@@ -1,0 +1,6 @@
+﻿FSH0001 Source.cs(20,16): Mutation '- => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(20,16): Mutation '- => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(20,16): Mutation '- => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(20,16): Mutation '- => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(20,24): Mutation '4 => 3' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(20,24): Mutation '4 => 5' at this location is not reachable from any test; a surviving mutant here would go unnoticed

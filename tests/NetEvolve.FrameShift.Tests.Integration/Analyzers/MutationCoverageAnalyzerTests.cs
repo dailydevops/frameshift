@@ -1,6 +1,7 @@
 namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -41,17 +42,33 @@ public class MutationCoverageAnalyzerTests
 
     private const int CoveredMemberLine = 7;
     private const int UncoveredMemberLine = 15;
-    private const int TransitiveHelperLine = 12;
-    private const int OrphanMemberLine = 20;
     private const int TrivialMutationLine = 15;
     private const int TrivialFixtureGapLine = 20;
     private const int ElapsedMemberLine = 17;
-    private const int BudgetMemberLine = 15;
     private const int BetaMemberLine = 15;
     private const int GammaMemberLine = 23;
-    private const int TopLevelStatementLine = 6;
-    private const int DescribeFirstLine = 10;
-    private const int DescribeLastLine = 25;
+
+    /// <summary>
+    /// The line feed the snapshots are built with, instead of <see cref="Environment.NewLine" />.
+    /// </summary>
+    private const string LineFeed = "\n";
+
+    /// <summary>
+    /// The separator between the parts of the key <see cref="SortKey(Diagnostic)" /> builds. It never
+    /// occurs in an identifier or a path, and a message containing it still sorts deterministically.
+    /// </summary>
+    private const string KeySeparator = "|";
+
+    /// <summary>
+    /// The width every number of an ordering key is padded to, so that an ordinal comparison of the keys
+    /// puts line 9 before line 10 instead of after it.
+    /// </summary>
+    private const string KeyNumberFormat = "D6";
+
+    private const string EveryMutantHeading = "=== every mutant of the member ===";
+    private const string OneMutantHeading = "=== at most one mutant per member ===";
+    private const string FirstManifestHeading = "=== the first manifest alone ===";
+    private const string BothManifestsHeading = "=== both manifests ===";
 
     /// <summary>
     /// Two members with identical shape, of which only <c>Covered.Scale</c> is exercised by the test
@@ -351,19 +368,22 @@ public class MutationCoverageAnalyzerTests
         _ = await Assert.That(DiagnosticAssertions.Describe(gaps)).Contains("Mutation '/ => +'");
     }
 
+    /// <summary>
+    /// The manifest names <c>Pipeline.Run</c> and nothing else, and that member calls the private
+    /// <c>Pipeline.Normalize</c> on line 12. The snapshot states both halves of "transitively reached
+    /// counts as covered" at once: not one line of the helper is reported, and <c>Orphan.Ignore</c> on
+    /// line 20, which nobody calls, is reported with every mutation it carries.
+    /// </summary>
     [Test]
     public async Task Analyze_ManifestNamesOnlyTheEntryMethod_TreatsTheCalledHelperAsCovered()
     {
         var compilation = CompilationFactory.Create(PipelineSource, ProductionAssemblyName);
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(EntryMemberId)]).ConfigureAwait(false);
-        var gaps = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint);
-        var lines = DiagnosticAssertions.Summarise(gaps).Select(summary => summary.Line);
 
         _ = await Assert.That(Errors(compilation)).IsEmpty();
         _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
-        _ = await Assert.That(lines.Where(line => line == TransitiveHelperLine)).IsEmpty();
-        _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { OrphanMemberLine });
+        _ = await Verify(Snapshot(diagnostics)).ConfigureAwait(false);
     }
 
     [Test]
@@ -449,6 +469,11 @@ public class MutationCoverageAnalyzerTests
         _ = await Assert.That(DiagnosticAssertions.Describe(unverified)).Contains("Mutation '- => +'");
     }
 
+    /// <summary>
+    /// Both halves of the mutant budget in one snapshot, run over the same compilation and the same
+    /// manifest: without a budget <c>Gap.Combine</c> reports every mutation point of its expression, with
+    /// a budget of one it reports exactly one of them, and the member is still named.
+    /// </summary>
     [Test]
     public async Task Analyze_MutantBudgetIsOne_ReportsOneDiagnosticForTheMember()
     {
@@ -466,17 +491,15 @@ public class MutationCoverageAnalyzerTests
             )
             .ConfigureAwait(false);
 
-        var limitedGaps = DiagnosticAssertions.Summarise(
-            AnalyzerRunner.OfId(limited, DiagnosticIds.UnreachableMutationPoint)
-        );
-
-        _ = await Assert
-            .That(AnalyzerRunner.OfId(unlimited, DiagnosticIds.UnreachableMutationPoint))
-            .Count()
-            .IsGreaterThan(1);
-        _ = await Assert.That(limitedGaps.Select(summary => summary.Line)).IsEquivalentTo(new[] { BudgetMemberLine });
+        _ = await Verify(Combine((EveryMutantHeading, unlimited), (OneMutantHeading, limited))).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Two manifests, each recording one of three interchangeable members, over the same compilation. The
+    /// snapshot shows the first manifest alone leaving <c>Second.Beta</c> and <c>Third.Gamma</c> reported
+    /// and both manifests together leaving only <c>Third.Gamma</c>, which is what uniting instead of
+    /// replacing means.
+    /// </summary>
     [Test]
     public async Task Analyze_TwoManifests_UnitesTheirRecordedMembers()
     {
@@ -488,23 +511,27 @@ public class MutationCoverageAnalyzerTests
         var merged = await RunAsync(compilation, [first, second]).ConfigureAwait(false);
 
         _ = await Assert.That(AnalyzerRunner.OfId(merged, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
-        _ = await Assert.That(GapLines(single).Distinct()).IsEquivalentTo(new[] { BetaMemberLine, GammaMemberLine });
-        _ = await Assert.That(GapLines(merged).Distinct()).IsEquivalentTo(new[] { GammaMemberLine });
+        _ = await Verify(Combine((FirstManifestHeading, single), (BothManifestsHeading, merged))).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Top-level statements, generics, a local function, lambdas, an expression-bodied member, pattern
+    /// matching, a <c>switch</c> expression and a record, all analysed at once. The snapshot is the whole
+    /// diagnostic set, so it states the two things an enumeration of line numbers could only hint at: the
+    /// body of <c>Toolbox.Describe</c> on the lines 10 to 25 produces nothing, because the manifest covers
+    /// it, and every other construct is walked and reported instead of silently skipped or crashed on.
+    /// </summary>
     [Test]
     public async Task Analyze_CompilationUsesEveryLanguageFeature_ReportsWithoutCrashing()
     {
         var compilation = CreateRobustCompilation();
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(DescribeMemberId)]).ConfigureAwait(false);
-        var lines = GapLines(diagnostics);
 
         _ = await Assert.That(Errors(compilation)).IsEmpty();
         _ = await Assert.That(DiagnosticAssertions.Ids(diagnostics).Where(IsAnalyzerFailure)).IsEmpty();
         _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
-        _ = await Assert.That(lines).Contains(TopLevelStatementLine);
-        _ = await Assert.That(lines.Where(line => line is >= DescribeFirstLine and <= DescribeLastLine)).IsEmpty();
+        _ = await Verify(Snapshot(diagnostics)).ConfigureAwait(false);
     }
 
     [Test]
@@ -601,7 +628,7 @@ public class MutationCoverageAnalyzerTests
     {
         var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
         using var source = new CancellationTokenSource();
-        await source.CancelAsync().ConfigureAwait(false);
+        await source.CancelAsyncCompat().ConfigureAwait(false);
 
         OperationCanceledException? caught = null;
         try
@@ -645,7 +672,13 @@ public class MutationCoverageAnalyzerTests
             additionalReferences: [production.ToMetadataReference()]
         );
 
-        return TestSurfaceManifestWriter.Write(TestSurfaceCollector.Collect(test, CancellationToken.None));
+        return TestSurfaceManifestWriter.Write(
+            TestSurfaceCollector.Collect(
+                test,
+                new TUnitTestMethodRecognizer(TUnitTestFrameworkProbe.GetTestAttributeType(test)),
+                CancellationToken.None
+            )
+        );
     }
 
     private static CSharpCompilation CreateRobustCompilation()
@@ -688,6 +721,73 @@ public class MutationCoverageAnalyzerTests
         {
             ["build_property.FrameShiftVerifyMutantCompilation"] = verify ? "true" : "false",
         };
+
+    /// <summary>
+    /// Builds the snapshot of several diagnostic sets of one test, each one under its own heading.
+    /// </summary>
+    /// <param name="sections">The sections, each a heading and the diagnostics reported under it.</param>
+    /// <returns>The snapshot content.</returns>
+    private static string Combine(params (string Heading, ImmutableArray<Diagnostic> Diagnostics)[] sections) =>
+        string.Join(LineFeed, sections.Select(section => section.Heading + LineFeed + Snapshot(section.Diagnostics)));
+
+    /// <summary>
+    /// Describes every diagnostic the way a build log does — identifier, file, line, column and message —
+    /// in an order that does not depend on when the analyzer happened to report it.
+    /// </summary>
+    /// <param name="diagnostics">The diagnostics to describe.</param>
+    /// <returns>
+    /// One line per diagnostic, or <see cref="DiagnosticAssertions.NoDiagnostics" /> when there is none.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// The order <see cref="DiagnosticAssertions" /> fixes — file, position, identifier — is not enough for
+    /// a snapshot. One mutation point produces several diagnostics at the very same position under the very
+    /// same identifier, the sort behind that order is not stable, and the analyzer callbacks run
+    /// concurrently, so those diagnostics would change places between two runs and between two target
+    /// frameworks. The message is therefore the last part of the key, which makes the order total.
+    /// </para>
+    /// <para>
+    /// The lines are joined with a line feed instead of with <see cref="Environment.NewLine" />, so that
+    /// the same snapshot is produced on Windows and on Linux.
+    /// </para>
+    /// </remarks>
+    private static string Snapshot(ImmutableArray<Diagnostic> diagnostics)
+    {
+        if (diagnostics.IsDefaultOrEmpty)
+        {
+            return DiagnosticAssertions.NoDiagnostics;
+        }
+
+        var described = diagnostics
+            .Select(diagnostic => (Key: SortKey(diagnostic), Text: DiagnosticAssertions.Describe(diagnostic)))
+            .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+            .Select(entry => entry.Text);
+
+        return string.Join(LineFeed, described);
+    }
+
+    /// <summary>
+    /// Builds the ordering key of one diagnostic: its file, its line and column as fixed width numbers, its
+    /// identifier and its message.
+    /// </summary>
+    /// <param name="diagnostic">The diagnostic to build the key of.</param>
+    /// <returns>The key, to be compared ordinally.</returns>
+    private static string SortKey(Diagnostic diagnostic)
+    {
+        var span = diagnostic.Location.GetLineSpan();
+        var position = span.StartLinePosition;
+
+        return string.Join(
+            KeySeparator,
+            span.Path,
+            ToKeyNumber(position.Line),
+            ToKeyNumber(position.Character),
+            diagnostic.Id,
+            diagnostic.GetMessage(CultureInfo.InvariantCulture)
+        );
+    }
+
+    private static string ToKeyNumber(int value) => value.ToString(KeyNumberFormat, CultureInfo.InvariantCulture);
 
     private static IEnumerable<int> GapLines(ImmutableArray<Diagnostic> diagnostics) =>
         DiagnosticAssertions

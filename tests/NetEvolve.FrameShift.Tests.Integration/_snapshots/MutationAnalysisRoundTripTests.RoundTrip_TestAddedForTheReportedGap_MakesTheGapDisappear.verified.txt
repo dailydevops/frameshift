@@ -1,0 +1,26 @@
+﻿=== before: only Add is tested ===
+--- manifest ---
+frameshift-test-surface/1
+T M:Tests.CalculatorTests.Add_ReturnsTheSum
+R M:Fixture.Calculator.#ctor
+R M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+R T:Fixture.Calculator
+
+--- diagnostics ---
+FSH0001 Production.cs(12,16): Mutation '- => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Production.cs(12,16): Mutation '- => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Production.cs(12,16): Mutation '- => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Production.cs(12,16): Mutation '- => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+
+=== after: Subtract is tested as well ===
+--- manifest ---
+frameshift-test-surface/1
+T M:Tests.CalculatorTests.Add_ReturnsTheSum
+T M:Tests.CalculatorTests.Subtract_ReturnsTheDifference
+R M:Fixture.Calculator.#ctor
+R M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+R M:Fixture.Calculator.Subtract(System.Int32,System.Int32)~System.Int32
+R T:Fixture.Calculator
+
+--- diagnostics ---
+<no diagnostics>

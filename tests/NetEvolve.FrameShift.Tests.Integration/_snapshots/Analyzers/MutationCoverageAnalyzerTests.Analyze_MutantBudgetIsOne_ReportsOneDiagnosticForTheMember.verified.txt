@@ -1,0 +1,18 @@
+﻿=== every mutant of the member ===
+FSH0001 Source.cs(15,16): Mutation '* => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,16): Mutation '* => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,16): Mutation '* => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,16): Mutation '* => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,17): Mutation '+ => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,17): Mutation '+ => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,17): Mutation '+ => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,17): Mutation '+ => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,25): Mutation '1 => 0' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,31): Mutation '- => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,31): Mutation '- => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,31): Mutation '- => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,31): Mutation '- => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,39): Mutation '2 => 1' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,39): Mutation '2 => 3' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+=== at most one mutant per member ===
+FSH0001 Source.cs(15,16): Mutation '* => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
