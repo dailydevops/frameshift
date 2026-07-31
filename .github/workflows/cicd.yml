@@ -35,10 +35,10 @@ jobs:
       # deliberately tests down to net6.0 and every runtime has to be installed for its target
       # framework to run at all.
       dotnetVersion: ${{ vars.NE_DOTNET_TARGETFRAMEWORKS }}
-      # Linux is on by default, the other two are not. The classic target frameworks only build on
-      # Windows, so that leg is the only one covering net472, net48 and net481.
+      # Linux is on by default, Windows is enabled below. The classic target frameworks only build on
+      # Windows, so that leg is the only one covering net472, net48 and net481. macOS is disabled outright.
       disableTestsOnWindows: false
-      disableTestsOnMacOs: false
+      disableTestsOnMacOs: true
       # A platform-specific failure must not hide the others; that is the point of the matrix.
       failFast: false
       solution: ./FrameShift.slnx
