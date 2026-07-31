@@ -118,13 +118,17 @@ The format is defined by `TestSurfaceManifestFormat` and is deliberately line-or
 ```text
 frameshift-test-surface/1
 # lines starting with '#' are comments and are ignored
-T M:Contoso.Tests.CalculatorTests.Add_ReturnsSum
+T M:Contoso.Tests.CalculatorTests.Add_ReturnsSum 3
 R M:Contoso.Calculator.Add(System.Int32,System.Int32)
 R T:Contoso.Calculator
+T M:Contoso.Tests.CalculatorTests.Divide_Throws 1+
+R M:Contoso.Calculator.Divide(System.Int32,System.Int32)
 ```
 
 The first non-empty, non-comment line must be the header `frameshift-test-surface/1`. A `T ` line carries
-the documentation comment id of a discovered test method, an `R ` line the id of a referenced production
+the documentation comment id of a discovered test method followed by its test-case count — an exact
+integer, or a lower bound with a trailing `+` where the count cannot be determined without executing a
+data source. The `R ` lines that follow belong to that `T ` line and carry the id of a referenced production
 member. `TestSurfaceManifestWriter` sorts both groups ordinally and separates lines with a single line
 feed, so the file is canonical and produces no diff churn.
 
