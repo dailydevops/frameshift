@@ -23,7 +23,9 @@ next to every other compiler diagnostic.
   (`FSH0002`), each with the reason why - for example that the mutated expression folds to the same
   constant, or that the mutated value is never consumed.
 - Test discovery for TUnit, xUnit, NUnit and MSTest, with each framework adapter staying silent on
-  compilations that are not its own.
+  compilations that are not its own. All four are detected by the same rule - the framework's
+  well-known test attribute resolves, or one of its assemblies is referenced - so a project that
+  references two major versions of one framework at the same time is still analysed.
 - A self-maintaining test-surface manifest: a source generator produces it from the test project and
   a packaged MSBuild target writes it next to the project file, so it never has to be edited by hand.
 - Reachability is closed transitively over the production call graph, including an approximation of
@@ -269,8 +271,16 @@ dotnet_diagnostic.FSH0002.severity = none
 ## Requirements
 
 - A C# project built with a toolchain that ships Roslyn 4.14 or newer - .NET SDK 9.0.300 or Visual
-  Studio 2022 17.14 and above. The analyzed projects themselves can target any framework.
-- A test project using TUnit, xUnit, NUnit or MSTest.
+  Studio 2022 17.14 and above. **The analyzed projects themselves can target any framework**,
+  including .NET Framework: the analyzer runs inside the compiler, not inside your application, so
+  the framework your code targets is irrelevant to it.
+- A single `netstandard2.0` assembly is what the package ships, because that is the one target every
+  compiler host can load - the .NET Core-based build server of the .NET SDK, the .NET Framework-based
+  one inside Visual Studio, and `csc` on either. It is exercised on both runtimes: the test suite runs
+  on `net6.0` through `net10.0` and, on Windows, additionally on `net472`, `net48` and `net481`.
+- A test project using TUnit, xUnit (v2 or v3), NUnit or MSTest (3 or 4). Referencing more than one of
+  them in the same project is supported; each framework's tests are discovered by its own adapter and
+  all of them are recorded in the one manifest.
 - No runtime dependency: the package is a development dependency and contributes nothing to the
   output of the projects that reference it.
 
