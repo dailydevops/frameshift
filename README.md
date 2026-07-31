@@ -17,7 +17,7 @@ The **production side** consumes the manifest through `AdditionalFiles`. `Mutati
 ```mermaid
 flowchart TB
     subgraph pass1["Pass 1 — test project"]
-        T1["Test methods<br/>TUnit · xUnit · NUnit · MSTest"]
+        T1["Test methods<br/>TUnit · xUnit v2 · xUnit v3 · NUnit · MSTest"]
         T2["TestSurface<br/>probes · recognisers · collector"]
         T3["Generation<br/>TestSurfaceManifestGenerator"]
         T1 --> T2 --> T3
@@ -40,8 +40,8 @@ flowchart TB
 
 Inside `src/NetEvolve.FrameShift` the code is organised by layer, and each layer is the place to look for exactly one concern:
 
-- **`Analyzers`** — the diagnostic analyzers: one test-surface analyzer per supported test framework, plus `MutationCoverageAnalyzer` for the production side.
-- **`TestSurface`** — the manifest format, reader and writer, the framework probes and test-method recognisers, and the registry that makes framework support pluggable.
+- **`Analyzers`** — the diagnostic analyzers: one test-surface analyzer per supported test framework _version_ — TUnit, xUnit v2, xUnit v3, NUnit, MSTest — plus `MutationCoverageAnalyzer` for the production side, six `DiagnosticAnalyzer` types in total.
+- **`TestSurface`** — the manifest format, reader and writer, the five framework probes and test-method recognisers, and the registry that makes framework support pluggable. The registry lists the probes in one fixed order — TUnit, xUnit v2, xUnit v3, NUnit, MSTest — which decides who reports FSH0003 in a project that uses several of them; a test pins it.
 - **`Generation`** — the incremental source generator that emits the manifest as a generated file, because a generator must never touch the file system.
 - **`Mutations`** and **`Mutations/Operators`** — the 14 mutation operators, the registry that indexes them by the syntax kinds they support, the generator that applies them, and the compiler that verifies each mutant.
 - **`Equivalence`** — decides whether a mutant is trivial, deliberately one-sided: triviality is only reported when it can be proven, so a real gap is never hidden.
@@ -72,9 +72,11 @@ Both test projects share one target-framework list, defined once in `Directory.B
 
 **Why the classic frameworks are tested but not shipped.** They are in the test matrix and deliberately not in the package, and those are two different questions. The package answer is above: one assembly, `netstandard2.0`, loadable everywhere. The test answer is that the same `netstandard2.0` assembly really does get loaded into a .NET Framework compiler host — that is what happens in Visual Studio — so the code has to be exercised on that runtime, not merely compiled for it. `net472`, `net48` and `net481` are the three .NET Framework versions worth distinguishing here, and they only build on Windows, which is why the list is conditional. Nothing about the _package_ changes with them: they add coverage, not artifacts.
 
-Both test projects reference the analyzer by project reference and run on TUnit. They additionally reference `xunit.core`, `xunit.v3.core`, `NUnit` and `MSTest.TestFramework` as compile-time-only metadata (`PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers"`), so the framework probes can be exercised against the real attribute types without a competing test platform extension entering the run.
+Both test projects reference the analyzer by project reference and run on TUnit. They additionally reference `xunit.core` (xUnit v2), `xunit.v3.core` (xUnit v3), `NUnit` and `MSTest.TestFramework` as compile-time-only metadata (`PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers"`), so all five framework probes can be exercised against the real attribute types without a competing test platform extension entering the run. `xunit.v3.core` is referenced conditionally, on the target frameworks it has assets for; the other three are referenced unconditionally.
 
-`xunit.v3.core` is the one package that does not cover the whole matrix: it ships assets for `net472` and for `net8.0` and above, and **none at all for `net6.0` and `net7.0`**. Every reference to an xUnit v3 type is therefore guarded by `#if FRAMESHIFT_XUNIT_V3`, a symbol defined for every target framework except `net6.0` and `net7.0`. The xUnit adapter is consequently covered on the remaining six — `net8.0`, `net9.0`, `net10.0`, `net472`, `net48`, `net481` — and the xUnit v2 tests, which use `xunit.core`, run everywhere. Keep such guards as narrow as the reference itself; per-framework `Compile` excludes are not used in this repository.
+`xunit.v3.core` is the one package that does not cover the whole matrix: it ships assets for `net472` and for `net8.0` and above, and **none at all for `net6.0` and `net7.0`**. Every reference to an xUnit v3 type is therefore guarded by `#if FRAMESHIFT_XUNIT_V3`, a symbol defined for every target framework except `net6.0` and `net7.0`.
+
+Because xUnit v2 and v3 are separate probes, recognisers and analyzers, that guard now covers the v3 side only. The **xUnit v3** adapter is exercised on six of the eight target frameworks — `net8.0`, `net9.0`, `net10.0`, `net472`, `net48`, `net481` — while the **xUnit v2** adapter, which needs nothing but `xunit.core`, is exercised on all eight, exactly like the TUnit, NUnit and MSTest adapters. Keep such guards as narrow as the reference itself, and never wider than the version that needs them; per-framework `Compile` excludes are not used in this repository.
 
 ## Features
 
@@ -83,7 +85,7 @@ Both test projects reference the analyzer by project reference and run on TUnit.
 - 14 mutation operators covering arithmetic, relational, equality, logical, bitwise, unary, increment/decrement, conditional, null-coalescing, boolean, numeric and string literal mutations.
 - Verifies every mutant by in-memory recompilation, so mutants that could never compile are never reported.
 - Classifies mutants that cannot change observable behaviour, keeping the warnings actionable.
-- Pluggable test-framework support with probes and recognisers for TUnit, xUnit, NUnit and MSTest, all four detecting their framework by the same rule: the well-known test attribute type resolves, or one of the framework's assemblies is referenced.
+- Pluggable test-framework support with a probe, a recogniser and an analyzer per framework _version_ — TUnit, xUnit v2, xUnit v3, NUnit and MSTest — all five detecting their version by the same rule: the well-known test attribute type resolves, or one of that version's assemblies is referenced. The two xUnit probes resolve `Xunit.FactAttribute` inside their own assembly, `xunit.core` or `xunit.v3.core`, so referencing both versions at once is exact rather than ambiguous.
 - Configuration entirely through MSBuild properties, with no configuration file to maintain.
 - Ships as a development dependency: no runtime footprint in the consuming application.
 
@@ -223,7 +225,7 @@ templates/                                    # Documentation templates (READMEs
 The two decisions that define the shape of this repository are recorded as ADRs:
 
 - [Two-pass mutation analysis](decisions/2026-07-31-two-pass-mutation-analysis.md) — why the analysis is split across the test and production compilations, and why a manifest is the artifact between them.
-- [Pluggable test framework support](decisions/2026-07-31-pluggable-test-framework-support.md) — how probes and recognisers keep support for additional test frameworks additive.
+- [Pluggable test framework support](decisions/2026-07-31-pluggable-test-framework-support.md) — how probes and recognisers keep support for additional test frameworks additive, why the unit of the seam is a framework _version_ rather than a framework, and what adding the next one costs: three small files and one registry line.
 
 Beyond those, two principles run through the code and are worth knowing before changing anything:
 

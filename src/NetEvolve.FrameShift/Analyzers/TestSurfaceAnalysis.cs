@@ -34,22 +34,48 @@ using NetEvolve.FrameShift.TestSurface;
 /// <see cref="TestFrameworkProbeRegistry.All" /> among those that are awake — awake meaning that the
 /// probe recognises the framework AND at least one of its test methods is discovered. Every other
 /// framework skips the manifest entirely, so <c>FSH0003</c> is reported once instead of once per
-/// referenced framework. <c>FSH0004</c> stays per framework, because it names an individual test method
-/// and each analyzer sees a different set of them.
+/// referenced framework.
 /// </para>
 /// <para>
 /// The manifest is compared against the UNION of the test surfaces of all awake frameworks, never
 /// against the surface of the leading one alone. A mixed project records the tests of every framework in
 /// its single manifest, so judging it by one framework's view would report it as stale purely because
-/// the other framework's tests are invisible from there.
+/// the other framework's tests are invisible from there. The union cannot double-count: it is a set of
+/// documentation comment ids, so a test method two awake frameworks both recognise contributes the very
+/// same id twice and therefore once.
+/// </para>
+/// <para>
+/// <c>FSH0004</c> is raised per framework, because it names an individual test method and every
+/// framework sees its own set of them — but it is reported at most once per test method. Two awake
+/// frameworks may describe overlapping sets of test methods, and then only the framework that comes
+/// first in <see cref="TestFrameworkProbeRegistry.All" /> among those that see a given method reports
+/// it; every later one leaves it alone. The rule deduplicates by what the developer would actually read
+/// in the error list — the reported location together with the reported symbol — and deliberately not by
+/// probe, framework name or framework version, because the point is that one line of source code is
+/// complained about once.
+/// </para>
+/// <para>
+/// That overlap is the ordinary case rather than an exotic one, because a probe identifies a framework
+/// <em>version</em>: one framework can be split across two probes, as xUnit is, whose registry entries
+/// sit next to each other and which can well recognise the same test method. Without the rule above, a
+/// project that references both xUnit major versions would hear about each of its tests twice, once per
+/// version, although there is only one test. The same holds — more rarely — for a method that carries
+/// the test attributes of two genuinely different frameworks at once.
+/// </para>
+/// <para>
+/// Determining what an earlier framework reports means collecting its <c>FSH0004</c> candidates as well.
+/// That costs nothing in the common case, because a project using a single framework has exactly one
+/// awake framework and there is nothing ahead of it to ask; only a project that really does mix
+/// frameworks pays for the extra walk, and only in the analyzers that are not the first awake one.
 /// </para>
 /// </remarks>
 internal static class TestSurfaceAnalysis
 {
     /// <summary>
     /// Runs the test-side analysis for the framework <paramref name="probe" /> detects. Reports
-    /// <c>FSH0004</c> for the tests of that framework, and — only when the framework leads the manifest
-    /// comparison — <c>FSH0003</c> for the manifest of the whole project.
+    /// <c>FSH0004</c> for the tests of that framework that no earlier awake framework already reports,
+    /// and — only when the framework leads the manifest comparison — <c>FSH0003</c> for the manifest of
+    /// the whole project.
     /// </summary>
     /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="probe">The probe detecting the test framework.</param>
@@ -80,9 +106,9 @@ internal static class TestSurfaceAnalysis
             return;
         }
 
-        ReportTestsWithoutProductionReference(context, recognizer);
-
         var awake = FindAwakeFrameworks(context);
+
+        ReportTestsWithoutProductionReference(context, probe, recognizer, awake);
 
         if (!LeadsManifestComparison(probe, awake))
         {
@@ -148,6 +174,21 @@ internal static class TestSurfaceAnalysis
     private static bool LeadsManifestComparison(ITestFrameworkProbe probe, ImmutableArray<AwakeFramework> awake) =>
         !awake.Any(framework => IsSameFramework(framework.Probe, probe)) || IsSameFramework(awake[0].Probe, probe);
 
+    /// <summary>
+    /// Determines whether two probes stand for the same entry of the registry, compared by their type so
+    /// that a probe instance created for a test is treated like the registered one.
+    /// </summary>
+    /// <param name="left">The first probe.</param>
+    /// <param name="right">The second probe.</param>
+    /// <returns>
+    /// <see langword="true" /> if both probes are the same registry entry; otherwise
+    /// <see langword="false" />.
+    /// </returns>
+    /// <remarks>
+    /// Two probes of two versions of one framework are two entries and therefore not the same here, and
+    /// they must not be: each of them collects a surface of its own, and which of the two leads is decided
+    /// by their position in the registry like for any other pair.
+    /// </remarks>
     private static bool IsSameFramework(ITestFrameworkProbe left, ITestFrameworkProbe right) =>
         ReferenceEquals(left, right) || left.GetType() == right.GetType();
 
@@ -155,6 +196,12 @@ internal static class TestSurfaceAnalysis
     /// Collects the union of the test surfaces of every awake framework, so that the manifest of a
     /// project using several frameworks is judged by everything it is supposed to contain.
     /// </summary>
+    /// <remarks>
+    /// The union is built over sets of documentation comment ids, so two awake frameworks that describe the
+    /// same test — two versions of one framework, for instance — add the same ids and cannot inflate the
+    /// surface. Only the recognisers are deduplicated, and only to avoid walking the running framework
+    /// twice.
+    /// </remarks>
     /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="probe">The probe of the running analyzer.</param>
     /// <param name="recognizer">The recogniser of the running analyzer.</param>
@@ -189,15 +236,22 @@ internal static class TestSurfaceAnalysis
     }
 
     /// <summary>
-    /// Reports <c>FSH0004</c> once for every test method that references no production member.
+    /// Reports <c>FSH0004</c> once for every test method that references no production member and that no
+    /// awake framework ahead of <paramref name="probe" /> reports already.
     /// </summary>
     /// <param name="context">The context of the analyzed compilation.</param>
+    /// <param name="probe">The probe of the running analyzer.</param>
     /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
+    /// <param name="awake">The awake frameworks, in registry order.</param>
     private static void ReportTestsWithoutProductionReference(
         CompilationAnalysisContext context,
-        ITestMethodRecognizer recognizer
+        ITestFrameworkProbe probe,
+        ITestMethodRecognizer recognizer,
+        ImmutableArray<AwakeFramework> awake
     )
     {
+        var reported = CollectReportsOfPrecedingFrameworks(context, probe, awake);
+
         var testMethods = TestSurfaceCollector.FindTestsWithoutProductionReference(
             context.Compilation,
             recognizer,
@@ -208,14 +262,94 @@ internal static class TestSurfaceAnalysis
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
+            var location = GetIdentifierLocation(testMethod, context.CancellationToken);
+
+            if (!reported.Add(CreateReportKey(location, testMethod)))
+            {
+                continue;
+            }
+
             context.ReportDiagnostic(
                 Diagnostic.Create(
                     Descriptors.TestWithoutProductionReference,
-                    GetIdentifierLocation(testMethod, context.CancellationToken),
+                    location,
                     testMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
                 )
             );
         }
+    }
+
+    /// <summary>
+    /// Collects the <c>FSH0004</c> reports that the awake frameworks ahead of <paramref name="probe" /> in
+    /// registry order produce, so that the running analyzer can leave those test methods to them.
+    /// </summary>
+    /// <param name="context">The context of the analyzed compilation.</param>
+    /// <param name="probe">The probe of the running analyzer.</param>
+    /// <param name="awake">The awake frameworks, in registry order.</param>
+    /// <returns>The keys of the reports already produced elsewhere.</returns>
+    /// <remarks>
+    /// A probe that is not awake at all is not part of the registry — it cannot be, having just discovered
+    /// tests of its own — and then nobody reports on its behalf, exactly as with the manifest, so it keeps
+    /// every report to itself instead of falling silent.
+    /// </remarks>
+    private static HashSet<(Location Location, string SymbolId)> CollectReportsOfPrecedingFrameworks(
+        CompilationAnalysisContext context,
+        ITestFrameworkProbe probe,
+        ImmutableArray<AwakeFramework> awake
+    )
+    {
+        var reported = new HashSet<(Location Location, string SymbolId)>();
+
+        if (!awake.Any(framework => IsSameFramework(framework.Probe, probe)))
+        {
+            return reported;
+        }
+
+        foreach (var framework in awake.TakeWhile(candidate => !IsSameFramework(candidate.Probe, probe)))
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            var testMethods = TestSurfaceCollector.FindTestsWithoutProductionReference(
+                context.Compilation,
+                framework.Recognizer,
+                context.CancellationToken
+            );
+
+            foreach (var testMethod in testMethods)
+            {
+                var location = GetIdentifierLocation(testMethod, context.CancellationToken);
+
+                _ = reported.Add(CreateReportKey(location, testMethod));
+            }
+        }
+
+        return reported;
+    }
+
+    /// <summary>
+    /// Builds the key a <c>FSH0004</c> report is deduplicated by, which is what the developer reads: the
+    /// location the diagnostic is anchored at and the test method it names.
+    /// </summary>
+    /// <param name="location">The location the diagnostic is reported at.</param>
+    /// <param name="method">The reported test method.</param>
+    /// <returns>The key identifying the report.</returns>
+    /// <remarks>
+    /// The symbol half of the key is its documentation comment id, the same identity the test-surface
+    /// manifest is written in, and the display string of the method wherever no id can be created. Two
+    /// probes of one framework resolve their attribute types in different assemblies, so they may well
+    /// hand out different attribute symbols for the very same method — the method symbol itself, however,
+    /// comes from the analysed compilation and is therefore the same for both.
+    /// </remarks>
+    private static (Location Location, string SymbolId) CreateReportKey(Location location, IMethodSymbol method)
+    {
+        var declarationId = DocumentationCommentId.CreateDeclarationId(method.OriginalDefinition);
+
+        return (
+            location,
+            string.IsNullOrEmpty(declarationId)
+                ? method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                : declarationId!
+        );
     }
 
     /// <summary>

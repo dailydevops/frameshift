@@ -1,4 +1,4 @@
-﻿namespace NetEvolve.FrameShift.Tests.Integration;
+namespace NetEvolve.FrameShift.Tests.Integration;
 
 using System.Collections.Immutable;
 using System.Globalization;
@@ -14,10 +14,9 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Drives <see cref="XunitTestSurfaceAnalyzer" /> end to end against a real two-assembly setup: a
+/// Drives <see cref="XunitV2TestSurfaceAnalyzer" /> end to end against a real two-assembly setup: a
 /// production assembly that is visible only as a metadata reference, and a test assembly compiled against
-/// it that carries genuine <c>[Fact]</c> methods. Every expectation is checked against xUnit.net v2 and
-/// v3 alike, because the single analyzer serves both.
+/// it that carries genuine <c>[Fact]</c> methods of xUnit.net v2.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -28,11 +27,20 @@ using TUnit.Core;
 /// compilation under analysis, so that no expectation depends on a hand-written documentation comment id.
 /// </para>
 /// <para>
+/// The suite runs on every target framework of this repository, because <c>xunit.core</c> ships assets for
+/// all of them. Only the expectations that need xUnit.net v3 next to v2 are guarded by
+/// <c>FRAMESHIFT_XUNIT_V3</c>, and they are the whole point of separating the two versions: the v2
+/// analyzer has to be completely silent on a project that uses version 3 only, even though version 3
+/// declares a test attribute of the very same metadata name, <c>Xunit.FactAttribute</c>. Silence alone
+/// would be cheap to reach by accident, so the cross-version expectation also proves that the v3 analyzer
+/// does report the very tests the v2 analyzer walks past.
+/// </para>
+/// <para>
 /// <see cref="AnalyzerRunner" /> turns an analyzer exception into a failing run instead of returning
 /// <c>AD0001</c>, therefore every test in this class also asserts that the analyzer did not crash.
 /// </para>
 /// </remarks>
-public class XunitTestSurfaceAnalyzerTests
+public class XunitV2TestSurfaceAnalyzerTests
 {
     private const string ProductionAssemblyName = "ProductionAssembly";
     private const string TestAssemblyName = "TestAssembly";
@@ -42,14 +50,12 @@ public class XunitTestSurfaceAnalyzerTests
     private const string CoveringTestName = "Add_ExercisesProduction";
     private const string LocalOnlyTestName = "LocalStateOnly_TouchesNoProduction";
 
-    private const string XunitV2Scenario = "xUnit v2";
-#if FRAMESHIFT_XUNIT_V3
-    private const string XunitV3Scenario = "xUnit v3";
-#endif
-
     private const string NoTestsScenario = "framework referenced, no test method";
     private const string ForeignAttributeScenario = "test attribute of an unrelated framework";
     private const string ForeignFrameworkScenario = "a different test framework with real tests";
+#if FRAMESHIFT_XUNIT_V3
+    private const string OtherXunitVersionScenario = "the other xUnit.net major version with real tests";
+#endif
 
     private const string MalformedManifest = "not-a-test-surface-manifest\n";
     private const string GhostReferenceId = "M:Fixture.Ghost.Vanished";
@@ -86,6 +92,12 @@ public class XunitTestSurfaceAnalyzerTests
     /// to a member outside this assembly and would therefore count as a production reference, which is
     /// exactly what the <c>FSH0004</c> expectation is about.
     /// </summary>
+    /// <remarks>
+    /// The source spells <c>Xunit</c> without naming a version, because both major versions declare the
+    /// identical names. Which version a compilation built from it actually carries is decided by its
+    /// reference set alone, which is what lets the very same source serve as the fixture of this suite and
+    /// as the foreign-version fixture of the v3 suite.
+    /// </remarks>
     private const string TestSource = """
         namespace Tests;
 
@@ -165,14 +177,10 @@ public class XunitTestSurfaceAnalyzerTests
         """;
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Fixtures_BothAssemblies_CompileWithoutErrors(string version)
+    public async Task Fixtures_BothAssemblies_CompileWithoutErrors()
     {
         var production = CreateProduction();
-        var test = CreateTest(version, production);
+        var test = CreateTest(production);
 
         _ = await Assert.That(Describe(production)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
         _ = await Assert.That(Describe(test)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
@@ -191,13 +199,9 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_TestExercisingProduction_IsNotReportedAsWithoutProductionReference(string version)
+    public async Task Analyzer_TestExercisingProduction_IsNotReportedAsWithoutProductionReference()
     {
-        var diagnostics = await RunAsync(CreateTest(version), DiagnosticIds.TestWithoutProductionReference)
+        var diagnostics = await RunAsync(CreateTest(), DiagnosticIds.TestWithoutProductionReference)
             .ConfigureAwait(false);
 
         var namesTheCoveringTest = diagnostics.Any(diagnostic =>
@@ -208,13 +212,9 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_TestWithoutProductionReference_IsReportedOnceAtItsIdentifier(string version)
+    public async Task Analyzer_TestWithoutProductionReference_IsReportedOnceAtItsIdentifier()
     {
-        var test = CreateTest(version);
+        var test = CreateTest();
         var identifier = FindMethod(test, LocalOnlyTestName).Identifier;
 
         var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
@@ -227,43 +227,26 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_WithoutAnyManifest_ReportsNoManifestProblem(string version)
+    public async Task Analyzer_WithoutAnyManifest_ReportsNoManifestProblem()
     {
-        var diagnostics = await RunAsync(CreateTest(version), DiagnosticIds.InvalidTestSurfaceManifest)
-            .ConfigureAwait(false);
+        var diagnostics = await RunAsync(CreateTest(), DiagnosticIds.InvalidTestSurfaceManifest).ConfigureAwait(false);
 
         _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_MalformedManifest_ReportsTheParseProblem(string version)
+    public async Task Analyzer_MalformedManifest_ReportsTheParseProblem()
     {
-        var diagnostics = await RunAsync(
-                CreateTest(version),
-                DiagnosticIds.InvalidTestSurfaceManifest,
-                MalformedManifest
-            )
+        var diagnostics = await RunAsync(CreateTest(), DiagnosticIds.InvalidTestSurfaceManifest, MalformedManifest)
             .ConfigureAwait(false);
 
         _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DescribeParseProblem());
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_ManifestMatchingTheCollectedSurface_ReportsNoManifestProblem(string version)
+    public async Task Analyzer_ManifestMatchingTheCollectedSurface_ReportsNoManifestProblem()
     {
-        var test = CreateTest(version);
+        var test = CreateTest();
 
         var diagnostics = await RunAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, CreateManifest(test))
             .ConfigureAwait(false);
@@ -272,13 +255,9 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_ManifestWithAnIdTooMany_ReportsOneRemovedId(string version)
+    public async Task Analyzer_ManifestWithAnIdTooMany_ReportsOneRemovedId()
     {
-        var test = CreateTest(version);
+        var test = CreateTest();
         var manifest = WithGhostReference(CreateManifest(test));
 
         var diagnostics = await RunAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, manifest)
@@ -290,13 +269,9 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_ManifestWithAnIdMissing_ReportsOneAddedId(string version)
+    public async Task Analyzer_ManifestWithAnIdMissing_ReportsOneAddedId()
     {
-        var test = CreateTest(version);
+        var test = CreateTest();
         var manifest = WithoutFirstReference(CreateManifest(test));
 
         var diagnostics = await RunAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, manifest)
@@ -308,18 +283,14 @@ public class XunitTestSurfaceAnalyzerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_Disabled_ReportsNothing(string version)
+    public async Task Analyzer_Disabled_ReportsNothing()
     {
         var options = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["build_property.FrameShiftEnabled"] = "false",
         };
 
-        var diagnostics = await RunAllAsync(CreateTest(version), MalformedManifest, options).ConfigureAwait(false);
+        var diagnostics = await RunAllAsync(CreateTest(), MalformedManifest, options).ConfigureAwait(false);
 
         _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
@@ -335,6 +306,9 @@ public class XunitTestSurfaceAnalyzerTests
     [Arguments(NoTestsScenario)]
     [Arguments(ForeignAttributeScenario)]
     [Arguments(ForeignFrameworkScenario)]
+#if FRAMESHIFT_XUNIT_V3
+    [Arguments(OtherXunitVersionScenario)]
+#endif
     public async Task Analyzer_NoTestOfItsFrameworkIsRecognised_ReportsNothing(string scenario)
     {
         var compilation = CreateCompilationWithoutRecognisableTests(scenario);
@@ -354,6 +328,9 @@ public class XunitTestSurfaceAnalyzerTests
     [Arguments(NoTestsScenario)]
     [Arguments(ForeignAttributeScenario)]
     [Arguments(ForeignFrameworkScenario)]
+#if FRAMESHIFT_XUNIT_V3
+    [Arguments(OtherXunitVersionScenario)]
+#endif
     public async Task Fixtures_WithoutRecognisableTests_CompileWithoutErrors(string scenario)
     {
         var compilation = CreateCompilationWithoutRecognisableTests(scenario);
@@ -361,19 +338,48 @@ public class XunitTestSurfaceAnalyzerTests
         _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
 
+#if FRAMESHIFT_XUNIT_V3
+    /// <summary>
+    /// The expectation the split exists for. A project on xUnit.net v3 only declares its tests with a
+    /// <c>Xunit.FactAttribute</c> of exactly the metadata name version 2 uses, so an adapter that judged by
+    /// the attribute name would claim those tests. The v2 analyzer therefore has to say nothing at all
+    /// about them - and the silence has to be the silence of a shut-down analyzer rather than the silence
+    /// of a fixture nobody can see anything in, which is why the v3 analyzer is run over the very same
+    /// compilation and must name the offending test.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_ProjectOnTheOtherXunitVersion_StaysSilentWhileTheOtherAnalyzerReports()
+    {
+        var test = CreateXunitV3Test();
+
+        var ownDiagnostics = await RunAllAsync(test, MalformedManifest).ConfigureAwait(false);
+        var otherDiagnostics = await AnalyzerRunner
+            .RunAsync(
+                new XunitV3TestSurfaceAnalyzer(),
+                test,
+                DiagnosticIds.TestWithoutProductionReference,
+                AdditionalFiles(MalformedManifest)
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(ownDiagnostics))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert.That(otherDiagnostics).Count().IsEqualTo(1);
+        _ = await Assert
+            .That(GetMessage(otherDiagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
+            .IsTrue();
+    }
+#endif
+
     /// <summary>
     /// Runs every manifest shape the other tests use through the analyzer once more and proves that none
     /// of them makes it throw, which Roslyn would otherwise hide behind an <c>AD0001</c> diagnostic.
     /// </summary>
-    /// <param name="version">The version of the framework the test compilation references.</param>
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Analyzer_EveryManifestShape_NeverCrashes(string version)
+    public async Task Analyzer_EveryManifestShape_NeverCrashes()
     {
-        var test = CreateTest(version);
+        var test = CreateTest();
         var reported = new List<string>();
 
         foreach (var shape in GetManifestShapes(CreateManifest(test)))
@@ -390,7 +396,7 @@ public class XunitTestSurfaceAnalyzerTests
     [Test]
     public async Task Initialize_ContextIsNull_ThrowsArgumentNullException()
     {
-        var analyzer = new XunitTestSurfaceAnalyzer();
+        var analyzer = new XunitV2TestSurfaceAnalyzer();
 
         var exception = Assert.Throws<ArgumentNullException>(() => analyzer.Initialize(null!));
 
@@ -414,32 +420,37 @@ public class XunitTestSurfaceAnalyzerTests
                 TestFramework.TUnit,
                 TestAssemblyName
             ),
+#if FRAMESHIFT_XUNIT_V3
+            OtherXunitVersionScenario => CreateXunitV3Test(),
+#endif
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown scenario."),
         };
 
     private static CSharpCompilation CreateProduction() =>
         CompilationFactory.Create(ProductionSource, ProductionAssemblyName, filePath: ProductionPath);
 
-    private static CSharpCompilation CreateTest(string version) => CreateTest(version, CreateProduction());
+    private static CSharpCompilation CreateTest() => CreateTest(CreateProduction());
 
-    private static CSharpCompilation CreateTest(string version, Compilation production) =>
+    private static CSharpCompilation CreateTest(Compilation production) =>
+        CreateTest(TestFramework.XunitV2, production);
+
+    private static CSharpCompilation CreateTest(TestFramework framework, Compilation production) =>
         CompilationFactory.Create(
             TestSource,
-            ToFramework(version),
+            framework,
             TestAssemblyName,
             additionalReferences: [production.ToMetadataReference()],
             filePath: TestPath
         );
 
-    private static TestFramework ToFramework(string version) =>
-        version switch
-        {
-            XunitV2Scenario => TestFramework.XunitV2,
 #if FRAMESHIFT_XUNIT_V3
-            XunitV3Scenario => TestFramework.XunitV3,
+    /// <summary>
+    /// Builds the very same fixture against xUnit.net v3 instead, which is the compilation this analyzer
+    /// has to walk past even though the attribute in the source is spelled identically.
+    /// </summary>
+    /// <returns>The created compilation.</returns>
+    private static CSharpCompilation CreateXunitV3Test() => CreateTest(TestFramework.XunitV3, CreateProduction());
 #endif
-            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unknown version."),
-        };
 
     /// <summary>
     /// Collects the test surface of <paramref name="test" /> exactly the way the analyzer does, so that a
@@ -449,7 +460,7 @@ public class XunitTestSurfaceAnalyzerTests
     /// <returns>The manifest text describing the collected surface.</returns>
     private static string CreateManifest(Compilation test)
     {
-        var recognizer = XunitTestFrameworkProbe.Instance.TryCreateRecognizer(test)!;
+        var recognizer = XunitV2TestFrameworkProbe.Instance.TryCreateRecognizer(test)!;
 
         return TestSurfaceManifestWriter.Write(TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None));
     }
@@ -464,13 +475,20 @@ public class XunitTestSurfaceAnalyzerTests
         Compilation compilation,
         string diagnosticId,
         string? manifest = null
-    ) => AnalyzerRunner.RunAsync(new XunitTestSurfaceAnalyzer(), compilation, diagnosticId, AdditionalFiles(manifest));
+    ) =>
+        AnalyzerRunner.RunAsync(new XunitV2TestSurfaceAnalyzer(), compilation, diagnosticId, AdditionalFiles(manifest));
 
     private static Task<ImmutableArray<Diagnostic>> RunAllAsync(
         Compilation compilation,
         string? manifest = null,
         IReadOnlyDictionary<string, string>? globalOptions = null
-    ) => AnalyzerRunner.RunAsync(new XunitTestSurfaceAnalyzer(), compilation, AdditionalFiles(manifest), globalOptions);
+    ) =>
+        AnalyzerRunner.RunAsync(
+            new XunitV2TestSurfaceAnalyzer(),
+            compilation,
+            AdditionalFiles(manifest),
+            globalOptions
+        );
 
     private static ImmutableArray<AdditionalText> AdditionalFiles(string? manifest) =>
         manifest is null ? [] : [new InMemoryAdditionalText(manifest)];

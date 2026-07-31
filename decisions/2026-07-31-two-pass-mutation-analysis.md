@@ -75,8 +75,9 @@ committed to the repository.
 
 ### Pass one — the test side produces the manifest
 
-- A framework-specific analyzer (`TUnitTestSurfaceAnalyzer`, `XunitTestSurfaceAnalyzer`,
-  `NUnitTestSurfaceAnalyzer`, `MSTestTestSurfaceAnalyzer`) hands its `ITestFrameworkProbe` to the shared
+- A version-specific analyzer (`TUnitTestSurfaceAnalyzer`, `XunitV2TestSurfaceAnalyzer`,
+  `XunitV3TestSurfaceAnalyzer`, `NUnitTestSurfaceAnalyzer`, `MSTestTestSurfaceAnalyzer`) hands its
+  `ITestFrameworkProbe` to the shared
   `TestSurfaceAnalysis`. Nothing happens unless the probe recognises its framework **and** at least one
   test method is discovered: a compilation whose tests cannot be seen is never judged.
 - `TestSurfaceCollector` walks the executable code reachable from the discovered test methods *inside the
@@ -163,7 +164,7 @@ changes.
 ```mermaid
 flowchart TD
     subgraph pass1["Pass 1 — test compilation (production code = metadata reference)"]
-        A["Test framework probe<br/>recognises TUnit / xunit / NUnit / MSTest"] --> B["TestMethodDiscovery<br/>finds test methods"]
+        A["Test framework probe<br/>recognises TUnit / xUnit v2 / xUnit v3 / NUnit / MSTest"] --> B["TestMethodDiscovery<br/>finds test methods"]
         B --> C["TestSurfaceCollector<br/>walks code reachable inside the test assembly"]
         C --> D["TestSurfaceManifestGenerator<br/>emits TestSurfaceManifest.g.cs<br/>(manifest inside one block comment)"]
         C --> E["TestSurfaceAnalysis<br/>FSH0003 stale manifest · FSH0004 test without reference"]
@@ -274,4 +275,4 @@ flowchart TD
 - [Pluggable Test Framework Support](./2026-07-31-pluggable-test-framework-support.md) — the seam this
   decision depends on. The two-pass split says *that* a test-side pass must produce the manifest; that
   decision defines *how* the test side recognises a framework's test methods, which is what makes pass
-  one work for TUnit, xunit, NUnit and MSTest alike.
+  one work for TUnit, xUnit v2, xUnit v3, NUnit and MSTest alike.
