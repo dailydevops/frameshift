@@ -133,64 +133,84 @@ internal sealed class RegexCharacterClassMutator : RegexPatternMutatorBase
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var token = tokens[index];
-
-            switch (token.Kind)
+            foreach (var rewrite in CreateRewritesForToken(pattern, tokens, index))
             {
-                case RegexTokenKind.Escape:
-                    foreach (var rewrite in CreateShorthandSwaps(pattern, token))
-                    {
-                        yield return rewrite;
-                    }
-
-                    break;
-                case RegexTokenKind.CharacterClassOpen:
-                    var negation = CreateNegationToggle(pattern, token);
-
-                    if (negation is not null)
-                    {
-                        yield return negation;
-                    }
-
-                    var collapse = TryCreateAnyClassCollapse(pattern, tokens, index);
-
-                    if (collapse is not null)
-                    {
-                        yield return collapse;
-                    }
-
-                    break;
-                case RegexTokenKind.CharacterClassRange:
-                    foreach (var rewrite in CreateRangeWidenings(pattern, tokens, index))
-                    {
-                        yield return rewrite;
-                    }
-
-                    break;
-                case RegexTokenKind.CharacterClassContent:
-                    var removal = TryCreateMemberRemoval(pattern, tokens, index);
-
-                    if (removal is not null)
-                    {
-                        yield return removal;
-                    }
-
-                    break;
-                case RegexTokenKind.Literal:
-                    var expansion = TryCreateDotExpansion(pattern, token);
-
-                    if (expansion is not null)
-                    {
-                        yield return expansion;
-                    }
-
-                    break;
-                default:
-                    // Every other kind carries no rewrite this operator offers.
-                    break;
+                yield return rewrite;
             }
         }
     }
+
+    /// <summary>
+    /// Dispatches to the rewrite rule matching the kind of the token at <paramref name="index" />.
+    /// </summary>
+    /// <param name="pattern">The pattern being rewritten.</param>
+    /// <param name="tokens">The tokens of the pattern, in order.</param>
+    /// <param name="index">The index of the token to produce rewrites for.</param>
+    /// <returns>The rewrites of that token, possibly none.</returns>
+    private static IEnumerable<RegexPatternRewrite> CreateRewritesForToken(
+        string pattern,
+        ImmutableArray<RegexToken> tokens,
+        int index
+    )
+    {
+        var token = tokens[index];
+
+        switch (token.Kind)
+        {
+            case RegexTokenKind.Escape:
+                return CreateShorthandSwaps(pattern, token);
+            case RegexTokenKind.CharacterClassOpen:
+                return CreateOpenBracketRewrites(pattern, tokens, index);
+            case RegexTokenKind.CharacterClassRange:
+                return CreateRangeWidenings(pattern, tokens, index);
+            case RegexTokenKind.CharacterClassContent:
+                return AsRewrites(TryCreateMemberRemoval(pattern, tokens, index));
+            case RegexTokenKind.Literal:
+                return AsRewrites(TryCreateDotExpansion(pattern, token));
+            default:
+                // Every other kind carries no rewrite this operator offers.
+                return [];
+        }
+    }
+
+    /// <summary>
+    /// Produces the rewrites of a <see cref="RegexTokenKind.CharacterClassOpen" /> token: its negation
+    /// toggle, and the collapse into <see cref="Dot" /> when it opens the exact <see cref="AnyCharacterClass" />
+    /// token run.
+    /// </summary>
+    /// <param name="pattern">The pattern being rewritten.</param>
+    /// <param name="tokens">The tokens of the pattern, in order.</param>
+    /// <param name="index">The index of the opening token.</param>
+    /// <returns>The rewrites of that token, possibly none.</returns>
+    private static IEnumerable<RegexPatternRewrite> CreateOpenBracketRewrites(
+        string pattern,
+        ImmutableArray<RegexToken> tokens,
+        int index
+    )
+    {
+        var negation = CreateNegationToggle(pattern, tokens[index]);
+
+        if (negation is not null)
+        {
+            yield return negation;
+        }
+
+        var collapse = TryCreateAnyClassCollapse(pattern, tokens, index);
+
+        if (collapse is not null)
+        {
+            yield return collapse;
+        }
+    }
+
+    /// <summary>
+    /// Wraps a possibly absent single rewrite into a sequence, so a single-rewrite rule can be dispatched
+    /// the same way as a multi-rewrite one.
+    /// </summary>
+    /// <param name="rewrite">The rewrite to wrap, or <see langword="null" />.</param>
+    /// <returns>A sequence holding <paramref name="rewrite" />, or an empty one.</returns>
+    private static IEnumerable<RegexPatternRewrite> AsRewrites(RegexPatternRewrite? rewrite) =>
+        rewrite is null ? [] : [rewrite];
 
     /// <summary>
     /// Produces the swap of a shorthand escape to each of the other five, in the fixed order the class

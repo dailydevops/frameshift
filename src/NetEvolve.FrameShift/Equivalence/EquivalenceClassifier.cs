@@ -589,28 +589,15 @@ internal static class EquivalenceClassifier
     )
     {
         if (
-            mutation.Original is not LiteralExpressionSyntax { Token.Value: string } original
-            || mutation.Replacement is not LiteralExpressionSyntax { Token.Value: string } replacement
-            || !CanQuery(original, semanticModel)
-        )
-        {
-            return null;
-        }
-
-        var site = RegexPatternLocator.TryLocate(original, semanticModel, cancellationToken);
-
-        if (site?.Options is not { } siteOptions)
-        {
-            return null;
-        }
-
-        var options = siteOptions & ~RegexOptions.Compiled;
-        var originalPattern = site.Pattern;
-        var mutatedPattern = replacement.Token.ValueText;
-
-        if (
-            !RegexPatternTokenizer.TryTokenize(originalPattern, options, out var originalTokens, out _, out _)
-            || !RegexPatternTokenizer.TryTokenize(mutatedPattern, options, out var mutatedTokens, out _, out _)
+            !TryTokenizeRegexRewrite(
+                mutation,
+                semanticModel,
+                cancellationToken,
+                out var originalPattern,
+                out var originalTokens,
+                out var mutatedPattern,
+                out var mutatedTokens
+            )
         )
         {
             return null;
@@ -648,6 +635,62 @@ internal static class EquivalenceClassifier
                 CanonicalizeZeroOrMore,
                 RegexZeroOrMoreQuantifierShorthandReason
             );
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="mutation" /> as a regex pattern rewrite and tokenizes both sides of it
+    /// under the site's own options, which is the shared precondition every quantifier canonicalization
+    /// rule needs before it can compare the two patterns.
+    /// </summary>
+    /// <param name="mutation">The mutation to inspect.</param>
+    /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="cancellationToken">A token to observe while resolving the site.</param>
+    /// <param name="originalPattern">The original pattern text.</param>
+    /// <param name="originalTokens">The tokens of the original pattern.</param>
+    /// <param name="mutatedPattern">The mutated pattern text.</param>
+    /// <param name="mutatedTokens">The tokens of the mutated pattern.</param>
+    /// <returns>
+    /// <see langword="true" /> if <paramref name="mutation" /> is a regex pattern rewrite whose options are
+    /// statically known and whose patterns both tokenize; otherwise <see langword="false" />.
+    /// </returns>
+    private static bool TryTokenizeRegexRewrite(
+        Mutation mutation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out string originalPattern,
+        out ImmutableArray<RegexToken> originalTokens,
+        out string mutatedPattern,
+        out ImmutableArray<RegexToken> mutatedTokens
+    )
+    {
+        originalPattern = string.Empty;
+        originalTokens = ImmutableArray<RegexToken>.Empty;
+        mutatedPattern = string.Empty;
+        mutatedTokens = ImmutableArray<RegexToken>.Empty;
+
+        if (
+            mutation.Original is not LiteralExpressionSyntax { Token.Value: string } original
+            || mutation.Replacement is not LiteralExpressionSyntax { Token.Value: string } replacement
+            || !CanQuery(original, semanticModel)
+        )
+        {
+            return false;
+        }
+
+        var site = RegexPatternLocator.TryLocate(original, semanticModel, cancellationToken);
+
+        if (site?.Options is not { } siteOptions)
+        {
+            return false;
+        }
+
+        var options = siteOptions & ~RegexOptions.Compiled;
+
+        originalPattern = site.Pattern;
+        mutatedPattern = replacement.Token.ValueText;
+
+        return RegexPatternTokenizer.TryTokenize(originalPattern, options, out originalTokens, out _, out _)
+            && RegexPatternTokenizer.TryTokenize(mutatedPattern, options, out mutatedTokens, out _, out _);
     }
 
     /// <summary>
