@@ -127,15 +127,15 @@ internal static class ReferenceAssemblies
         ImmutableArray<MetadataReference>
     >(CreateWithTUnit, LazyThreadSafetyMode.ExecutionAndPublication);
 
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV2 = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithXunitV2, LazyThreadSafetyMode.ExecutionAndPublication);
+
 #if FRAMESHIFT_XUNIT_V3
     private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV3 = new Lazy<
         ImmutableArray<MetadataReference>
     >(CreateWithXunitV3, LazyThreadSafetyMode.ExecutionAndPublication);
 #endif
-
-    private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV2 = new Lazy<
-        ImmutableArray<MetadataReference>
-    >(CreateWithXunitV2, LazyThreadSafetyMode.ExecutionAndPublication);
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> _withNUnit = new Lazy<
         ImmutableArray<MetadataReference>
@@ -161,6 +161,18 @@ internal static class ReferenceAssemblies
     public static ImmutableArray<MetadataReference> WithTUnit => _withTUnit.Value;
 
     /// <summary>
+    /// Gets <see cref="Default" /> plus the xUnit.net v2 assemblies, so that a fixture can carry real
+    /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
+    /// </summary>
+    /// <remarks>
+    /// <c>xunit.core</c> reaches every target framework of this suite - through <c>net452</c> on .NET
+    /// Framework and through <c>netstandard1.1</c> on .NET - so this set is buildable on all of them and
+    /// needs no conditional compilation. Only the v3 side is conditional, and a guard accidentally placed
+    /// around this member would silently drop the xUnit.net v2 tests from two target frameworks.
+    /// </remarks>
+    public static ImmutableArray<MetadataReference> WithXunitV2 => _withXunitV2.Value;
+
+    /// <summary>
     /// Gets <see cref="Default" /> plus the xUnit.net v3 assemblies, so that a fixture can carry real
     /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
     /// </summary>
@@ -180,12 +192,6 @@ internal static class ReferenceAssemblies
 #endif
 
     /// <summary>
-    /// Gets <see cref="Default" /> plus the xUnit.net v2 assemblies, so that a fixture can carry real
-    /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
-    /// </summary>
-    public static ImmutableArray<MetadataReference> WithXunitV2 => _withXunitV2.Value;
-
-    /// <summary>
     /// Gets <see cref="Default" /> plus the NUnit assemblies, so that a fixture can carry real
     /// <c>[Test]</c> and <c>[TestCase]</c> methods.
     /// </summary>
@@ -202,11 +208,24 @@ internal static class ReferenceAssemblies
     /// proving that one adapter does not answer for another framework needs.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The two xUnit.net versions declare the very same type names in the very same namespaces. A
     /// fixture built against this set therefore cannot spell out a name such as <c>Xunit.FactAttribute</c>,
     /// and <see cref="Compilation.GetTypeByMetadataName(string)" /> returns <see langword="null" /> for it;
-    /// only <c>GetTypesByMetadataName</c> sees both declarations. On a target framework without xUnit.net v3
-    /// assets only v2 is part of the set, and that name is then unambiguous again.
+    /// only <c>GetTypesByMetadataName</c> sees both declarations, and only
+    /// <see cref="IAssemblySymbol.GetTypeByMetadataName(string)" /> resolves it per assembly. On a target
+    /// framework without xUnit.net v3 assets only v2 is part of the set, and that name is then unambiguous
+    /// again.
+    /// </para>
+    /// <para>
+    /// That ambiguity is the point of the set, and it must be the only one: no assembly identity may appear
+    /// twice, because a duplicate reference makes every lookup ambiguous for a reason that has nothing to do
+    /// with the two versions. Two things keep it single. The xUnit.net versions share no assembly identity
+    /// at all - v2 contributes <c>xunit.core</c> and <c>xunit.abstractions</c>, v3 contributes
+    /// <c>xunit.v3.core</c> and <c>xunit.v3.common</c>, and neither one references anything of the other.
+    /// And every path of a set is contributed by an assembly loaded into this very process, so one identity
+    /// can only ever resolve to one file, which <see cref="CreateFileReferences" /> then collapses.
+    /// </para>
     /// </remarks>
     public static ImmutableArray<MetadataReference> WithAllFrameworks => _withAllFrameworks.Value;
 
@@ -233,8 +252,8 @@ internal static class ReferenceAssemblies
         {
             TestFramework.None => Default,
             TestFramework.TUnit => WithTUnit,
-            TestFramework.XunitV3 => WithXunitV3,
             TestFramework.XunitV2 => WithXunitV2,
+            TestFramework.XunitV3 => WithXunitV3,
             TestFramework.NUnit => WithNUnit,
             TestFramework.MSTest => WithMSTest,
             TestFramework.All => WithAllFrameworks,
@@ -273,43 +292,50 @@ internal static class ReferenceAssemblies
 
     private static ImmutableArray<MetadataReference> CreateWithTUnit() => CreateWith(TUnitAnchors);
 
+    private static ImmutableArray<MetadataReference> CreateWithXunitV2() => CreateWith(XunitV2Anchors);
+
 #if FRAMESHIFT_XUNIT_V3
     private static ImmutableArray<MetadataReference> CreateWithXunitV3() => CreateWith(XunitV3Anchors);
 #endif
-
-    private static ImmutableArray<MetadataReference> CreateWithXunitV2() => CreateWith(XunitV2Anchors);
 
     private static ImmutableArray<MetadataReference> CreateWithNUnit() => CreateWith(NUnitAnchors);
 
     private static ImmutableArray<MetadataReference> CreateWithMSTest() => CreateWith(MSTestAnchors);
 
+    /// <summary>
+    /// Seeds the walk with every framework anchor, in the order the probe registry reports them, so that the
+    /// references of a mixed compilation are listed the way the analyzers walk them.
+    /// </summary>
+    /// <returns>The created references.</returns>
     private static ImmutableArray<MetadataReference> CreateWithAllFrameworks() =>
-        CreateWith([.. TUnitAnchors,
+        CreateWith([.. TUnitAnchors, .. XunitV2Anchors,
 #if FRAMESHIFT_XUNIT_V3
             .. XunitV3Anchors,
 #endif
-            .. XunitV2Anchors, .. NUnitAnchors, .. MSTestAnchors]);
+            .. NUnitAnchors, .. MSTestAnchors]);
 
     /// <summary>
     /// The seed of the TUnit reference set.
     /// </summary>
     private static Type[] TUnitAnchors => [typeof(TUnit.Core.TestAttribute)];
 
+    /// <summary>
+    /// The seed of the xUnit.net v2 reference set. <c>Xunit.Sdk.IXunitTestCase</c> lives in
+    /// <c>xunit.core</c>, the assembly that also declares the v2 <c>Xunit.FactAttribute</c>, and it has no
+    /// counterpart in v3, whose interface is <c>Xunit.v3.IXunitTestCase</c>. The anchor therefore stays
+    /// unambiguous while this test project references both versions at once.
+    /// </summary>
+    private static Type[] XunitV2Anchors => [typeof(Xunit.Sdk.IXunitTestCase)];
+
 #if FRAMESHIFT_XUNIT_V3
     /// <summary>
     /// The seed of the xUnit.net v3 reference set. <c>Xunit.v3.XunitTestFramework</c> lives in
-    /// <c>xunit.v3.core</c> and has no counterpart in v2, so it stays unambiguous when both versions are
-    /// referenced by this test project at once.
+    /// <c>xunit.v3.core</c>, the assembly that also declares the v3 <c>Xunit.FactAttribute</c>, and it has
+    /// no counterpart in v2. The anchor therefore stays unambiguous while this test project references both
+    /// versions at once.
     /// </summary>
     private static Type[] XunitV3Anchors => [typeof(Xunit.v3.XunitTestFramework)];
 #endif
-
-    /// <summary>
-    /// The seed of the xUnit.net v2 reference set. <c>Xunit.Sdk.IXunitTestCase</c> lives in
-    /// <c>xunit.core</c> and has no counterpart in v3, so it stays unambiguous when both versions are
-    /// referenced by this test project at once.
-    /// </summary>
-    private static Type[] XunitV2Anchors => [typeof(Xunit.Sdk.IXunitTestCase)];
 
     /// <summary>
     /// The seed of the NUnit reference set.

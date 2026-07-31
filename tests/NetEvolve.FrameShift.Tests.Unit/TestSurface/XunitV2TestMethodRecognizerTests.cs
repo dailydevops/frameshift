@@ -1,4 +1,4 @@
-﻿namespace NetEvolve.FrameShift.Tests.Unit;
+namespace NetEvolve.FrameShift.Tests.Unit;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -9,33 +9,37 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers how an xUnit test method is recognised: by <c>[Fact]</c>, by <c>[Theory]</c>, by an attribute
+/// Covers how an xUnit v2 test method is recognised: by <c>[Fact]</c>, by <c>[Theory]</c>, by an attribute
 /// that derives from <c>FactAttribute</c>, and never by an attribute that only happens to carry the same
-/// simple name. Every expectation is checked against version 2 and version 3 alike, because the two ship
-/// identical type names from differently named assemblies.
+/// simple name.
 /// </summary>
 /// <remarks>
-/// The shapes a test method can take — static, generic, inherited, abstract and private — are covered
+/// <para>
+/// The recogniser matches the attribute type resolved inside <c>xunit.core</c> and its derivations, and
+/// nothing else. There is deliberately no rule matching an attribute by its simple name, so a
+/// <c>FactAttribute</c> of the project itself - or of xUnit v3 - is not a v2 test attribute, and a
+/// recogniser without a resolved type recognises nothing at all.
+/// </para>
+/// <para>
+/// The shapes a test method can take - static, generic, inherited, abstract and private - are covered
 /// deliberately: whichever of them the recogniser dropped would silently shrink the recorded test surface
 /// and make the production side claim mutations are unreachable when they are not.
+/// </para>
+/// <para>
+/// Everything here runs on every target framework, because <c>xunit.core</c> ships assets for all of them.
+/// </para>
 /// </remarks>
-public class XunitTestMethodRecognizerTests
+public class XunitV2TestMethodRecognizerTests
 {
-    private const string XunitV2Scenario = "xUnit v2";
-#if FRAMESHIFT_XUNIT_V3
-    private const string XunitV3Scenario = "xUnit v3";
-#endif
+    private const string FrameworkName = "xUnit v2";
 
     private const string CasesTypeName = "Fixture.Cases";
+    private const string AbstractCasesTypeName = "Fixture.AbstractCases";
 
     private const string ExpectedTestMethods =
         "Cases.FactTest|Cases.TheoryTest|Cases.DerivedAttributeTest|Cases.StaticTest|"
         + "Cases.GenericTest|Cases.PrivateTest|AbstractCases.AbstractTest|AbstractCases.InheritedTest";
 
-    /// <summary>
-    /// The fixture compiles against both major versions unchanged, because <c>Xunit.FactAttribute</c>,
-    /// <c>Xunit.TheoryAttribute</c> and <c>Xunit.InlineDataAttribute</c> exist in either of them.
-    /// </summary>
     private const string XunitFixtureSource = """
         namespace Fixture;
 
@@ -126,16 +130,12 @@ public class XunitTestMethodRecognizerTests
         """;
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task Fixtures_EveryCompilation_CompilesWithoutErrors(string version)
+    public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
     {
         var errors = new[]
         {
-            Describe(CreateXunitFixture(version)),
-            Describe(CompilationFactory.Create(UnrelatedFixtureSource, ToFramework(version))),
+            Describe(CreateXunitV2Fixture()),
+            Describe(CreateUnrelatedFixture()),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource)),
         };
 
@@ -145,15 +145,11 @@ public class XunitTestMethodRecognizerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task FrameworkName_Recognizer_NamesTheFramework(string version)
+    public async Task FrameworkName_Recognizer_NamesTheFramework()
     {
-        var recognizer = CreateRecognizer(CreateXunitFixture(version));
+        var recognizer = CreateRecognizer(CreateXunitV2Fixture());
 
-        _ = await Assert.That(recognizer.FrameworkName).IsEqualTo("xUnit");
+        _ = await Assert.That(recognizer.FrameworkName).IsEqualTo(FrameworkName);
     }
 
     /// <summary>
@@ -161,15 +157,10 @@ public class XunitTestMethodRecognizerTests
     /// override of the abstract test is not listed again, because the attribute sits on the declaration
     /// the override replaces.
     /// </summary>
-    /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task FindTestMethods_EveryTestShape_IsDiscoveredInDeclarationOrder(string version)
+    public async Task FindTestMethods_EveryTestShape_IsDiscoveredInDeclarationOrder()
     {
-        var compilation = CreateXunitFixture(version);
+        var compilation = CreateXunitV2Fixture();
 
         var found = TestMethodDiscovery.FindTestMethods(
             compilation,
@@ -181,25 +172,16 @@ public class XunitTestMethodRecognizerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario, "FactTest", true)]
-    [Arguments(XunitV2Scenario, "TheoryTest", true)]
-    [Arguments(XunitV2Scenario, "DerivedAttributeTest", true)]
-    [Arguments(XunitV2Scenario, "StaticTest", true)]
-    [Arguments(XunitV2Scenario, "GenericTest", true)]
-    [Arguments(XunitV2Scenario, "PrivateTest", true)]
-    [Arguments(XunitV2Scenario, "PlainMethod", false)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario, "FactTest", true)]
-    [Arguments(XunitV3Scenario, "TheoryTest", true)]
-    [Arguments(XunitV3Scenario, "DerivedAttributeTest", true)]
-    [Arguments(XunitV3Scenario, "StaticTest", true)]
-    [Arguments(XunitV3Scenario, "GenericTest", true)]
-    [Arguments(XunitV3Scenario, "PrivateTest", true)]
-    [Arguments(XunitV3Scenario, "PlainMethod", false)]
-#endif
-    public async Task IsTestMethod_Method_IsClassifiedByItsAttributes(string version, string methodName, bool expected)
+    [Arguments("FactTest", true)]
+    [Arguments("TheoryTest", true)]
+    [Arguments("DerivedAttributeTest", true)]
+    [Arguments("StaticTest", true)]
+    [Arguments("GenericTest", true)]
+    [Arguments("PrivateTest", true)]
+    [Arguments("PlainMethod", false)]
+    public async Task IsTestMethod_Method_IsClassifiedByItsAttributes(string methodName, bool expected)
     {
-        var compilation = CreateXunitFixture(version);
+        var compilation = CreateXunitV2Fixture();
         var recognizer = CreateRecognizer(compilation);
         var method = FindMethod(compilation, CasesTypeName, methodName);
 
@@ -207,72 +189,72 @@ public class XunitTestMethodRecognizerTests
     }
 
     [Test]
-    [Arguments(XunitV2Scenario, "AbstractTest")]
-    [Arguments(XunitV2Scenario, "InheritedTest")]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario, "AbstractTest")]
-    [Arguments(XunitV3Scenario, "InheritedTest")]
-#endif
-    public async Task IsTestMethod_AbstractAndInheritedMethod_IsClassifiedAsATest(string version, string methodName)
+    [Arguments("AbstractTest")]
+    [Arguments("InheritedTest")]
+    public async Task IsTestMethod_AbstractAndInheritedMethod_IsClassifiedAsATest(string methodName)
     {
-        var compilation = CreateXunitFixture(version);
+        var compilation = CreateXunitV2Fixture();
         var recognizer = CreateRecognizer(compilation);
-        var method = FindMethod(compilation, "Fixture.AbstractCases", methodName);
+        var method = FindMethod(compilation, AbstractCasesTypeName, methodName);
 
         _ = await Assert.That(recognizer.IsTestMethod(method)).IsTrue();
     }
 
     /// <summary>
     /// An attribute that only shares the simple name is not a test attribute, no matter whether the
-    /// framework is referenced at all — and where it is not, no recogniser exists in the first place.
+    /// framework is referenced at all - the recogniser compares symbols, never names.
     /// </summary>
-    /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task IsTestMethod_FactAttributeFromAnUnrelatedNamespace_IsNotClassifiedAsATest(string version)
+    public async Task IsTestMethod_FactAttributeFromAnUnrelatedNamespace_IsNotClassifiedAsATest()
     {
-        var compilation = CompilationFactory.Create(UnrelatedFixtureSource, ToFramework(version));
+        var compilation = CreateUnrelatedFixture();
         var recognizer = CreateRecognizer(compilation);
         var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
 
         _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new XunitTestMethodRecognizer(null).IsTestMethod(method)).IsFalse();
+        _ = await Assert.That(new XunitV2TestMethodRecognizer(null).IsTestMethod(method)).IsFalse();
     }
 
     /// <summary>
-    /// When the well-known attribute type could not be resolved — which is what happens to a compilation
-    /// referencing both major versions — only the name rule is left, and it has to carry the recognition
-    /// of the real framework attributes on its own.
+    /// A recogniser whose attribute type could not be resolved finds no test rather than throwing, and it
+    /// does not guess from the simple name either: judging fails closed, so a compilation whose tests
+    /// cannot be seen is never judged at all.
     /// </summary>
-    /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
-    [Arguments(XunitV2Scenario)]
-#if FRAMESHIFT_XUNIT_V3
-    [Arguments(XunitV3Scenario)]
-#endif
-    public async Task IsTestMethod_RecognizerWithoutAnAttributeType_FallsBackToTheNameRule(string version)
+    public async Task IsTestMethod_RecognizerWithoutAnAttributeType_FindsNoTest()
     {
-        var compilation = CreateXunitFixture(version);
-        var recognizer = new XunitTestMethodRecognizer(null);
+        var compilation = CreateXunitV2Fixture();
+        var recognizer = new XunitV2TestMethodRecognizer(null);
 
         var fact = FindMethod(compilation, CasesTypeName, "FactTest");
-        var theory = FindMethod(compilation, CasesTypeName, "TheoryTest");
         var derived = FindMethod(compilation, CasesTypeName, "DerivedAttributeTest");
         var plain = FindMethod(compilation, CasesTypeName, "PlainMethod");
 
-        _ = await Assert.That(recognizer.IsTestMethod(fact)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(theory)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(derived)).IsTrue();
+        _ = await Assert.That(recognizer.FrameworkName).IsEqualTo(FrameworkName);
+        _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
+        _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
         _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+    }
+
+    [Test]
+    public async Task FindTestMethods_RecognizerWithoutAnAttributeType_FindsNothing()
+    {
+        var compilation = CreateXunitV2Fixture();
+
+        var found = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new XunitV2TestMethodRecognizer(null),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(found.Length).IsEqualTo(0);
     }
 
     [Test]
     public async Task IsTestMethod_MethodIsNull_ThrowsArgumentNullException()
     {
-        var recognizer = new XunitTestMethodRecognizer(null);
+        var compilation = CreateXunitV2Fixture();
+        var recognizer = CreateRecognizer(compilation);
         var threw = false;
 
         try
@@ -287,21 +269,14 @@ public class XunitTestMethodRecognizerTests
         _ = await Assert.That(threw).IsTrue();
     }
 
-    private static CSharpCompilation CreateXunitFixture(string version) =>
-        CompilationFactory.Create(XunitFixtureSource, ToFramework(version), filePath: "Cases.cs");
+    private static CSharpCompilation CreateXunitV2Fixture() =>
+        CompilationFactory.Create(XunitFixtureSource, TestFramework.XunitV2, filePath: "Cases.cs");
 
-    private static TestFramework ToFramework(string version) =>
-        version switch
-        {
-            XunitV2Scenario => TestFramework.XunitV2,
-#if FRAMESHIFT_XUNIT_V3
-            XunitV3Scenario => TestFramework.XunitV3,
-#endif
-            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unknown version."),
-        };
+    private static CSharpCompilation CreateUnrelatedFixture() =>
+        CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.XunitV2, filePath: "Unrelated.cs");
 
-    private static XunitTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
-        new XunitTestMethodRecognizer(XunitTestFrameworkProbe.GetTestAttributeType(compilation));
+    private static XunitV2TestMethodRecognizer CreateRecognizer(Compilation compilation) =>
+        new XunitV2TestMethodRecognizer(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation));
 
     private static IMethodSymbol FindMethod(Compilation compilation, string typeName, string methodName) =>
         compilation.GetTypeByMetadataName(typeName)!.GetMembers(methodName).OfType<IMethodSymbol>().First();

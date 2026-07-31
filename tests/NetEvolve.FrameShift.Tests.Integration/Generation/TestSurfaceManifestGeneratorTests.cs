@@ -91,8 +91,7 @@ public class TestSurfaceManifestGeneratorTests
         }
         """;
 
-#if FRAMESHIFT_XUNIT_V3
-    private const string XunitSource = """
+    private const string XunitV2Source = """
         namespace Tests;
 
         public class CalculatorTests
@@ -106,7 +105,6 @@ public class TestSurfaceManifestGeneratorTests
             }
         }
         """;
-#endif
 
     private const string NUnitSource = """
         namespace Tests;
@@ -267,9 +265,7 @@ public class TestSurfaceManifestGeneratorTests
         List<string> described = [Describe(production), Describe(CreateAwkwardProduction())];
 
         described.Add(Describe(CreateTest(TestFramework.TUnit, TUnitSource, production)));
-#if FRAMESHIFT_XUNIT_V3
-        described.Add(Describe(CreateTest(TestFramework.XunitV3, XunitSource, production)));
-#endif
+        described.Add(Describe(CreateTest(TestFramework.XunitV2, XunitV2Source, production)));
         described.Add(Describe(CreateTest(TestFramework.NUnit, NUnitSource, production)));
         described.Add(Describe(CreateTest(TestFramework.MSTest, MSTestSource, production)));
         described.Add(Describe(CreateTest(TestFramework.All, MixedFrameworkSource, production)));
@@ -338,17 +334,17 @@ public class TestSurfaceManifestGeneratorTests
         await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction()))
             .ConfigureAwait(false);
 
-#if FRAMESHIFT_XUNIT_V3
     /// <summary>
-    /// The same for xUnit, which reaches the generator through a different probe. The fixture and this
-    /// test are compiled out on net6.0 and net7.0, where xUnit.net v3 ships no assets at all; the other
-    /// six frameworks of the matrix compare the very same snapshot.
+    /// The same for xUnit, which reaches the generator through a different probe. The fixture uses
+    /// xUnit.net v2, whose assets exist on every target framework, so this snapshot is compared on all
+    /// eight of them. The generator itself is version-agnostic — it walks whichever probes the registry
+    /// reports as matching — and the manifest it emits records documentation comment ids only, never a
+    /// framework name, so the v3 probe would produce this very same snapshot.
     /// </summary>
     [Test]
     public async Task Generate_XunitCompilation_MatchesTheSnapshot() =>
-        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.XunitV3, XunitSource, CreateProduction()))
+        await VerifyGeneratedSourcesAsync(CreateTest(TestFramework.XunitV2, XunitV2Source, CreateProduction()))
             .ConfigureAwait(false);
-#endif
 
     /// <summary>
     /// The same for NUnit.

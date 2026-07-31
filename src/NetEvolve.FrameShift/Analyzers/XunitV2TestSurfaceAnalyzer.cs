@@ -7,8 +7,8 @@ using NetEvolve.FrameShift.Diagnostics;
 using NetEvolve.FrameShift.TestSurface;
 
 /// <summary>
-/// The test-side analyzer of FrameShift for xUnit, covering version 2 and version 3 alike. It runs on an
-/// xUnit test project, discovers the test methods of the compilation, walks the code reachable from them
+/// The test-side analyzer of FrameShift for xUnit v2. It runs on a compilation that references
+/// <c>xunit.core</c>, discovers the test methods of that compilation, walks the code reachable from them
 /// and determines which production members they exercise.
 /// </summary>
 /// <remarks>
@@ -29,15 +29,18 @@ using NetEvolve.FrameShift.TestSurface;
 /// the very first manifest.
 /// </para>
 /// <para>
-/// The analyzer shuts down entirely — reporting nothing whatsoever — unless xUnit is detected in the
-/// compilation and at least one xUnit test method is actually discovered. Every framework gets its own
-/// analyzer built on the same shared analysis, and each one stays silent on compilations that are not
-/// its own. In a project that uses several frameworks at once, only one of the analyzers judges the
-/// manifest; see <see cref="TestSurfaceAnalysis" /> for that rule.
+/// The analyzer shuts down entirely — reporting nothing whatsoever — unless xUnit v2 is detected in the
+/// compilation and at least one xUnit v2 test method is actually discovered. The two xUnit major
+/// versions get one analyzer each, because they declare test attributes of identical metadata names in
+/// different assemblies and only a version-specific probe can tell them apart exactly. Every framework
+/// gets its own analyzer built on the same shared analysis, and each one stays silent on compilations
+/// that are not its own. In a project that uses several frameworks at once — including one that uses
+/// both xUnit versions — only one of the analyzers judges the manifest; see
+/// <see cref="TestSurfaceAnalysis" /> for that rule.
 /// </para>
 /// </remarks>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
-public sealed class XunitTestSurfaceAnalyzer : DiagnosticAnalyzer
+public sealed class XunitV2TestSurfaceAnalyzer : DiagnosticAnalyzer
 {
     private static readonly ImmutableArray<DiagnosticDescriptor> _supportedDiagnostics =
     [
@@ -69,5 +72,5 @@ public sealed class XunitTestSurfaceAnalyzer : DiagnosticAnalyzer
     }
 
     private static void OnCompilation(CompilationAnalysisContext context) =>
-        TestSurfaceAnalysis.Execute(context, XunitTestFrameworkProbe.Instance);
+        TestSurfaceAnalysis.Execute(context, XunitV2TestFrameworkProbe.Instance);
 }

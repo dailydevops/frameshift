@@ -22,10 +22,12 @@ next to every other compiler diagnostic.
 - Mutants that cannot change observable behaviour are recognised and reported separately
   (`FSH0002`), each with the reason why - for example that the mutated expression folds to the same
   constant, or that the mutated value is never consumed.
-- Test discovery for TUnit, xUnit, NUnit and MSTest, with each framework adapter staying silent on
-  compilations that are not its own. All four are detected by the same rule - the framework's
-  well-known test attribute resolves, or one of its assemblies is referenced - so a project that
-  references two major versions of one framework at the same time is still analysed.
+- Test discovery for TUnit, xUnit v2, xUnit v3, NUnit and MSTest - five adapters, one per framework
+  version, each staying silent on compilations that are not its own. All five are detected by the same
+  rule: the version's well-known test attribute resolves, or one of its assemblies is referenced.
+  Because xUnit v2 and v3 declare the same attribute name in different assemblies, each xUnit adapter
+  resolves that attribute inside its own assembly, so a project referencing both versions at the same
+  time is analysed by both and every test is attributed to the version that actually marks it.
 - A self-maintaining test-surface manifest: a source generator produces it from the test project and
   a packaged MSBuild target writes it next to the project file, so it never has to be edited by hand.
 - Reachability is closed transitively over the production call graph, including an approximation of
@@ -178,7 +180,7 @@ approximated by adding the overrides and implementations declared here.
 ```mermaid
 flowchart TD
     subgraph pass1["Pass 1 - test project"]
-        A["Test methods discovered<br/>TUnit / xUnit / NUnit / MSTest"] --> B["Walk code reachable<br/>inside the test assembly"]
+        A["Test methods discovered<br/>TUnit / xUnit v2 / xUnit v3 / NUnit / MSTest"] --> B["Walk code reachable<br/>inside the test assembly"]
         B --> C["Record referenced<br/>production members"]
         C --> D["Source generator emits<br/>the manifest"]
         D --> E["MSBuild target writes<br/>ProjectName.frameshift-tests"]
@@ -278,9 +280,10 @@ dotnet_diagnostic.FSH0002.severity = none
   compiler host can load - the .NET Core-based build server of the .NET SDK, the .NET Framework-based
   one inside Visual Studio, and `csc` on either. It is exercised on both runtimes: the test suite runs
   on `net6.0` through `net10.0` and, on Windows, additionally on `net472`, `net48` and `net481`.
-- A test project using TUnit, xUnit (v2 or v3), NUnit or MSTest (3 or 4). Referencing more than one of
-  them in the same project is supported; each framework's tests are discovered by its own adapter and
-  all of them are recorded in the one manifest.
+- A test project using TUnit, xUnit v2, xUnit v3, NUnit or MSTest (3 or 4). Every framework version has
+  its own adapter, and referencing more than one of them in the same project is supported - including
+  xUnit v2 and v3 side by side. Each version's tests are discovered by its own adapter and all of them
+  are recorded in the one manifest.
 - No runtime dependency: the package is a development dependency and contributes nothing to the
   output of the projects that reference it.
 
