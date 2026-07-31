@@ -1,0 +1,23 @@
+﻿{
+  diagnostics: <no diagnostics>,
+  sources: [
+    /*
+frameshift-test-surface/1
+T M:Tests.BoxTests.Box_ExercisesTheAwkwardMembers
+R M:Fixture.Box`1.#ctor
+R M:Fixture.Box`1.Convert``1(`0,``0)~``0
+R M:Fixture.Box`1.Nested.#ctor
+R M:Fixture.Box`1.Nested.Depth~System.Int32
+R M:Fixture.Box`1.op_Addition(Fixture.Box{`0},Fixture.Box{`0})~Fixture.Box{`0}
+R P:Fixture.Box`1.Item(System.Int32)
+R P:Fixture.Box`1.Value
+R P:Fixture.IShape.Corners
+R T:Fixture.Box`1
+R T:Fixture.Box`1.Nested
+R T:Fixture.IShape
+R T:System.Int32
+R T:System.String
+*/
+
+  ]
+}
