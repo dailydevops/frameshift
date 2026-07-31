@@ -53,6 +53,33 @@ public class LogicalOperatorMutatorTests
         }
         """;
 
+    private const string TrueFalseOperatorTemplate = """
+        internal sealed class Flag
+        {
+            public static Flag operator &(Flag left, Flag right) => left;
+
+            public static Flag operator |(Flag left, Flag right) => right;
+
+            public static bool operator true(Flag value) => true;
+
+            public static bool operator false(Flag value) => false;
+        }
+
+        internal static class Combinations
+        {
+            public static Flag Combine(Flag left, Flag right) => /*!*/left OPERATOR right;
+        }
+        """;
+
+    private const string MethodGroupOperandSource = """
+        internal static class Combinations
+        {
+            public static int Value() => 0;
+
+            public static object Combine() => /*!*/Value & Value;
+        }
+        """;
+
     private static readonly LogicalOperatorMutator _mutator = new LogicalOperatorMutator();
 
     [Test]
@@ -157,6 +184,59 @@ public class LogicalOperatorMutatorTests
 
         _ = await Assert.That(mutated).Contains(expectedText);
         _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// A type with <c>true</c> and <c>false</c> operators may be used with <c>&amp;&amp;</c> and
+    /// <c>||</c>, which resolve through its <c>&amp;</c> and <c>|</c> operators. The conditional form is
+    /// mutated, because both underlying operators exist.
+    /// </summary>
+    [Test]
+    [Arguments("&&", "&& => ||")]
+    [Arguments("||", "|| => &&")]
+    public async Task CreateMutations_ConditionalOperatorOverATypeWithTrueAndFalse_ProducesTheOppositeOperator(
+        string source,
+        string expectedName
+    )
+    {
+        string[] expected = [expectedName];
+        var (mutations, tree, model, errors) = Mutate(CreateSource(TrueFalseOperatorTemplate, source));
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("Flag");
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+    }
+
+    /// <summary>
+    /// The non-conditional form over the same type is a user defined bitwise operator over non-boolean
+    /// operands, which this operator family leaves alone.
+    /// </summary>
+    [Test]
+    [Arguments("&")]
+    [Arguments("|")]
+    public async Task CreateMutations_UserDefinedBooleanLikeOperator_ReturnsEmpty(string source)
+    {
+        var (mutations, _, _, errors) = Mutate(CreateSource(TrueFalseOperatorTemplate, source));
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// A method group has no type at all, so the boolean guard has to reject a <see langword="null" />
+    /// type instead of assuming every operand carries one. C# rejects the fixture, which is exactly what
+    /// makes the operands typeless.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_TypelessOperands_ReturnsEmpty()
+    {
+        var (mutations, tree, model, _) = Mutate(MethodGroupOperandSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+
+        _ = await Assert.That(binary.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
     }
 
     private static string CreateSource(string template, string source) =>

@@ -82,6 +82,101 @@ public class ArithmeticOperatorMutatorTests
         }
         """;
 
+    private const string AllOperatorsSource = """
+        namespace Fixtures;
+
+        internal sealed class Vector
+        {
+            internal Vector(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Vector operator +(Vector left, Vector right) => new Vector(left.Amount + right.Amount);
+
+            public static Vector operator -(Vector left, Vector right) => new Vector(left.Amount - right.Amount);
+
+            public static Vector operator *(Vector left, Vector right) => new Vector(left.Amount * right.Amount);
+
+            public static Vector operator /(Vector left, Vector right) => new Vector(left.Amount / right.Amount);
+
+            public static Vector operator %(Vector left, Vector right) => new Vector(left.Amount % right.Amount);
+        }
+
+        internal static class Vectors
+        {
+            internal static Vector Combine(Vector left, Vector right) => /*!*/left + right;
+        }
+        """;
+
+    private const string GenericOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Box<TValue>
+        {
+            internal Box(TValue value) => Value = value;
+
+            internal TValue Value { get; }
+
+            public static Box<TValue> operator +(Box<TValue> left, Box<TValue> right) => left;
+
+            public static Box<TValue> operator *(Box<TValue> left, Box<TValue> right) => right;
+        }
+
+        internal static class Boxes
+        {
+            internal static Box<int> Combine(Box<int> left, Box<int> right) => /*!*/left + right;
+        }
+        """;
+
+    private const string NullableLiftedOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money? Combine(Money? left, Money? right) => /*!*/left + right;
+        }
+        """;
+
+    private const string ImplicitConversionOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Cents
+        {
+            internal Cents(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static implicit operator Money(Cents value) => new Money(value.Amount);
+        }
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Combine(Money left, Cents right) => /*!*/left + right;
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -255,6 +350,74 @@ public class ArithmeticOperatorMutatorTests
         _ = await Assert
             .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
             .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorOnAClassWithEveryCounterpart_ProducesAllFour()
+    {
+        string[] expectedIds =
+        [
+            "arithmetic.add-to-divide",
+            "arithmetic.add-to-modulo",
+            "arithmetic.add-to-multiply",
+            "arithmetic.add-to-subtract",
+        ];
+        var result = Mutate(AllOperatorsSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorOnAGenericType_ProducesOnlyTheDeclaredCounterpart()
+    {
+        string[] expectedIds = ["arithmetic.add-to-multiply"];
+        string[] expectedDisplayNames = ["+ => *"];
+        var result = Mutate(GenericOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+            .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    /// <summary>
+    /// A lifted operator on a nullable value type is bound to the operator declared on the underlying
+    /// type, so the counterpart lookup has to succeed on that underlying type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedOperator_ProducesOnlyTheDeclaredCounterpart()
+    {
+        string[] expectedIds = ["arithmetic.add-to-subtract"];
+        var result = Mutate(NullableLiftedOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// The right operand is a <c>Cents</c>, but the bound operator is declared on <c>Money</c> and only
+    /// reached through an implicit conversion. The counterpart has to be looked up on the declaring type,
+    /// not on the operand type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OperatorReachedThroughAnImplicitConversion_UsesTheDeclaringType()
+    {
+        string[] expectedIds = ["arithmetic.add-to-subtract"];
+        var result = Mutate(ImplicitConversionOperatorSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(ImplicitConversionOperatorSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.ContainingType.Name).IsEqualTo("Money");
+        _ = await Assert.That(semanticModel.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
     }
 
     private static string BinaryFixture(string symbol) =>

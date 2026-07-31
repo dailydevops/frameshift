@@ -88,6 +88,119 @@ public class EqualityOperatorMutatorTests
         }
         """;
 
+    private const string StructPairSource = """
+        internal readonly struct Money
+        {
+            public static bool operator ==(Money left, Money right) => true;
+
+            public static bool operator !=(Money left, Money right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Money left, Money right) => /*!*/left == right;
+        }
+        """;
+
+    private const string GenericPairSource = """
+        internal readonly struct Box<TValue>
+        {
+            public static bool operator ==(Box<TValue> left, Box<TValue> right) => true;
+
+            public static bool operator !=(Box<TValue> left, Box<TValue> right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Box<int> left, Box<int> right) => /*!*/left == right;
+        }
+        """;
+
+    private const string LiftedPairSource = """
+        internal readonly struct Money
+        {
+            public static bool operator ==(Money left, Money right) => true;
+
+            public static bool operator !=(Money left, Money right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Money? left, Money? right) => /*!*/left == right;
+        }
+        """;
+
+    private const string NullableCounterpartSource = """
+        internal readonly struct Money
+        {
+            public static bool operator ==(Money left, Money right) => true;
+
+            public static bool operator !=(Money? left, Money? right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Money left, Money right) => /*!*/left == right;
+        }
+        """;
+
+    private const string MismatchedCounterpartSource = """
+        internal readonly struct Money
+        {
+            public static bool operator ==(Money left, Money right) => true;
+
+            public static bool operator !=(Money left, int right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Money left, Money right) => /*!*/left == right;
+        }
+        """;
+
+    private const string ImplicitConversionSource = """
+        internal readonly struct Cents
+        {
+            public static implicit operator Money(Cents value) => default;
+        }
+
+        internal readonly struct Money
+        {
+            public static bool operator ==(Money left, Money right) => true;
+
+            public static bool operator !=(Money left, Money right) => false;
+
+            public override bool Equals(object? other) => true;
+
+            public override int GetHashCode() => 0;
+        }
+
+        internal static class Comparisons
+        {
+            public static bool Compare(Money left, Cents right) => /*!*/left == right;
+        }
+        """;
+
     private const string RelationalSource = """
         internal static class Comparisons
         {
@@ -207,6 +320,94 @@ public class EqualityOperatorMutatorTests
 
         _ = await Assert.That(errors).IsEqualTo(string.Empty);
         _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    [Test]
+    [Arguments(StructPairSource, "Money")]
+    [Arguments(GenericPairSource, "Box")]
+    public async Task CreateMutations_UserDefinedPairOnAValueType_ProducesTheCounterpart(
+        string source,
+        string expectedTypeName
+    )
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        string[] expected = ["== => !="];
+        var (mutations, tree, model, errors) = Mutate(source);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo(expectedTypeName);
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+    }
+
+    /// <summary>
+    /// A comparison of two nullable value types is bound to the lifted form of the operator declared on
+    /// the underlying type, so the counterpart has to be found on that underlying type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedPair_ProducesTheCounterpart()
+    {
+        string[] expected = ["== => !="];
+        var (mutations, tree, model, errors) = Mutate(LiftedPairSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("Money?");
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+    }
+
+    /// <summary>
+    /// The declared counterpart takes the nullable form of the operand type. Unwrapping the nullable
+    /// makes the two signatures match, so the mutant binds and the mutation is offered. C# insists on a
+    /// literally matching pair, which is why the fixture deliberately does not compile.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CounterpartDeclaredOnTheNullableOperandType_ProducesTheCounterpart()
+    {
+        string[] expected = ["== => !="];
+        var (mutations, tree, model, _) = Mutate(NullableCounterpartSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+    }
+
+    /// <summary>
+    /// The declared counterpart has a different second parameter type, so the mutant would bind to
+    /// nothing. The fixture deliberately does not compile, because C# rejects an unmatched pair.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CounterpartWithDifferentParameterTypes_ReturnsEmpty()
+    {
+        var (mutations, tree, model, _) = Mutate(MismatchedCounterpartSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// The right operand is a <c>Cents</c>, but the bound operator is declared on <c>Money</c> and only
+    /// reached through an implicit conversion, so the counterpart is looked up on <c>Money</c>.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OperatorReachedThroughAnImplicitConversion_ProducesTheCounterpart()
+    {
+        string[] expected = ["== => !="];
+        var (mutations, tree, model, errors) = Mutate(ImplicitConversionSource);
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
+        _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
+        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
     }
 
     private static string CreateSource(string source) =>

@@ -127,6 +127,37 @@ public class LogicalNegationMutatorTests
         }
         """;
 
+    private const string MethodGroupOperandSource = """
+        internal static class Negations
+        {
+            public static bool Flag() => true;
+
+            public static object Negate() => /*!*/!Flag;
+        }
+        """;
+
+    private const string TrueFalseOperatorConditionSource = """
+        internal sealed class Flag
+        {
+            public static bool operator true(Flag value) => true;
+
+            public static bool operator false(Flag value) => false;
+        }
+
+        internal static class Conditions
+        {
+            public static int Classify(Flag flag)
+            {
+                /*!*/if (flag)
+                {
+                    return 1;
+                }
+
+                return 0;
+            }
+        }
+        """;
+
     private static readonly LogicalNegationMutator _mutator = new LogicalNegationMutator();
 
     [Test]
@@ -290,6 +321,38 @@ public class LogicalNegationMutatorTests
 
         _ = await Assert.That(mutated).Contains("Negate(bool value) => /*!*/value;");
         _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// A method group has no type at all, so the boolean guard has to reject a <see langword="null" />
+    /// type instead of assuming every operand carries one. C# rejects the fixture, which is exactly what
+    /// makes the operand typeless.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_TypelessOperand_ReturnsEmpty()
+    {
+        var (mutations, tree, model, _) = Mutate(MethodGroupOperandSource);
+        var negation = SyntaxNodeLocator.FindMarked<PrefixUnaryExpressionSyntax>(tree);
+
+        _ = await Assert.That(negation.Kind()).IsEqualTo(SyntaxKind.LogicalNotExpression);
+        _ = await Assert.That(model.GetTypeInfo(negation.Operand).Type).IsNull();
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// A type with <c>true</c> and <c>false</c> operators is a legal <c>if</c> condition, but its type is
+    /// not <see langword="bool" />. Wrapping it into <c>!(...)</c> would require a <c>!</c> operator the
+    /// type does not declare, so no mutation is offered.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ConditionWithTrueAndFalseOperators_ReturnsEmpty()
+    {
+        var (mutations, tree, model, errors) = Mutate(TrueFalseOperatorConditionSource);
+        var ifStatement = SyntaxNodeLocator.FindMarked<IfStatementSyntax>(tree);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type?.ToDisplayString()).IsEqualTo("Flag");
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
     }
 
     private static string[] DisplayNames(ImmutableArray<Mutation> mutations) =>

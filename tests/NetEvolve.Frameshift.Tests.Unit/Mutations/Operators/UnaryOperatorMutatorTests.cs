@@ -55,6 +55,62 @@ public class UnaryOperatorMutatorTests
         }
         """;
 
+    private const string PlusOnlyOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money value) => value;
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Identity(Money value) => /*!*/+value;
+        }
+        """;
+
+    private const string GenericOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Box<TValue>
+        {
+            internal Box(TValue value) => Value = value;
+
+            internal TValue Value { get; }
+
+            public static Box<TValue> operator -(Box<TValue> value) => value;
+
+            public static Box<TValue> operator +(Box<TValue> value) => value;
+        }
+
+        internal static class Boxes
+        {
+            internal static Box<int> Invert(Box<int> value) => /*!*/-value;
+        }
+        """;
+
+    private const string NullableLiftedNegateOnlySource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator -(Money value) => new Money(0 - value.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money? Invert(Money? value) => /*!*/-value;
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -226,6 +282,52 @@ public class UnaryOperatorMutatorTests
         string[] expectedIds = ["unary.negate-to-plus", "unary.remove-negate"];
         var result = Mutate(NegateAndPlusOperatorSource);
 
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedUnaryPlusWithoutNegation_ProducesOnlyTheRemoval()
+    {
+        string[] expectedIds = ["unary.remove-plus"];
+        string[] expectedDisplayNames = ["+x => x"];
+        var result = Mutate(PlusOnlyOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+            .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorsOnAGenericType_ProducesBothMutations()
+    {
+        string[] expectedIds = ["unary.negate-to-plus", "unary.remove-negate"];
+        var result = Mutate(GenericOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// The lifted negation of a nullable value type is bound to the operator declared on the underlying
+    /// type, which declares no unary plus, so only the removal survives.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedNegation_ProducesOnlyTheRemoval()
+    {
+        string[] expectedIds = ["unary.remove-negate"];
+        var result = Mutate(NullableLiftedNegateOnlySource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(NullableLiftedNegateOnlySource);
+        var unary = SyntaxNodeLocator.FindMarked<PrefixUnaryExpressionSyntax>(tree);
+
+        _ = await Assert
+            .That(semanticModel.GetTypeInfo(unary.Operand).Type?.ToDisplayString())
+            .IsEqualTo("Fixtures.Money?");
         _ = await Assert
             .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
             .IsEquivalentTo(expectedIds);

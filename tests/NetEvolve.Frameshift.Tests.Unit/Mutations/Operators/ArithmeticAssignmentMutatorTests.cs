@@ -116,6 +116,121 @@ public class ArithmeticAssignmentMutatorTests
         }
         """;
 
+    private const string AllOperatorsSource = """
+        namespace Fixtures;
+
+        internal sealed class Vector
+        {
+            internal Vector(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Vector operator +(Vector left, Vector right) => new Vector(left.Amount + right.Amount);
+
+            public static Vector operator -(Vector left, Vector right) => new Vector(left.Amount - right.Amount);
+
+            public static Vector operator *(Vector left, Vector right) => new Vector(left.Amount * right.Amount);
+
+            public static Vector operator /(Vector left, Vector right) => new Vector(left.Amount / right.Amount);
+
+            public static Vector operator %(Vector left, Vector right) => new Vector(left.Amount % right.Amount);
+        }
+
+        internal static class Vectors
+        {
+            internal static Vector Accumulate(Vector left, Vector right)
+            {
+                var total = left;
+                /*!*/total += right;
+                return total;
+            }
+        }
+        """;
+
+    private const string GenericOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Box<TValue>
+        {
+            internal Box(TValue value) => Value = value;
+
+            internal TValue Value { get; }
+
+            public static Box<TValue> operator +(Box<TValue> left, Box<TValue> right) => left;
+
+            public static Box<TValue> operator %(Box<TValue> left, Box<TValue> right) => right;
+        }
+
+        internal static class Boxes
+        {
+            internal static Box<int> Accumulate(Box<int> left, Box<int> right)
+            {
+                var total = left;
+                /*!*/total += right;
+                return total;
+            }
+        }
+        """;
+
+    private const string NullableLiftedOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money? Accumulate(Money? left, Money? right)
+            {
+                var total = left;
+                /*!*/total += right;
+                return total;
+            }
+        }
+        """;
+
+    private const string ImplicitConversionOperatorSource = """
+        namespace Fixtures;
+
+        internal readonly struct Cents
+        {
+            internal Cents(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static implicit operator Money(Cents value) => new Money(value.Amount);
+        }
+
+        internal readonly struct Money
+        {
+            internal Money(int amount) => Amount = amount;
+
+            internal int Amount { get; }
+
+            public static Money operator +(Money left, Money right) => new Money(left.Amount + right.Amount);
+
+            public static Money operator -(Money left, Money right) => new Money(left.Amount - right.Amount);
+        }
+
+        internal static class Wallet
+        {
+            internal static Money Accumulate(Money left, Cents right)
+            {
+                var total = left;
+                /*!*/total += right;
+                return total;
+            }
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -299,6 +414,73 @@ public class ArithmeticAssignmentMutatorTests
         _ = await Assert
             .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
             .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorOnAClassWithEveryCounterpart_ProducesAllFour()
+    {
+        string[] expectedIds =
+        [
+            "arithmetic-assignment.add-assign-to-divide-assign",
+            "arithmetic-assignment.add-assign-to-modulo-assign",
+            "arithmetic-assignment.add-assign-to-multiply-assign",
+            "arithmetic-assignment.add-assign-to-subtract-assign",
+        ];
+        var result = Mutate(AllOperatorsSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorOnAGenericType_ProducesOnlyTheDeclaredCounterpart()
+    {
+        string[] expectedIds = ["arithmetic-assignment.add-assign-to-modulo-assign"];
+        string[] expectedDisplayNames = ["+= => %="];
+        var result = Mutate(GenericOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+            .IsEquivalentTo(expectedDisplayNames);
+    }
+
+    /// <summary>
+    /// A compound assignment over a nullable value type is bound to the lifted form of the operator
+    /// declared on the underlying type, so the counterpart lookup has to succeed on that underlying type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedOperator_ProducesOnlyTheDeclaredCounterpart()
+    {
+        string[] expectedIds = ["arithmetic-assignment.add-assign-to-subtract-assign"];
+        var result = Mutate(NullableLiftedOperatorSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// The right hand side is a <c>Cents</c>, but the bound operator is declared on <c>Money</c> and only
+    /// reached through an implicit conversion. The counterpart has to be looked up on the declaring type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OperatorReachedThroughAnImplicitConversion_UsesTheDeclaringType()
+    {
+        string[] expectedIds = ["arithmetic-assignment.add-assign-to-subtract-assign"];
+        var result = Mutate(ImplicitConversionOperatorSource);
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(ImplicitConversionOperatorSource);
+        var assignment = SyntaxNodeLocator.FindMarked<AssignmentExpressionSyntax>(tree);
+        var bound = semanticModel.GetSymbolInfo(assignment).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(bound?.ContainingType.Name).IsEqualTo("Money");
+        _ = await Assert.That(semanticModel.GetTypeInfo(assignment.Right).Type?.Name).IsEqualTo("Cents");
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
     }
 
     private static string AssignmentFixture(string symbol) =>

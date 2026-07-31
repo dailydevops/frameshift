@@ -88,6 +88,102 @@ public class IncrementDecrementMutatorTests
         }
         """;
 
+    private const string GenericBothOperatorsSource = """
+        namespace Fixtures;
+
+        internal readonly struct Box<TValue>
+        {
+            internal Box(TValue value) => Value = value;
+
+            internal TValue Value { get; }
+
+            public static Box<TValue> operator ++(Box<TValue> value) => value;
+
+            public static Box<TValue> operator --(Box<TValue> value) => value;
+        }
+
+        internal static class Boxes
+        {
+            internal static Box<int> Advance(Box<int> value)
+            {
+                var current = value;
+                _ = /*!*/++current;
+                return current;
+            }
+        }
+        """;
+
+    private const string GenericIncrementOnlySource = """
+        namespace Fixtures;
+
+        internal readonly struct Box<TValue>
+        {
+            internal Box(TValue value) => Value = value;
+
+            internal TValue Value { get; }
+
+            public static Box<TValue> operator ++(Box<TValue> value) => value;
+        }
+
+        internal static class Boxes
+        {
+            internal static Box<int> Advance(Box<int> value)
+            {
+                var current = value;
+                _ = /*!*/++current;
+                return current;
+            }
+        }
+        """;
+
+    private const string NullableLiftedBothOperatorsSource = """
+        namespace Fixtures;
+
+        internal readonly struct Ticks
+        {
+            internal Ticks(int count) => Count = count;
+
+            internal int Count { get; }
+
+            public static Ticks operator ++(Ticks value) => new Ticks(value.Count + 1);
+
+            public static Ticks operator --(Ticks value) => new Ticks(value.Count - 1);
+        }
+
+        internal static class Clock
+        {
+            internal static Ticks? Advance(Ticks? value)
+            {
+                var current = value;
+                _ = /*!*/current++;
+                return current;
+            }
+        }
+        """;
+
+    private const string NullableLiftedIncrementOnlySource = """
+        namespace Fixtures;
+
+        internal readonly struct Ticks
+        {
+            internal Ticks(int count) => Count = count;
+
+            internal int Count { get; }
+
+            public static Ticks operator ++(Ticks value) => new Ticks(value.Count + 1);
+        }
+
+        internal static class Clock
+        {
+            internal static Ticks? Advance(Ticks? value)
+            {
+                var current = value;
+                _ = /*!*/current++;
+                return current;
+            }
+        }
+        """;
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -238,6 +334,51 @@ public class IncrementDecrementMutatorTests
             .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
             .IsEquivalentTo(expectedIds);
         _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("current--");
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedOperatorsOnAGenericType_ProducesTheSwap()
+    {
+        string[] expectedIds = ["increment-decrement.prefix-increment-to-decrement"];
+        var result = Mutate(GenericBothOperatorsSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("--current");
+    }
+
+    [Test]
+    public async Task CreateMutations_UserDefinedIncrementOnAGenericTypeWithoutDecrement_ReturnsEmpty()
+    {
+        var result = Mutate(GenericIncrementOnlySource);
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PreIncrementExpression);
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A lifted increment on a nullable value type is bound to the operator declared on the underlying
+    /// type, so the counterpart lookup has to succeed on that underlying type.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedOperators_ProducesTheSwap()
+    {
+        string[] expectedIds = ["increment-decrement.postfix-increment-to-decrement"];
+        var result = Mutate(NullableLiftedBothOperatorsSource);
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    [Test]
+    public async Task CreateMutations_LiftedUserDefinedIncrementWithoutDecrement_ReturnsEmpty()
+    {
+        var result = Mutate(NullableLiftedIncrementOnlySource);
+
+        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+        _ = await Assert.That(result.Mutations).IsEmpty();
     }
 
     private static string Fixture(string expression) =>

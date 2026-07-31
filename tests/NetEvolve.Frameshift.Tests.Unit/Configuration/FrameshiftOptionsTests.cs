@@ -163,6 +163,37 @@ public class FrameshiftOptionsTests
         _ = await Assert.That(options.ReportTrivialMutants).IsFalse();
     }
 
+    [Test]
+    public async Task Read_OptionsAreNull_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => _ = FrameshiftOptions.Read(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("options");
+    }
+
+    /// <summary>
+    /// An MSBuild property that is declared but never given a value reaches the analyzer as a key that is
+    /// present and a value that is not there. Reading it must land on the documented default, exactly like
+    /// a value nobody could parse, and it must never make the build fail.
+    /// </summary>
+    [Test]
+    public async Task Read_EveryOptionPresentWithoutAValue_ReturnsTheDefaults()
+    {
+        var options = FrameshiftOptions.Read(
+            new TestAnalyzerConfigOptions(
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    [FrameshiftOptionKeys.Enabled] = null!,
+                    [FrameshiftOptionKeys.VerifyMutantCompilation] = null!,
+                    [FrameshiftOptionKeys.MaxMutantsPerMember] = null!,
+                    [FrameshiftOptionKeys.ReportTrivialMutants] = null!,
+                }
+            )
+        );
+
+        _ = await Assert.That(Describe(options)).IsEqualTo(DocumentedDefaults);
+    }
+
     private static FrameshiftOptions Read(string key, string value) =>
         FrameshiftOptions.Read(
             new TestAnalyzerConfigOptions(new Dictionary<string, string>(StringComparer.Ordinal) { [key] = value })

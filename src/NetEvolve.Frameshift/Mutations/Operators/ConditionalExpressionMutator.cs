@@ -61,8 +61,13 @@ internal sealed class ConditionalExpressionMutator : MutationOperatorBase
             return negation.Operand.WithLeadingTrivia(leadingTrivia).WithTrailingTrivia(negation.GetTrailingTrivia());
         }
 
+        // The trailing trivia has to stay outside of the added parentheses, otherwise the whitespace
+        // that separated the condition from the question mark ends up in front of the closing
+        // parenthesis and the mutant no longer reads like the code it replaces.
         var operand = RequiresParentheses(condition)
-            ? SyntaxFactory.ParenthesizedExpression(condition.WithLeadingTrivia(SyntaxTriviaList.Empty))
+            ? SyntaxFactory
+                .ParenthesizedExpression(condition.WithoutTrivia())
+                .WithTrailingTrivia(condition.GetTrailingTrivia())
             : condition.WithLeadingTrivia(SyntaxTriviaList.Empty);
 
         var operatorToken = SyntaxFactory.Token(leadingTrivia, SyntaxKind.ExclamationToken, SyntaxTriviaList.Empty);

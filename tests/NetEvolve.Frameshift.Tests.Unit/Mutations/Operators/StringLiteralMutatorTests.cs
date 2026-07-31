@@ -193,6 +193,23 @@ public class StringLiteralMutatorTests
         _ = await Assert.That(mutations).IsEmpty();
     }
 
+    /// <summary>
+    /// A literal that was parsed on its own has no parent at all, so the walk up the parent chain of the
+    /// constant context check ends immediately instead of at a member or compilation unit.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_DetachedLiteralWithoutParent_IsMutated()
+    {
+        var (_, semanticModel, _) = CompilationFactory.CreateWithModel(NonEmptySource);
+        var literal = (LiteralExpressionSyntax)SyntaxFactory.ParseExpression("\"abc\"");
+        var mutations = Mutate(new StringLiteralMutator(), literal, semanticModel);
+
+        _ = await Assert.That(literal.Parent).IsNull();
+        _ = await Assert.That(literal.IsKind(SyntaxKind.StringLiteralExpression)).IsTrue();
+        _ = await Assert.That(mutations.Length).IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+    }
+
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindStringLiteral);
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source, Func<SyntaxTree, SyntaxNode> select)

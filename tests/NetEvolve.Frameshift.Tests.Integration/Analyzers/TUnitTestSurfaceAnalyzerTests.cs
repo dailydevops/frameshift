@@ -49,6 +49,7 @@ public class TUnitTestSurfaceAnalyzerTests
     private const string FrameworkLikeAssemblyName = "TUnit.Satellite";
 
     private const string MalformedManifest = "not-a-test-surface-manifest\n";
+    private const string UnrelatedAdditionalFilePath = "Notes.txt";
     private const string GhostReferenceId = "M:Fixture.Ghost.Vanished";
     private const string ReferencePrefix = "R ";
 
@@ -405,6 +406,79 @@ public class TUnitTestSurfaceAnalyzerTests
             WithGhostReference(manifest),
             WithoutFirstReference(manifest),
         ];
+
+    [Test]
+    public async Task Initialize_ContextIsNull_ThrowsArgumentNullException()
+    {
+        var analyzer = new TUnitTestSurfaceAnalyzer();
+
+        var exception = Assert.Throws<ArgumentNullException>(() => analyzer.Initialize(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("context");
+    }
+
+    /// <summary>
+    /// A manifest whose content cannot be read at all is reported like an unparseable one. Staying silent
+    /// would let the production side keep trusting a file nobody was able to look at.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_ManifestWithoutReadableContent_ReportsTheUnreadableFile()
+    {
+        var diagnostics = await RunWithFilesAsync(
+                CreateTest(),
+                DiagnosticIds.InvalidTestSurfaceManifest,
+                InMemoryAdditionalText.WithoutContent()
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(diagnostics))
+            .IsEqualTo(DescribeManifestProblem("the content of the file is not available."));
+    }
+
+    /// <summary>
+    /// Additional files are shared by everything the build hands to the analyzers, so a file that is not
+    /// a manifest has to be walked past rather than mistaken for one.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_AdditionalFileThatIsNotAManifest_ReportsNoManifestProblem()
+    {
+        var diagnostics = await RunWithFilesAsync(
+                CreateTest(),
+                DiagnosticIds.InvalidTestSurfaceManifest,
+                new InMemoryAdditionalText(UnrelatedAdditionalFilePath, MalformedManifest)
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
+    [Test]
+    public async Task Analyzer_ManifestBehindAnUnrelatedAdditionalFile_IsStillFound()
+    {
+        var diagnostics = await RunWithFilesAsync(
+                CreateTest(),
+                DiagnosticIds.InvalidTestSurfaceManifest,
+                new InMemoryAdditionalText(UnrelatedAdditionalFilePath, MalformedManifest),
+                new InMemoryAdditionalText(MalformedManifest)
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(diagnostics))
+            .IsEqualTo(
+                DescribeManifestProblem(
+                    "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
+                        + "but found 'not-a-test-surface-manifest'."
+                )
+            );
+    }
+
+    private static Task<ImmutableArray<Diagnostic>> RunWithFilesAsync(
+        Compilation compilation,
+        string diagnosticId,
+        params AdditionalText[] additionalFiles
+    ) => AnalyzerRunner.RunAsync(new TUnitTestSurfaceAnalyzer(), compilation, diagnosticId, additionalFiles);
 
     private static CSharpCompilation CreateProduction() =>
         CompilationFactory.Create(ProductionSource, ProductionAssemblyName, filePath: ProductionPath);

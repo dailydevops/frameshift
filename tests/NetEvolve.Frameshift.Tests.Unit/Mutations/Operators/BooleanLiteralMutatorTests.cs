@@ -213,6 +213,24 @@ public class BooleanLiteralMutatorTests
         _ = await Assert.That(exception).IsNotNull();
     }
 
+    /// <summary>
+    /// A literal that was created on its own has no parent at all, so the walk up the parent chain of the
+    /// constant context check ends immediately instead of at a member or compilation unit.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_DetachedLiteralWithoutParent_IsMutated()
+    {
+        var (_, semanticModel, _) = CompilationFactory.CreateWithModel(TrueSource);
+        var literal = SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression);
+        var mutator = new BooleanLiteralMutator();
+
+        var mutations = mutator.CreateMutations(literal, semanticModel, CancellationToken.None).ToArray();
+
+        _ = await Assert.That(literal.Parent).IsNull();
+        _ = await Assert.That(mutations.Length).IsEqualTo(1);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+    }
+
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindBooleanLiteral);
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source, Func<SyntaxTree, SyntaxNode> select)

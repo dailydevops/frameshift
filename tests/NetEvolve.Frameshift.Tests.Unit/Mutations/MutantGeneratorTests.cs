@@ -49,6 +49,137 @@ public class MutantGeneratorTests
         }
         """;
 
+    private const string SimpleNameAttributeSource = """
+        using System.Diagnostics.CodeAnalysis;
+
+        public class Sample
+        {
+            [ExcludeFromCodeCoverage]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    private const string QualifiedNameAttributeSource = """
+        public class Sample
+        {
+            [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    private const string AliasQualifiedAttributeSource = """
+        public sealed class ExcludeFromCodeCoverageAttribute : System.Attribute
+        {
+        }
+
+        public class Sample
+        {
+            [global::ExcludeFromCodeCoverageAttribute]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    private const string ExplicitSuffixAttributeSource = """
+        public class Sample
+        {
+            [System.CodeDom.Compiler.GeneratedCodeAttribute("tool", "1.0")]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    /// <summary>
+    /// An attribute that only shares the simple name of a well known excluding attribute. Matching is on
+    /// the rightmost identifier by design, so this declaration is excluded as well.
+    /// </summary>
+    private const string ForeignNamespaceAttributeSource = """
+        namespace Foreign
+        {
+            public sealed class GeneratedCodeAttribute : System.Attribute
+            {
+            }
+        }
+
+        public class Sample
+        {
+            [Foreign.GeneratedCode]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    private const string UnrelatedAttributeSource = """
+        public sealed class MarkerAttribute : System.Attribute
+        {
+        }
+
+        public class Sample
+        {
+            [Marker]
+            public int First(int value) => value + 1;
+        }
+        """;
+
+    private const string ExcludedTypeSource = """
+        [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+        public class Sample
+        {
+            public int First(int value) => value + 1;
+
+            public int Second(int value) => value + 2;
+        }
+        """;
+
+    private const string ExcludedAccessorSource = """
+        public class Sample
+        {
+            private int _field;
+
+            public int Value
+            {
+                [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+                get => _field + 1;
+                set => _field = value + 2;
+            }
+        }
+        """;
+
+    private const string IncludedAccessorSource = """
+        public class Sample
+        {
+            private int _field;
+
+            public int Value
+            {
+                get => _field + 1;
+                set => _field = value + 2;
+            }
+        }
+        """;
+
+    private const string ExcludedLocalFunctionSource = """
+        public class Sample
+        {
+            public int Compute(int value)
+            {
+                [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+                static int Inner(int inner) => inner + 1;
+
+                return Inner(value);
+            }
+        }
+        """;
+
+    private const string IncludedLocalFunctionSource = """
+        public class Sample
+        {
+            public int Compute(int value)
+            {
+                static int Inner(int inner) => inner + 1;
+
+                return Inner(value);
+            }
+        }
+        """;
+
     [Test]
     public async Task CreateMutations_MixedSource_YieldsMutationsOfSeveralOperators()
     {
@@ -80,19 +211,46 @@ public class MutantGeneratorTests
     }
 
     [Test]
-    public async Task CreateMutations_GeneratedFileName_ReturnsEmpty()
+    [Arguments("Sample.g.cs")]
+    [Arguments("Sample.g.i.cs")]
+    [Arguments("Sample.designer.cs")]
+    [Arguments("Sample.Designer.cs")]
+    [Arguments("Sample.generated.cs")]
+    [Arguments("Sample.GENERATED.CS")]
+    [Arguments("C:/repo/src/Sample.g.cs")]
+    public async Task CreateMutations_GeneratedFileName_ReturnsEmpty(string filePath)
     {
-        var mutations = Generate(MixedSource, "Sample.g.cs");
+        var mutations = Generate(MixedSource, filePath);
 
         _ = await Assert.That(mutations).IsEmpty();
     }
 
+    /// <summary>
+    /// Only the end of the path decides. A directory that happens to be named like a generated file, or a
+    /// file whose name merely contains a suffix somewhere, is hand written code and must stay mutable.
+    /// </summary>
+    /// <param name="filePath">The path of the syntax tree.</param>
     [Test]
-    public async Task CreateMutations_DesignerFileName_ReturnsEmpty()
+    [Arguments("C:/repo/Sample.g.cs/Handwritten.cs")]
+    [Arguments("C:/repo/generated.cs/Sample.cs")]
+    [Arguments("Sample.g.cs.txt")]
+    [Arguments("Sample.generated.csx")]
+    public async Task CreateMutations_SuffixOnlyInsideThePath_YieldsMutations(string filePath)
     {
-        var mutations = Generate(MixedSource, "Sample.Designer.cs");
+        var mutations = Generate(MixedSource, filePath);
 
-        _ = await Assert.That(mutations).IsEmpty();
+        _ = await Assert.That(mutations.Length).IsGreaterThan(0);
+    }
+
+    /// <summary>
+    /// An in-memory tree reports an empty path, which is not the path of a generated file.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EmptyFilePath_YieldsMutations()
+    {
+        var mutations = Generate(MixedSource, filePath: string.Empty);
+
+        _ = await Assert.That(mutations.Length).IsGreaterThan(0);
     }
 
     [Test]
@@ -117,6 +275,80 @@ public class MutantGeneratorTests
         var mutations = Generate(IncludedSource);
 
         _ = await Assert.That(mutations.Length).IsGreaterThan(0);
+    }
+
+    /// <summary>
+    /// The attribute is recognised by its rightmost identifier, so every way of writing the very same
+    /// attribute has to exclude the declaration.
+    /// </summary>
+    /// <param name="source">The fixture spelling the attribute one particular way.</param>
+    [Test]
+    [Arguments(SimpleNameAttributeSource)]
+    [Arguments(QualifiedNameAttributeSource)]
+    [Arguments(AliasQualifiedAttributeSource)]
+    [Arguments(ExplicitSuffixAttributeSource)]
+    public async Task CreateMutations_ExcludingAttributeInAnyNameShape_ReturnsEmpty(string source)
+    {
+        var mutations = Generate(source);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// Matching on the simple name is deliberate, so an attribute of a foreign namespace that carries one
+    /// of the well known names excludes the declaration as well. Anything else would force the generator
+    /// to bind every attribute of every declaration it walks.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ExcludingAttributeNameFromAForeignNamespace_ReturnsEmpty()
+    {
+        var mutations = Generate(ForeignNamespaceAttributeSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_MemberWithAnUnrelatedAttribute_YieldsMutations()
+    {
+        var mutations = Generate(UnrelatedAttributeSource);
+
+        _ = await Assert.That(mutations.Length).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task CreateMutations_ExcludedType_DropsEveryMemberOfThatType()
+    {
+        var excluded = Generate(ExcludedTypeSource);
+        var included = Generate(IncludedSource);
+
+        _ = await Assert.That(included.Length).IsGreaterThan(0);
+        _ = await Assert.That(excluded).IsEmpty();
+    }
+
+    /// <summary>
+    /// An attribute on an accessor excludes that accessor and nothing else, so the sibling accessor of
+    /// the same property keeps producing mutations.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ExcludedAccessor_DropsOnlyThatAccessor()
+    {
+        var excluded = Snippets(ExcludedAccessorSource);
+        var included = Snippets(IncludedAccessorSource);
+
+        _ = await Assert.That(included).Contains("_field + 1");
+        _ = await Assert.That(included).Contains("value + 2");
+        _ = await Assert.That(excluded).Contains("value + 2");
+        _ = await Assert.That(excluded.Contains("_field + 1", StringComparer.Ordinal)).IsFalse();
+    }
+
+    [Test]
+    public async Task CreateMutations_ExcludedLocalFunction_DropsOnlyThatLocalFunction()
+    {
+        var excluded = Snippets(ExcludedLocalFunctionSource);
+        var included = Snippets(IncludedLocalFunctionSource);
+
+        _ = await Assert.That(included).Contains("inner + 1");
+        _ = await Assert.That(excluded.Contains("inner + 1", StringComparer.Ordinal)).IsFalse();
     }
 
     [Test]
@@ -175,12 +407,53 @@ public class MutantGeneratorTests
         _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation).Length).IsEqualTo(0);
     }
 
+    /// <summary>
+    /// Guards every attribute fixture: an exclusion that is only caused by a source that does not compile
+    /// would prove nothing about the attribute detection.
+    /// </summary>
+    /// <param name="source">The fixture to compile.</param>
+    [Test]
+    [Arguments(SimpleNameAttributeSource)]
+    [Arguments(QualifiedNameAttributeSource)]
+    [Arguments(AliasQualifiedAttributeSource)]
+    [Arguments(ExplicitSuffixAttributeSource)]
+    [Arguments(ForeignNamespaceAttributeSource)]
+    [Arguments(UnrelatedAttributeSource)]
+    [Arguments(ExcludedTypeSource)]
+    [Arguments(ExcludedAccessorSource)]
+    [Arguments(IncludedAccessorSource)]
+    [Arguments(ExcludedLocalFunctionSource)]
+    [Arguments(IncludedLocalFunctionSource)]
+    public async Task Fixtures_EveryAttributeFixture_CompilesWithoutErrors(string source)
+    {
+        var compilation = CompilationFactory.Create(source);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
     private static Mutation[] Generate(string source, string filePath = CompilationFactory.DefaultFilePath)
     {
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source, filePath: filePath);
 
         return [.. MutantGenerator.CreateMutations(tree.GetRoot(), semanticModel, CancellationToken.None)];
     }
+
+    /// <summary>
+    /// Reads the source text every mutation of <paramref name="source" /> points at, which names the
+    /// mutation points a fixture produced without depending on the operator ids behind them.
+    /// </summary>
+    /// <param name="source">The fixture to walk.</param>
+    /// <returns>The distinct mutated snippets, ordered ordinally.</returns>
+    private static string[] Snippets(string source) =>
+        [
+            .. Generate(source)
+                .Select(mutation => mutation.Location.SourceSpan)
+                .Select(span => source.Substring(span.Start, span.Length))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(snippet => snippet, StringComparer.Ordinal),
+        ];
 
     /// <summary>
     /// Reads the root of <paramref name="tree" /> outside an <see langword="async" /> method, which is

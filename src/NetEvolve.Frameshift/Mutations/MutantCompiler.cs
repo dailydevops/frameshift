@@ -100,6 +100,14 @@ internal sealed class MutantCompiler
     /// <returns>The viability of the mutant.</returns>
     private MutantViability VerifyCore(Mutation mutation, SyntaxTree originalTree, CancellationToken cancellationToken)
     {
+        // A replacement that does not parse can never produce a mutant that compiles. It has to be
+        // inspected before it is grafted into the tree, because attaching the trivia of the original
+        // node drops the syntax diagnostics the parser attached to it.
+        if (HasError(mutation.Replacement.GetDiagnostics()))
+        {
+            return MutantViability.DoesNotCompile;
+        }
+
         SyntaxTree mutatedTree;
         Compilation mutatedCompilation;
         try

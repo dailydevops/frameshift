@@ -21,6 +21,10 @@ public class MutantCompilerTests
     private const string ViableOperatorId = "arithmetic.add-to-subtract";
     private const string BrokenOperatorId = "numeric.literal-to-string";
     private const string SwapOperatorId = "arithmetic.swap";
+    private const string SharedOperatorId = "arithmetic.shared";
+
+    private const string TwinPathA = "TwinA.cs";
+    private const string TwinPathB = "TwinB.cs";
 
     private const string CalculatorSource = """
         namespace Fixture;
@@ -45,6 +49,61 @@ public class MutantCompilerTests
             public static int Double(int value) => /*!*/value + value;
         }
         """;
+
+    /// <summary>
+    /// A fixture whose semantic diagnostics contain a warning and nothing else, so that the search for
+    /// errors has to walk past a diagnostic that is not one.
+    /// </summary>
+    private const string WarningSource = """
+        namespace Fixture;
+
+        public static class Warner
+        {
+            [System.Obsolete("Use Compute instead.")]
+            public static int Legacy(int value) => value;
+
+            public static int Compute(int value) => Legacy(/*!*/value + 2);
+        }
+        """;
+
+    /// <summary>
+    /// Two files that differ only in their namespace name, which has the same length in both, so that
+    /// the marked addition sits at the very same source span in either file. The cache key therefore has
+    /// nothing but the file path left to tell the two mutation points apart.
+    /// </summary>
+    private const string TwinSourceA = """
+        namespace TwinA;
+
+        public static class Twin
+        {
+            public static int Combine(int left, int right) => /*!*/left + right;
+        }
+        """;
+
+    private const string TwinSourceB = """
+        namespace TwinB;
+
+        public static class Twin
+        {
+            public static int Combine(int left, int right) => /*!*/left + right;
+        }
+        """;
+
+    [Test]
+    public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
+    {
+        var errors = new[]
+        {
+            Describe(CompilationFactory.Create(CalculatorSource)),
+            Describe(CompilationFactory.Create(DoublerSource)),
+            Describe(CompilationFactory.Create(WarningSource)),
+            Describe(CreateTwinFixture()),
+        };
+
+        _ = await Assert
+            .That(string.Join(" / ", errors.Distinct(StringComparer.Ordinal)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
 
     [Test]
     public async Task Verify_MutationKeepsTheCodeValid_ReturnsViable()
@@ -196,6 +255,168 @@ public class MutantCompilerTests
             .IsEquivalentTo(new[] { MutantViability.DoesNotCompile });
     }
 
+    [Test]
+    public async Task Constructor_CompilationIsNull_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() => _ = new MutantCompiler(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("compilation");
+    }
+
+    [Test]
+    public async Task Verify_MutationIsNull_ThrowsArgumentNullException()
+    {
+        var (compilation, tree) = CreateFixture();
+        var compiler = new MutantCompiler(compilation);
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = compiler.Verify(null!, tree, CancellationToken.None)
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("mutation");
+    }
+
+    [Test]
+    public async Task Verify_OriginalTreeIsNull_ThrowsArgumentNullException()
+    {
+        var (compilation, tree) = CreateFixture();
+        var compiler = new MutantCompiler(compilation);
+        var mutation = CreateViableMutation(tree);
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = compiler.Verify(mutation, null!, CancellationToken.None)
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("originalTree");
+    }
+
+    /// <summary>
+    /// A tree that the compilation does not own cannot be swapped in, so the mutant is rejected instead
+    /// of being verified against a compilation it has nothing to do with.
+    /// </summary>
+    [Test]
+    public async Task Verify_OriginalTreeIsNotPartOfTheCompilation_ReturnsDoesNotCompile()
+    {
+        var (compilation, _) = CreateFixture();
+        var foreign = CompilationFactory.Create(DoublerSource, assemblyName: "ForeignAssembly");
+        var foreignTree = foreign.SyntaxTrees[0];
+        var compiler = new MutantCompiler(compilation);
+
+        var viability = compiler.Verify(CreateViableMutation(foreignTree), foreignTree, CancellationToken.None);
+
+        _ = await Assert.That(compilation.SyntaxTrees.Contains(foreignTree)).IsFalse();
+        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+    }
+
+    [Test]
+    public async Task Verify_MutantDoesNotEvenParse_ReturnsDoesNotCompile()
+    {
+        var (compilation, tree) = CreateFixture();
+        var compiler = new MutantCompiler(compilation);
+        var mutation = CreateUnparsableMutation(tree);
+
+        // The diagnostics have to be read from the replacement itself. Grafting it into the tree
+        // attaches the trivia of the original node, and that drops the diagnostics the parser
+        // recorded, which is exactly why the verification cannot rely on the mutated tree.
+        var syntaxErrors = mutation
+            .Replacement.GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .ToArray();
+
+        var viability = compiler.Verify(mutation, tree, CancellationToken.None);
+
+        _ = await Assert.That(syntaxErrors.Length).IsGreaterThan(0);
+        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+    }
+
+    /// <summary>
+    /// Only errors decide viability. A mutant whose binding produces warnings is still a mutant a test
+    /// could kill, so reporting it as broken would silently drop a real mutation point.
+    /// </summary>
+    [Test]
+    public async Task Verify_MutantOnlyProducesWarnings_ReturnsViable()
+    {
+        var compilation = CompilationFactory.Create(WarningSource);
+        var tree = compilation.SyntaxTrees[0];
+        var compiler = new MutantCompiler(compilation);
+        var warningIds = compilation
+            .GetSemanticModel(tree)
+            .GetDiagnostics()
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Warning)
+            .Select(diagnostic => diagnostic.Id)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var mutation = CreateSubtractionMutation(tree, ViableOperatorId);
+        var viability = compiler.Verify(mutation, tree, CancellationToken.None);
+
+        _ = await Assert.That(warningIds).Contains("CS0618");
+        _ = await Assert.That(viability).IsEqualTo(MutantViability.Viable);
+    }
+
+    /// <summary>
+    /// Two operators rewriting the very same node are two mutants. If the cache key ignored the operator,
+    /// the second verdict would be the memoised first one.
+    /// </summary>
+    [Test]
+    public async Task Verify_AnotherOperatorAtTheSameLocation_IsVerifiedOnItsOwn()
+    {
+        var (compilation, tree) = CreateFixture();
+        var compiler = new MutantCompiler(compilation);
+        var viable = CreateSubtractionMutation(tree, ViableOperatorId);
+        var broken = CreateStringLiteralMutation(tree, BrokenOperatorId);
+
+        var first = compiler.Verify(viable, tree, CancellationToken.None);
+        var second = compiler.Verify(broken, tree, CancellationToken.None);
+
+        _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
+        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+    }
+
+    /// <summary>
+    /// The same operator at two locations of one file are two mutants. If the cache key ignored the span,
+    /// the second verdict would be the memoised first one.
+    /// </summary>
+    [Test]
+    public async Task Verify_TheSameOperatorAtAnotherLocation_IsVerifiedOnItsOwn()
+    {
+        var (compilation, tree) = CreateFixture();
+        var compiler = new MutantCompiler(compilation);
+        var viable = CreateSubtractionMutation(tree, SharedOperatorId);
+        var broken = CreateBrokenMutation(tree, SharedOperatorId);
+
+        var first = compiler.Verify(viable, tree, CancellationToken.None);
+        var second = compiler.Verify(broken, tree, CancellationToken.None);
+
+        _ = await Assert.That(broken.Location.SourceSpan).IsNotEqualTo(viable.Location.SourceSpan);
+        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+    }
+
+    /// <summary>
+    /// The same operator at the same span in two different files are two mutants. If the cache key
+    /// ignored the file path, the second verdict would be the memoised first one.
+    /// </summary>
+    [Test]
+    public async Task Verify_TheSameOperatorAndSpanInAnotherFile_IsVerifiedOnItsOwn()
+    {
+        var compilation = CreateTwinFixture();
+        var treeA = compilation.SyntaxTrees[0];
+        var treeB = compilation.SyntaxTrees[1];
+        var compiler = new MutantCompiler(compilation);
+        var viable = CreateSubtractionMutation(treeA, SharedOperatorId);
+        var broken = CreateStringLiteralMutation(treeB, SharedOperatorId);
+
+        var first = compiler.Verify(viable, treeA, CancellationToken.None);
+        var second = compiler.Verify(broken, treeB, CancellationToken.None);
+
+        _ = await Assert.That(treeB.FilePath).IsNotEqualTo(treeA.FilePath);
+        _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
+        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+    }
+
     private static MutantViability[] VerdictsOf(
         IEnumerable<(string OperatorId, MutantViability Viability)> results,
         string operatorId
@@ -221,16 +442,63 @@ public class MutantCompilerTests
     }
 
     /// <summary>
+    /// Creates the two-file compilation whose marked additions share a source span.
+    /// </summary>
+    /// <returns>The created compilation.</returns>
+    private static CSharpCompilation CreateTwinFixture() =>
+        CompilationFactory.Create([(TwinPathA, TwinSourceA), (TwinPathB, TwinSourceB)]);
+
+    /// <summary>
     /// Turns the marked <c>left + right</c> into <c>left - right</c>, which stays a legal program.
     /// </summary>
     /// <param name="tree">The tree holding the marked addition.</param>
     /// <returns>The mutation.</returns>
-    private static Mutation CreateViableMutation(SyntaxTree tree)
+    private static Mutation CreateViableMutation(SyntaxTree tree) => CreateSubtractionMutation(tree, ViableOperatorId);
+
+    /// <summary>
+    /// Turns the marked addition into a subtraction under the given operator id.
+    /// </summary>
+    /// <param name="tree">The tree holding the marked addition.</param>
+    /// <param name="operatorId">The operator id the mutation is cached under.</param>
+    /// <returns>The mutation.</returns>
+    private static Mutation CreateSubtractionMutation(SyntaxTree tree, string operatorId)
     {
         var original = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var replacement = SyntaxFactory.BinaryExpression(SyntaxKind.SubtractExpression, original.Left, original.Right);
 
-        return new Mutation(MutationKind.ArithmeticOperator, ViableOperatorId, "+ => -", original, replacement);
+        return new Mutation(MutationKind.ArithmeticOperator, operatorId, "+ => -", original, replacement);
+    }
+
+    /// <summary>
+    /// Replaces the marked addition with a string literal, which keeps the span of the mutation point
+    /// while making the surrounding method return the wrong type.
+    /// </summary>
+    /// <param name="tree">The tree holding the marked addition.</param>
+    /// <param name="operatorId">The operator id the mutation is cached under.</param>
+    /// <returns>The mutation.</returns>
+    private static Mutation CreateStringLiteralMutation(SyntaxTree tree, string operatorId)
+    {
+        var original = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var replacement = SyntaxFactory.LiteralExpression(
+            SyntaxKind.StringLiteralExpression,
+            SyntaxFactory.Literal("mutated")
+        );
+
+        return new Mutation(MutationKind.StringLiteral, operatorId, "+ => mutated", original, replacement);
+    }
+
+    /// <summary>
+    /// Replaces the marked addition with an expression the parser could not read to the end, so that the
+    /// mutated tree already carries a syntax error before anything is bound.
+    /// </summary>
+    /// <param name="tree">The tree holding the marked addition.</param>
+    /// <returns>The mutation.</returns>
+    private static Mutation CreateUnparsableMutation(SyntaxTree tree)
+    {
+        var original = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+        var replacement = SyntaxFactory.ParseExpression("left +");
+
+        return new Mutation(MutationKind.ArithmeticOperator, SwapOperatorId, "+ => <broken>", original, replacement);
     }
 
     /// <summary>
@@ -239,7 +507,16 @@ public class MutantCompilerTests
     /// </summary>
     /// <param name="tree">The tree holding the literal.</param>
     /// <returns>The mutation.</returns>
-    private static Mutation CreateBrokenMutation(SyntaxTree tree)
+    private static Mutation CreateBrokenMutation(SyntaxTree tree) => CreateBrokenMutation(tree, BrokenOperatorId);
+
+    /// <summary>
+    /// Replaces the numeric literal returned by <c>Constant</c> with a string literal, under the given
+    /// operator id.
+    /// </summary>
+    /// <param name="tree">The tree holding the literal.</param>
+    /// <param name="operatorId">The operator id the mutation is cached under.</param>
+    /// <returns>The mutation.</returns>
+    private static Mutation CreateBrokenMutation(SyntaxTree tree, string operatorId)
     {
         var original = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
             tree,
@@ -250,7 +527,7 @@ public class MutantCompilerTests
             SyntaxFactory.Literal("mutated")
         );
 
-        return new Mutation(MutationKind.NumericLiteral, BrokenOperatorId, "7 => mutated", original, replacement);
+        return new Mutation(MutationKind.NumericLiteral, operatorId, "7 => mutated", original, replacement);
     }
 
     /// <summary>

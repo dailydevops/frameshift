@@ -1,4 +1,4 @@
-﻿namespace NetEvolve.Frameshift.TestSurface;
+namespace NetEvolve.Frameshift.TestSurface;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -170,7 +170,7 @@ internal static class TestSurfaceCollector
     )
     {
         var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var pending = new Stack<IMethodSymbol>();
+        var pending = new Stack<ISymbol>();
         var entryPoint = testMethod.OriginalDefinition;
 
         _ = visited.Add(entryPoint);
@@ -180,9 +180,9 @@ internal static class TestSurfaceCollector
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var method = pending.Pop();
+            var member = pending.Pop();
 
-            foreach (var syntaxReference in method.DeclaringSyntaxReferences)
+            foreach (var syntaxReference in member.DeclaringSyntaxReferences)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -215,7 +215,7 @@ internal static class TestSurfaceCollector
         SemanticModel semanticModel,
         SyntaxNode executableNode,
         HashSet<ISymbol> visited,
-        Stack<IMethodSymbol> pending,
+        Stack<ISymbol> pending,
         ImmutableHashSet<string>.Builder referencedMemberIds,
         CancellationToken cancellationToken
     )
@@ -250,7 +250,7 @@ internal static class TestSurfaceCollector
         Compilation compilation,
         ISymbol symbol,
         HashSet<ISymbol> visited,
-        Stack<IMethodSymbol> pending,
+        Stack<ISymbol> pending,
         ImmutableHashSet<string>.Builder referencedMemberIds
     )
     {
@@ -270,9 +270,9 @@ internal static class TestSurfaceCollector
 
         if (SymbolEqualityComparer.Default.Equals(containingAssembly, compilation.Assembly))
         {
-            foreach (var method in GetTraversableMethods(definition).Where(visited.Add))
+            foreach (var traversable in GetTraversableMembers(definition).Where(visited.Add))
             {
-                pending.Push(method);
+                pending.Push(traversable);
             }
 
             return;
@@ -301,18 +301,25 @@ internal static class TestSurfaceCollector
                 or SymbolKind.Event
                 or SymbolKind.NamedType;
 
-    private static IEnumerable<IMethodSymbol> GetTraversableMethods(ISymbol symbol)
+    /// <summary>
+    /// Yields the declarations that have to be walked when <paramref name="symbol" /> is used.
+    /// </summary>
+    /// <param name="symbol">The referenced member.</param>
+    /// <returns>The member itself and, for a property or an event, its accessors.</returns>
+    /// <remarks>
+    /// The member itself is part of the result, because the declaration of a property or a field can
+    /// carry an initializer, and that initializer runs whenever the declaring type is created. Only
+    /// walking the accessors would miss it.
+    /// </remarks>
+    private static IEnumerable<ISymbol> GetTraversableMembers(ISymbol symbol)
     {
+        if (IsTraversable(symbol))
+        {
+            yield return symbol.OriginalDefinition;
+        }
+
         switch (symbol)
         {
-            case IMethodSymbol method:
-                if (IsTraversable(method))
-                {
-                    yield return method.OriginalDefinition;
-                }
-
-                break;
-
             case IPropertySymbol property:
                 if (IsTraversable(property.GetMethod))
                 {
@@ -349,8 +356,8 @@ internal static class TestSurfaceCollector
         }
     }
 
-    private static bool IsTraversable(IMethodSymbol? method) =>
-        method is not null && method.OriginalDefinition.DeclaringSyntaxReferences.Length > 0;
+    private static bool IsTraversable(ISymbol? symbol) =>
+        symbol is not null && symbol.OriginalDefinition.DeclaringSyntaxReferences.Length > 0;
 
     private static IEnumerable<SyntaxNode> GetExecutableNodes(SyntaxNode declaration) =>
         declaration switch

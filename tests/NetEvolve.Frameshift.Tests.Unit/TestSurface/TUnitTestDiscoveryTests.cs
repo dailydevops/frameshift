@@ -233,6 +233,62 @@ public class TUnitTestDiscoveryTests
         _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(method, compilation)).IsEqualTo(expected);
     }
 
+    /// <summary>
+    /// Without the framework there is no recogniser, and without a recogniser nothing is a test method.
+    /// The question has to be answered with a plain "no" rather than with an exception, because the
+    /// production side asks it about every compilation it sees.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_CompilationWithoutTheFramework_ReturnsFalse()
+    {
+        var compilation = CompilationFactory.Create(UnrelatedFixtureSource);
+        var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
+
+        _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(method, compilation)).IsFalse();
+    }
+
+    /// <summary>
+    /// The overload taking a pre-resolved attribute type is what the production side analyzer uses, so
+    /// that the well-known type is looked up once instead of once per method.
+    /// </summary>
+    /// <param name="methodName">The method to classify.</param>
+    /// <param name="expected">The expected classification.</param>
+    [Test]
+    [Arguments("DecoratedTest", true)]
+    [Arguments("StaticTest", true)]
+    [Arguments("PlainMethod", false)]
+    public async Task IsTestMethod_WithAPreResolvedAttributeType_ClassifiesLikeTheCompilationOverload(
+        string methodName,
+        bool expected
+    )
+    {
+        var compilation = CreateTUnitFixture();
+        var method = FindMethod(compilation, "Fixture.Cases", methodName);
+        var attributeType = TUnitTestDiscovery.GetTestAttributeType(compilation);
+
+        _ = await Assert.That(attributeType).IsNotNull();
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(method, attributeType)).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// When the well-known attribute type could not be resolved, only the name rule is left. It has to
+    /// carry the recognition on its own, both for the attribute of the framework itself and for one of a
+    /// framework satellite.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_WithoutAnAttributeType_FallsBackToTheNameRule()
+    {
+        var tunit = CreateTUnitFixture();
+        var satellite = CreateSatelliteFixture(FrameworkAssemblyName);
+
+        var frameworkAttribute = FindMethod(tunit, "Fixture.Cases", "DecoratedTest");
+        var satelliteAttribute = FindMethod(satellite, "Fixture.SatelliteCases", "UsesFrameworkAttributeDirectly");
+
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(frameworkAttribute, testAttributeType: null)).IsTrue();
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(satelliteAttribute, testAttributeType: null)).IsTrue();
+    }
+
     [Test]
     public async Task IsTestMethod_MethodIsNull_ThrowsArgumentNullException()
     {
@@ -267,6 +323,21 @@ public class TUnitTestDiscoveryTests
         var resolved = TUnitTestDiscovery.GetTestAttributeType(CompilationFactory.Create(UnrelatedFixtureSource));
 
         _ = await Assert.That(resolved).IsNull();
+    }
+
+    /// <summary>
+    /// An attribute that only shares the simple name is not a test attribute, no matter whether the
+    /// well-known type could be resolved for the compilation.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_AttributeFromAnUnrelatedNamespace_IsNotClassifiedAsATest()
+    {
+        var compilation = CompilationFactory.Create(UnrelatedFixtureSource, includeTUnit: true);
+        var attributeType = TUnitTestDiscovery.GetTestAttributeType(compilation);
+        var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
+
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(method, attributeType)).IsFalse();
+        _ = await Assert.That(TUnitTestDiscovery.IsTestMethod(method, testAttributeType: null)).IsFalse();
     }
 
     private static CSharpCompilation CreateTUnitFixture() =>

@@ -1,5 +1,6 @@
 namespace NetEvolve.Frameshift.Equivalence;
 
+using System;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -123,13 +124,45 @@ internal static class EquivalenceClassifier
             return null;
         }
 
-        if (mutated is null || !original.Equals(mutated))
+        if (mutated is null || !IsSameConstant(original, mutated))
         {
             return null;
         }
 
         return EquivalenceVerdict.Trivial(ConstantFoldingReason);
     }
+
+    /// <summary>
+    /// Determines whether two folded constants are indistinguishable at run time.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="object.Equals(object)" /> is not enough for floating point values, because positive
+    /// and negative zero compare equal while they are observably different, for example through
+    /// <c>1.0 / value</c>. Every not-a-number value on the other hand is treated as the same constant,
+    /// because its sign bit does not survive any arithmetic the mutated code could perform on it.
+    /// </remarks>
+    /// <param name="original">The constant value of the original expression.</param>
+    /// <param name="mutated">The folded value of the mutated expression.</param>
+    /// <returns><see langword="true" /> if both constants are the same; otherwise <see langword="false" />.</returns>
+    private static bool IsSameConstant(object original, object mutated) =>
+        (original, mutated) switch
+        {
+            (double left, double right) => IsSameFloatingPoint(left, right),
+            (float left, float right) => IsSameFloatingPoint(left, right),
+            _ => original.Equals(mutated),
+        };
+
+    /// <summary>
+    /// Compares two floating point constants by their bit pattern, which is what tells the two zeros
+    /// apart. Every not-a-number value counts as the same constant.
+    /// </summary>
+    /// <param name="left">The left value.</param>
+    /// <param name="right">The right value.</param>
+    /// <returns><see langword="true" /> if both values are the same; otherwise <see langword="false" />.</returns>
+    private static bool IsSameFloatingPoint(double left, double right) =>
+        double.IsNaN(left)
+            ? double.IsNaN(right)
+            : BitConverter.DoubleToInt64Bits(left) == BitConverter.DoubleToInt64Bits(right);
 
     /// <summary>
     /// Evaluates the constant value of <see cref="Mutation.Replacement" /> by folding the mutated
@@ -384,10 +417,26 @@ internal static class EquivalenceClassifier
             return false;
         }
 
-        var areEqual = left.Equals(right);
+        // A not-a-number operand makes both operators false respectively true, which is exactly what
+        // Equals does not model: it reports two not-a-number values as equal, while == reports them
+        // as different. Folding it through Equals would silently swallow an observable mutation.
+        var areEqual = !IsNotANumber(left) && left.Equals(right);
         value = kind == SyntaxKind.EqualsExpression ? areEqual : !areEqual;
         return true;
     }
+
+    /// <summary>
+    /// Determines whether a constant is a floating point not-a-number value.
+    /// </summary>
+    /// <param name="value">The constant to inspect.</param>
+    /// <returns><see langword="true" /> if the value is not a number; otherwise <see langword="false" />.</returns>
+    private static bool IsNotANumber(object value) =>
+        value switch
+        {
+            double number => double.IsNaN(number),
+            float number => float.IsNaN(number),
+            _ => false,
+        };
 
     /// <summary>
     /// Folds the shift operators for <see cref="int" /> operands, applying the same shift count

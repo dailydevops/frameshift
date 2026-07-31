@@ -17,6 +17,76 @@ using TUnit.Core;
 /// </summary>
 public class BitwiseOperatorMutatorTests
 {
+    private const string UserDefinedBitwiseSource = """
+        namespace Fixtures;
+
+        internal readonly struct Mask
+        {
+            internal Mask(int bits) => Bits = bits;
+
+            internal int Bits { get; }
+
+            public static Mask operator &(Mask left, Mask right) => new Mask(left.Bits & right.Bits);
+
+            public static Mask operator |(Mask left, Mask right) => new Mask(left.Bits | right.Bits);
+
+            public static Mask operator ^(Mask left, Mask right) => new Mask(left.Bits ^ right.Bits);
+        }
+
+        internal static class Masks
+        {
+            internal static Mask Combine(Mask left, Mask right) => /*!*/left OPERATOR right;
+        }
+        """;
+
+    private const string UserDefinedShiftSource = """
+        namespace Fixtures;
+
+        internal readonly struct Mask
+        {
+            internal Mask(int bits) => Bits = bits;
+
+            internal int Bits { get; }
+
+            public static Mask operator <<(Mask left, int count) => new Mask(left.Bits << count);
+
+            public static Mask operator >>(Mask left, int count) => new Mask(left.Bits >> count);
+        }
+
+        internal static class Masks
+        {
+            internal static Mask Shift(Mask left, int count) => /*!*/left OPERATOR count;
+        }
+        """;
+
+    private const string EnumShiftSource = """
+        namespace Fixtures;
+
+        internal enum Flags
+        {
+            None = 0,
+            First = 1,
+        }
+
+        internal static class Bits
+        {
+            internal static object Shift(Flags value, int count) => /*!*/value << count;
+        }
+        """;
+
+    private const string MethodGroupOperandSource = """
+        namespace Fixtures;
+
+        internal static class Bits
+        {
+            internal static int Mask() => 0;
+
+            internal static object Combine() => /*!*/Mask & Mask;
+        }
+        """;
+
+    private const string OperatorPlaceholder = "OPERATOR";
+
     private const string TriviaSource = """
         namespace Fixtures;
 
@@ -194,6 +264,77 @@ public class BitwiseOperatorMutatorTests
         _ = await Assert.That(mutated).Contains("left /* inner */ ^ /* after */ right; // tail");
     }
 
+    [Test]
+    public async Task CreateMutations_NullableEnumOperands_ProducesTheBitwiseCounterparts()
+    {
+        string[] expectedIds = ["bitwise.and-to-or", "bitwise.and-to-xor"];
+        var result = Mutate(Fixture("nullableFirstFlag & nullableSecondFlag"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(expectedIds);
+    }
+
+    /// <summary>
+    /// A user defined bitwise operator on a struct produces a value of that struct, which is not an
+    /// integral type. Such an expression belongs to no bitwise mutation, because the mutant would change
+    /// the meaning of an operator this operator family knows nothing about.
+    /// </summary>
+    [Test]
+    [Arguments("&")]
+    [Arguments("|")]
+    [Arguments("^")]
+    public async Task CreateMutations_UserDefinedBitwiseOperator_ReturnsEmpty(string symbol)
+    {
+        var result = Mutate(CreateSource(UserDefinedBitwiseSource, symbol));
+
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    [Test]
+    [Arguments("<<")]
+    [Arguments(">>")]
+    public async Task CreateMutations_UserDefinedShiftOperator_ReturnsEmpty(string symbol)
+    {
+        var result = Mutate(CreateSource(UserDefinedShiftSource, symbol));
+
+        _ = await Assert.That(result.Mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// An enum operand is integral enough for <c>&amp;</c>, <c>|</c> and <c>^</c>, but never for a shift.
+    /// C# rejects the fixture, which is the only way to bind a shift to an enum operand at all.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EnumOperandOfAShift_ReturnsEmpty()
+    {
+        var (mutations, _, node, model) = MutateAllowingErrors(EnumShiftSource);
+        var binary = (BinaryExpressionSyntax)node;
+
+        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A method group has no type at all, so the operand guard has to reject a <see langword="null" />
+    /// type instead of assuming every operand carries one. C# rejects the fixture, which is exactly what
+    /// makes the operand typeless.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_TypelessOperand_ReturnsEmpty()
+    {
+        var (mutations, _, node, model) = MutateAllowingErrors(MethodGroupOperandSource);
+        var binary = (BinaryExpressionSyntax)node;
+
+        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    private static string CreateSource(string template, string symbol) =>
+        template.Replace(OperatorPlaceholder, symbol, StringComparison.Ordinal);
+
     private static string Fixture(string expression) =>
         $$"""
             namespace Fixtures;
@@ -216,6 +357,8 @@ public class BitwiseOperatorMutatorTests
                     bool? nullableOther,
                     Flags firstFlag,
                     Flags secondFlag,
+                    Flags? nullableFirstFlag,
+                    Flags? nullableSecondFlag,
                     int? nullableLeft,
                     int? nullableRight
                 )
@@ -254,5 +397,26 @@ public class BitwiseOperatorMutatorTests
         var mutator = new BitwiseOperatorMutator();
 
         return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node);
+    }
+
+    /// <summary>
+    /// Mutates a fixture that deliberately does not compile, which is the only way to bind an operand
+    /// that is an enum in a shift or has no type at all. The tests using this overload pin the shape of
+    /// the fixture through the semantic model instead of through its compile errors.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>The created mutations, the tree, the marked node and the semantic model.</returns>
+    private static (
+        ImmutableArray<Mutation> Mutations,
+        SyntaxTree Tree,
+        ExpressionSyntax Node,
+        SemanticModel Model
+    ) MutateAllowingErrors(string source)
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
+        var mutator = new BitwiseOperatorMutator();
+
+        return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node, semanticModel);
     }
 }

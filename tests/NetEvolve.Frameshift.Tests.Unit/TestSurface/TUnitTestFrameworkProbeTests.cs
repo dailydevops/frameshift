@@ -175,6 +175,35 @@ public class TUnitTestFrameworkProbeTests
         _ = await Assert.That(threw).IsTrue();
     }
 
+    /// <summary>
+    /// The name rule is what recognises a specialised test attribute of the framework, so it has to say
+    /// yes to the framework assemblies and no to everything else, including to no assembly at all.
+    /// </summary>
+    [Test]
+    public async Task IsFrameworkAssembly_AssemblyName_IsClassifiedByItsPrefix()
+    {
+        var framework = CreateSatelliteConsumer(PlainSource, FrameworkLikeAssemblyName);
+        var foreign = CreateSatelliteConsumer(PlainSource, ForeignAssemblyName);
+
+        var frameworkAssembly = SatelliteAssembly(framework, FrameworkLikeAssemblyName);
+        var foreignAssembly = SatelliteAssembly(foreign, ForeignAssemblyName);
+
+        _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(frameworkAssembly)).IsTrue();
+        _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(foreignAssembly)).IsFalse();
+    }
+
+    [Test]
+    public async Task IsFrameworkAssembly_AssemblyIsNull_ReturnsFalse() =>
+        _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(null)).IsFalse();
+
+    [Test]
+    public async Task GetTestAttributeType_WithoutTheFramework_ReturnsNull()
+    {
+        var compilation = CompilationFactory.Create(PlainSource);
+
+        _ = await Assert.That(TUnitTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+    }
+
     [Test]
     public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
     {
@@ -201,6 +230,18 @@ public class TUnitTestFrameworkProbeTests
             filePath: "Cases.cs"
         );
     }
+
+    /// <summary>
+    /// Resolves the referenced satellite assembly of <paramref name="compilation" /> by its name.
+    /// </summary>
+    /// <param name="compilation">The compilation referencing the satellite.</param>
+    /// <param name="assemblyName">The name of the satellite assembly.</param>
+    /// <returns>The resolved assembly symbol.</returns>
+    private static IAssemblySymbol SatelliteAssembly(Compilation compilation, string assemblyName) =>
+        compilation
+            .References.Select(reference => compilation.GetAssemblyOrModuleSymbol(reference))
+            .OfType<IAssemblySymbol>()
+            .First(assembly => string.Equals(assembly.Name, assemblyName, StringComparison.Ordinal));
 
     private static IMethodSymbol FindMethod(Compilation compilation, string methodName) =>
         compilation.GetTypeByMetadataName("Fixture.Cases")!.GetMembers(methodName).OfType<IMethodSymbol>().First();

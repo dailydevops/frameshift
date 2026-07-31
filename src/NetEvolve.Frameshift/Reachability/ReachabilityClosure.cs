@@ -162,7 +162,11 @@ internal static class ReachabilityClosure
 
                 foreach (var symbol in symbols)
                 {
-                    Add(symbol);
+                    // A seeded member is reachable like any other, so the dispatch approximation has to
+                    // run for it as well. A test that calls an interface or virtual member directly is
+                    // the most common shape there is, and without this the implementations behind that
+                    // abstraction would all be reported as gaps.
+                    HandleReference(symbol);
                 }
             }
         }
