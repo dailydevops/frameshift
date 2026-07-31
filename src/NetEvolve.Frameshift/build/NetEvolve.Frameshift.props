@@ -21,6 +21,15 @@
       FrameshiftEnableDefaultManifestItems  true|false   Adds every '**/*.frameshift-tests' file of the
                                                          project to @(AdditionalFiles). Default: true,
                                                          unless $(EnableDefaultItems) is false.
+      FrameshiftWriteTestSurfaceManifest    true|false   Writes the generated test-surface manifest of a
+                                                         test project next to the project file. The
+                                                         default is decided in
+                                                         NetEvolve.Frameshift.targets: true for a project
+                                                         referencing a known test framework package
+                                                         (TUnit, xunit, NUnit, MSTest), false otherwise.
+                                                         Enabling it turns on $(EmitCompilerGeneratedFiles).
+      FrameshiftTestSurfaceManifestFile     path         The manifest file that is written. Default:
+                                                         $(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests.
   -->
 
   <PropertyGroup Label="Frameshift defaults">

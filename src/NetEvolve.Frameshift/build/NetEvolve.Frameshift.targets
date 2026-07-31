@@ -2,8 +2,12 @@
   <!--
     NetEvolve.Frameshift - build assets.
 
-    Intentionally minimal: the only job of this file is to tell the user when the analysis cannot do
-    anything because no test-surface manifest reached the compiler.
+    This file does two things:
+
+      1. It tells the user when the analysis cannot do anything because no test-surface manifest reached
+         the compiler (FSHB0001).
+      2. It turns the manifest the TestSurfaceManifestGenerator emits into the checked-in
+         '<ProjectName>.frameshift-tests' file next to the test project.
 
     Set 'FrameshiftSuppressSetupWarning' to 'true' to silence FSHB0001, for example for projects that are
     deliberately not covered, or while the manifest of the first pass does not exist yet:
@@ -11,6 +15,9 @@
       <PropertyGroup>
         <FrameshiftSuppressSetupWarning>true</FrameshiftSuppressSetupWarning>
       </PropertyGroup>
+
+    Set 'FrameshiftWriteTestSurfaceManifest' to 'false' to keep the analysis but never write a manifest,
+    or to 'true' to force writing one for a project that references no known test framework package.
   -->
 
   <Target
@@ -35,6 +42,133 @@
 
     <ItemGroup>
       <_FrameshiftTestSurfaceManifest Remove="@(_FrameshiftTestSurfaceManifest)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Decides whether this project writes a test-surface manifest, and prepares the build for it.
+
+    The detection lives in a target and not in NetEvolve.Frameshift.props, because @(PackageReference) is
+    not reliably populated when the package props are imported, and because item lists cannot be read
+    from a property outside a target at all.
+  -->
+  <Target Name="FrameshiftConfigureTestSurfaceManifest" BeforeTargets="CoreCompile" Condition=" '$(FrameshiftEnabled)' == 'true' AND '$(DesignTimeBuild)' != 'true' ">
+    <ItemGroup>
+      <_FrameshiftTestFrameworkPackage
+        Include="@(PackageReference)"
+        Condition="
+          $([MSBuild]::ValueOrDefault('%(Identity)', '').ToLowerInvariant().StartsWith('tunit'))
+          Or $([MSBuild]::ValueOrDefault('%(Identity)', '').ToLowerInvariant().StartsWith('xunit'))
+          Or $([MSBuild]::ValueOrDefault('%(Identity)', '').ToLowerInvariant().StartsWith('nunit'))
+          Or $([MSBuild]::ValueOrDefault('%(Identity)', '').ToLowerInvariant().StartsWith('mstest')) "
+      />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <!-- Only fill in what the consuming project has not decided for itself. -->
+      <FrameshiftWriteTestSurfaceManifest Condition=" '$(FrameshiftWriteTestSurfaceManifest)' == '' AND '@(_FrameshiftTestFrameworkPackage)' != '' ">true</FrameshiftWriteTestSurfaceManifest>
+      <FrameshiftWriteTestSurfaceManifest Condition=" '$(FrameshiftWriteTestSurfaceManifest)' == '' ">false</FrameshiftWriteTestSurfaceManifest>
+
+      <!--
+        A multi-targeting project runs one inner build per framework, and every one of them would write
+        the very same file. Exactly one inner build is elected to do it: the one building the first
+        entry of $(TargetFrameworks).
+      -->
+      <_FrameshiftPrimaryTargetFramework Condition=" '$(TargetFrameworks)' != '' ">$(TargetFrameworks.Split(';')[0].Trim())</_FrameshiftPrimaryTargetFramework>
+      <_FrameshiftIsManifestWriter
+        Condition=" '$(FrameshiftWriteTestSurfaceManifest)' == 'true'
+                                              AND ( '$(TargetFrameworks)' == ''
+                                                    OR '$(TargetFramework)' == '$(_FrameshiftPrimaryTargetFramework)' ) "
+        >true</_FrameshiftIsManifestWriter>
+
+      <!--
+        The generator can only hand the manifest over as a generated source file, so that file has to be
+        written to disk. $(CompilerGeneratedFilesOutputPath) is only defaulted by the SDK when
+        $(EmitCompilerGeneratedFiles) was already true during evaluation, which it is not here.
+      -->
+      <EmitCompilerGeneratedFiles Condition=" '$(_FrameshiftIsManifestWriter)' == 'true' ">true</EmitCompilerGeneratedFiles>
+      <CompilerGeneratedFilesOutputPath Condition=" '$(_FrameshiftIsManifestWriter)' == 'true' AND '$(CompilerGeneratedFilesOutputPath)' == '' "
+        >$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
+
+      <FrameshiftTestSurfaceManifestFile Condition=" '$(FrameshiftTestSurfaceManifestFile)' == '' "
+        >$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests</FrameshiftTestSurfaceManifestFile>
+    </PropertyGroup>
+
+    <!--
+      The SDK creates $(CompilerGeneratedFilesOutputPath) in its own 'CreateCompilerGeneratedFilesOutputPath'
+      target, which also hooks BeforeTargets="CoreCompile" and is imported before this file, so it runs
+      first - while $(EmitCompilerGeneratedFiles) is still false and its condition is therefore not met.
+      The compiler does read the property late enough to honour it, but it does not create the directory
+      and fails with CS0016. Creating the directory here is what closes that gap.
+    -->
+    <MakeDir Condition=" '$(_FrameshiftIsManifestWriter)' == 'true' " Directories="$(CompilerGeneratedFilesOutputPath)" />
+
+    <!--
+      The manifest is written into this project's own directory, so the default '**/*.frameshift-tests'
+      glob in NetEvolve.Frameshift.props picks it up again on the next build and hands the test project
+      its own manifest. The production side would then judge the test assembly against a manifest that
+      records members of the assemblies under test, find none of them declared here, and report FSH0001
+      or a stale FSH0003 for every one of them.
+
+      The exclusion cannot live in the props: the file name is only known once
+      $(FrameshiftTestSurfaceManifestFile) has been resolved, and a value set in the consuming project is
+      not visible yet when the package props are imported. Removing the item here is late enough for the
+      property and still early enough for CoreCompile, which expands @(AdditionalFiles) when it runs.
+    -->
+    <ItemGroup Condition=" '$(FrameshiftWriteTestSurfaceManifest)' == 'true' ">
+      <AdditionalFiles Remove="@(AdditionalFiles)" Condition=" '%(FullPath)' == '$([MSBuild]::NormalizePath($(FrameshiftTestSurfaceManifestFile)))' " />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_FrameshiftTestFrameworkPackage Remove="@(_FrameshiftTestFrameworkPackage)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Turns the generated file back into the manifest. The generated file is one single block comment
+    whose first line is exactly '/*' and whose last line is exactly '*/'; everything in between is a
+    verbatim manifest line, so dropping those two lines is all it takes.
+
+    When the generated file is absent - no test framework was detected inside the compilation, or the
+    generator did not run - $(_FrameshiftGeneratedManifestPath) stays empty, both tasks are skipped by
+    their conditions and the existing manifest is left untouched.
+
+    The target deliberately declares no Inputs and no Outputs. MSBuild's up-to-date check does not expand
+    wildcards in Inputs; it treats '<path>\**\TestSurfaceManifest.g.cs' as a literal file name, finds no
+    such file and therefore runs the target in full on every build anyway. Not writing when nothing
+    changed is what actually keeps the build incremental, and that is WriteOnlyWhenDifferent's job below.
+  -->
+  <Target Name="FrameshiftWriteTestSurfaceManifest" AfterTargets="CoreCompile" Condition=" '$(_FrameshiftIsManifestWriter)' == 'true' AND '$(DesignTimeBuild)' != 'true' ">
+    <ItemGroup>
+      <_FrameshiftGeneratedManifest Include="$(CompilerGeneratedFilesOutputPath)\**\TestSurfaceManifest.g.cs" />
+    </ItemGroup>
+
+    <PropertyGroup>
+      <_FrameshiftGeneratedManifestPath>%(_FrameshiftGeneratedManifest.FullPath)</_FrameshiftGeneratedManifestPath>
+    </PropertyGroup>
+
+    <ReadLinesFromFile File="$(_FrameshiftGeneratedManifestPath)" Condition=" '$(_FrameshiftGeneratedManifestPath)' != '' ">
+      <Output TaskParameter="Lines" ItemName="_FrameshiftGeneratedManifestLine" />
+    </ReadLinesFromFile>
+
+    <ItemGroup>
+      <_FrameshiftManifestLine Include="@(_FrameshiftGeneratedManifestLine)" Condition=" '%(Identity)' != '/*' AND '%(Identity)' != '*/' " />
+    </ItemGroup>
+
+    <!--
+      No Encoding attribute on purpose. WriteLinesToFile defaults to UTF-8 without a byte order mark,
+      which is what a checked-in text file should be. Asking for 'UTF-8' explicitly makes it write a BOM,
+      and its WriteOnlyWhenDifferent comparison does not account for that BOM: the file then differs from
+      itself and is rewritten on every single build. Because the manifest is an AdditionalFiles input of
+      the projects under analysis, that new timestamp recompiles them every build as well, and their
+      recompilation feeds the next one - the whole solution never reaches an up-to-date state again.
+    -->
+    <WriteLinesToFile File="$(FrameshiftTestSurfaceManifestFile)" Lines="@(_FrameshiftManifestLine)" Condition=" '@(_FrameshiftManifestLine)' != '' " Overwrite="true" WriteOnlyWhenDifferent="true" />
+
+    <ItemGroup>
+      <_FrameshiftGeneratedManifest Remove="@(_FrameshiftGeneratedManifest)" />
+      <_FrameshiftGeneratedManifestLine Remove="@(_FrameshiftGeneratedManifestLine)" />
+      <_FrameshiftManifestLine Remove="@(_FrameshiftManifestLine)" />
     </ItemGroup>
   </Target>
 </Project>

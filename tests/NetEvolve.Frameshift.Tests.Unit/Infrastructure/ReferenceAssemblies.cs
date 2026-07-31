@@ -3,6 +3,7 @@ namespace NetEvolve.Frameshift.Tests.Infrastructure;
 using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
+using MSTestFramework = Microsoft.VisualStudio.TestTools.UnitTesting;
 
 /// <summary>
 /// The metadata references every test compilation is built against.
@@ -17,7 +18,13 @@ using Microsoft.CodeAnalysis;
 /// test assembly by exactly that reference; tests asserting that it stays silent could then never fail.
 /// </para>
 /// <para>
-/// Building a <see cref="MetadataReference" /> reads and maps a file, therefore both sets are computed
+/// A test framework is therefore added back explicitly, and always from the real package assemblies:
+/// the framework adapters are recognised by metadata names and base types, so a hand-written look-alike
+/// would hide exactly the defects these tests exist to catch. Every set is seeded with a type that only
+/// its own framework declares, and the assembly reference graph is walked from there.
+/// </para>
+/// <para>
+/// Building a <see cref="MetadataReference" /> reads and maps a file, therefore every set is computed
 /// once per process and shared by every compilation.
 /// </para>
 /// </remarks>
@@ -39,6 +46,26 @@ internal static class ReferenceAssemblies
         ImmutableArray<MetadataReference>
     >(CreateWithTUnit, LazyThreadSafetyMode.ExecutionAndPublication);
 
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV3 = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithXunitV3, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV2 = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithXunitV2, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withNUnit = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithNUnit, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withMSTest = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithMSTest, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _withAllFrameworks = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateWithAllFrameworks, LazyThreadSafetyMode.ExecutionAndPublication);
+
     /// <summary>
     /// Gets the runtime references of the currently executing framework, deduplicated by path.
     /// </summary>
@@ -51,11 +78,71 @@ internal static class ReferenceAssemblies
     public static ImmutableArray<MetadataReference> WithTUnit => _withTUnit.Value;
 
     /// <summary>
+    /// Gets <see cref="Default" /> plus the xUnit.net v3 assemblies, so that a fixture can carry real
+    /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
+    /// </summary>
+    public static ImmutableArray<MetadataReference> WithXunitV3 => _withXunitV3.Value;
+
+    /// <summary>
+    /// Gets <see cref="Default" /> plus the xUnit.net v2 assemblies, so that a fixture can carry real
+    /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
+    /// </summary>
+    public static ImmutableArray<MetadataReference> WithXunitV2 => _withXunitV2.Value;
+
+    /// <summary>
+    /// Gets <see cref="Default" /> plus the NUnit assemblies, so that a fixture can carry real
+    /// <c>[Test]</c> and <c>[TestCase]</c> methods.
+    /// </summary>
+    public static ImmutableArray<MetadataReference> WithNUnit => _withNUnit.Value;
+
+    /// <summary>
+    /// Gets <see cref="Default" /> plus the MSTest assemblies, so that a fixture can carry real
+    /// <c>[TestMethod]</c> and <c>[DataRow]</c> methods.
+    /// </summary>
+    public static ImmutableArray<MetadataReference> WithMSTest => _withMSTest.Value;
+
+    /// <summary>
+    /// Gets <see cref="Default" /> plus every supported test framework at once, which is what a test
+    /// proving that one adapter does not answer for another framework needs.
+    /// </summary>
+    /// <remarks>
+    /// The two xUnit.net versions declare the very same type names in the very same namespaces. A
+    /// fixture built against this set therefore cannot spell out a name such as <c>Xunit.FactAttribute</c>,
+    /// and <see cref="Compilation.GetTypeByMetadataName(string)" /> returns <see langword="null" /> for it;
+    /// only <c>GetTypesByMetadataName</c> sees both declarations.
+    /// </remarks>
+    public static ImmutableArray<MetadataReference> WithAllFrameworks => _withAllFrameworks.Value;
+
+    /// <summary>
     /// Selects <see cref="WithTUnit" /> or <see cref="Default" />.
     /// </summary>
     /// <param name="includeTUnit">Whether the TUnit assemblies are part of the result.</param>
     /// <returns>The selected references.</returns>
-    public static ImmutableArray<MetadataReference> For(bool includeTUnit) => includeTUnit ? WithTUnit : Default;
+    public static ImmutableArray<MetadataReference> For(bool includeTUnit) =>
+        For(includeTUnit ? TestFramework.TUnit : TestFramework.None);
+
+    /// <summary>
+    /// Selects the reference set of <paramref name="framework" />.
+    /// </summary>
+    /// <param name="framework">The test framework the compilation is built for.</param>
+    /// <returns>The selected references.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="framework" /> is not a known value.</exception>
+    public static ImmutableArray<MetadataReference> For(TestFramework framework) =>
+        framework switch
+        {
+            TestFramework.None => Default,
+            TestFramework.TUnit => WithTUnit,
+            TestFramework.XunitV3 => WithXunitV3,
+            TestFramework.XunitV2 => WithXunitV2,
+            TestFramework.NUnit => WithNUnit,
+            TestFramework.MSTest => WithMSTest,
+            TestFramework.All => WithAllFrameworks,
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(framework),
+                framework,
+                "There is no reference set for this test framework."
+            ),
+        };
 
     /// <summary>
     /// Creates a reference to the assembly declaring <paramref name="type" />, for the rare fixture that
@@ -83,8 +170,55 @@ internal static class ReferenceAssemblies
 
     private static ImmutableArray<MetadataReference> CreateDefault() => CreateReferences(_frameworkPaths.Value);
 
-    private static ImmutableArray<MetadataReference> CreateWithTUnit() =>
-        CreateReferences([.. _frameworkPaths.Value, .. GetTestFrameworkPaths()]);
+    private static ImmutableArray<MetadataReference> CreateWithTUnit() => CreateWith(TUnitAnchors);
+
+    private static ImmutableArray<MetadataReference> CreateWithXunitV3() => CreateWith(XunitV3Anchors);
+
+    private static ImmutableArray<MetadataReference> CreateWithXunitV2() => CreateWith(XunitV2Anchors);
+
+    private static ImmutableArray<MetadataReference> CreateWithNUnit() => CreateWith(NUnitAnchors);
+
+    private static ImmutableArray<MetadataReference> CreateWithMSTest() => CreateWith(MSTestAnchors);
+
+    private static ImmutableArray<MetadataReference> CreateWithAllFrameworks() =>
+        CreateWith([.. TUnitAnchors, .. XunitV3Anchors, .. XunitV2Anchors, .. NUnitAnchors, .. MSTestAnchors]);
+
+    /// <summary>
+    /// The seed of the TUnit reference set.
+    /// </summary>
+    private static Type[] TUnitAnchors => [typeof(TUnit.Core.TestAttribute)];
+
+    /// <summary>
+    /// The seed of the xUnit.net v3 reference set. <c>Xunit.v3.XunitTestFramework</c> lives in
+    /// <c>xunit.v3.core</c> and has no counterpart in v2, so it stays unambiguous when both versions are
+    /// referenced by this test project at once.
+    /// </summary>
+    private static Type[] XunitV3Anchors => [typeof(Xunit.v3.XunitTestFramework)];
+
+    /// <summary>
+    /// The seed of the xUnit.net v2 reference set. <c>Xunit.Sdk.IXunitTestCase</c> lives in
+    /// <c>xunit.core</c> and has no counterpart in v3, so it stays unambiguous when both versions are
+    /// referenced by this test project at once.
+    /// </summary>
+    private static Type[] XunitV2Anchors => [typeof(Xunit.Sdk.IXunitTestCase)];
+
+    /// <summary>
+    /// The seed of the NUnit reference set.
+    /// </summary>
+    private static Type[] NUnitAnchors => [typeof(NUnit.Framework.TestAttribute)];
+
+    /// <summary>
+    /// The seed of the MSTest reference set.
+    /// </summary>
+    private static Type[] MSTestAnchors => [typeof(MSTestFramework.TestMethodAttribute)];
+
+    /// <summary>
+    /// Builds <see cref="Default" /> plus the assembly graph reachable from every anchor.
+    /// </summary>
+    /// <param name="anchors">The types whose declaring assemblies seed the walk.</param>
+    /// <returns>The created references.</returns>
+    private static ImmutableArray<MetadataReference> CreateWith(Type[] anchors) =>
+        CreateReferences([.. _frameworkPaths.Value, .. GetPackagePaths(anchors)]);
 
     /// <summary>
     /// Maps every path to a reference, skipping paths that were already mapped.
@@ -148,17 +282,22 @@ internal static class ReferenceAssemblies
         && string.Equals(Path.GetDirectoryName(path), directory, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
-    /// Walks the assembly reference graph of the assembly declaring <c>TUnit.Core.TestAttribute</c>, so
-    /// that the attribute type and every type it needs can be bound by a test compilation.
+    /// Walks the assembly reference graph of every anchor's declaring assembly, so that the anchor types
+    /// and every type they need can be bound by a test compilation.
     /// </summary>
+    /// <param name="anchors">The types whose declaring assemblies seed the walk.</param>
     /// <returns>The paths of the reachable assemblies that are backed by a file.</returns>
-    private static ImmutableArray<string> GetTestFrameworkPaths()
+    /// <exception cref="InvalidOperationException">An anchor assembly is not backed by a file.</exception>
+    private static ImmutableArray<string> GetPackagePaths(Type[] anchors)
     {
         var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pending = new Queue<Assembly>();
         var builder = ImmutableArray.CreateBuilder<string>();
 
-        pending.Enqueue(GetTestFrameworkAssembly());
+        foreach (var anchor in anchors)
+        {
+            pending.Enqueue(GetAnchorAssembly(anchor));
+        }
 
         while (pending.Count > 0)
         {
@@ -180,6 +319,27 @@ internal static class ReferenceAssemblies
         return builder.ToImmutable();
     }
 
+    /// <summary>
+    /// Resolves the assembly of an anchor type and proves it is backed by a file, because a reference set
+    /// that silently lost its framework would turn every test using it into a false pass.
+    /// </summary>
+    /// <param name="anchor">The type whose declaring assembly seeds the walk.</param>
+    /// <returns>The declaring assembly.</returns>
+    /// <exception cref="InvalidOperationException">The declaring assembly has no file on disk.</exception>
+    private static Assembly GetAnchorAssembly(Type anchor)
+    {
+        var assembly = anchor.Assembly;
+
+        if (assembly.Location.Length == 0)
+        {
+            throw new InvalidOperationException(
+                $"The assembly declaring '{anchor.FullName}' is not backed by a file and cannot be referenced."
+            );
+        }
+
+        return assembly;
+    }
+
     private static void EnqueueReferences(Assembly assembly, Queue<Assembly> pending)
     {
         foreach (var name in assembly.GetReferencedAssemblies())
@@ -192,8 +352,6 @@ internal static class ReferenceAssemblies
             }
         }
     }
-
-    private static Assembly GetTestFrameworkAssembly() => typeof(TUnit.Core.TestAttribute).Assembly;
 
     private static Assembly? TryLoad(AssemblyName name)
     {

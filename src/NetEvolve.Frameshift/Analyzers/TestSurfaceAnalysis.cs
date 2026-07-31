@@ -27,11 +27,29 @@ using NetEvolve.Frameshift.TestSurface;
 /// That rule is what keeps several framework analyzers side by side harmless: each stays silent on the
 /// compilations that are not its own.
 /// </para>
+/// <para>
+/// A test project may of course use more than one framework at the same time, and then more than one
+/// analyzer is legitimately awake on the very same compilation. There is still only one test-surface
+/// manifest, so the manifest is handled once and only once, by the framework that comes first in
+/// <see cref="TestFrameworkProbeRegistry.All" /> among those that are awake — awake meaning that the
+/// probe recognises the framework AND at least one of its test methods is discovered. Every other
+/// framework skips the manifest entirely, so <c>FSH0003</c> is reported once instead of once per
+/// referenced framework. <c>FSH0004</c> stays per framework, because it names an individual test method
+/// and each analyzer sees a different set of them.
+/// </para>
+/// <para>
+/// The manifest is compared against the UNION of the test surfaces of all awake frameworks, never
+/// against the surface of the leading one alone. A mixed project records the tests of every framework in
+/// its single manifest, so judging it by one framework's view would report it as stale purely because
+/// the other framework's tests are invisible from there.
+/// </para>
 /// </remarks>
 internal static class TestSurfaceAnalysis
 {
     /// <summary>
-    /// Runs the test-side analysis for the framework <paramref name="probe" /> detects.
+    /// Runs the test-side analysis for the framework <paramref name="probe" /> detects. Reports
+    /// <c>FSH0004</c> for the tests of that framework, and — only when the framework leads the manifest
+    /// comparison — <c>FSH0003</c> for the manifest of the whole project.
     /// </summary>
     /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="probe">The probe detecting the test framework.</param>
@@ -63,10 +81,111 @@ internal static class TestSurfaceAnalysis
         }
 
         ReportTestsWithoutProductionReference(context, recognizer);
-        CompareWithManifestOnDisk(
-            context,
-            TestSurfaceCollector.Collect(context.Compilation, recognizer, context.CancellationToken)
-        );
+
+        var awake = FindAwakeFrameworks(context);
+
+        if (!LeadsManifestComparison(probe, awake))
+        {
+            return;
+        }
+
+        CompareWithManifestOnDisk(context, CollectUnion(context, probe, recognizer, awake));
+    }
+
+    /// <summary>
+    /// Determines which of the registered frameworks are awake on the analyzed compilation, meaning that
+    /// their probe recognises them and that at least one of their test methods is actually discovered.
+    /// </summary>
+    /// <param name="context">The context of the analyzed compilation.</param>
+    /// <returns>
+    /// The awake frameworks together with their recognisers, in the order of
+    /// <see cref="TestFrameworkProbeRegistry.All" />.
+    /// </returns>
+    private static ImmutableArray<AwakeFramework> FindAwakeFrameworks(CompilationAnalysisContext context)
+    {
+        var builder = ImmutableArray.CreateBuilder<AwakeFramework>();
+
+        foreach (var candidate in TestFrameworkProbeRegistry.All)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            var recognizer = candidate.TryCreateRecognizer(context.Compilation);
+
+            if (recognizer is null)
+            {
+                continue;
+            }
+
+            var testMethods = TestMethodDiscovery.FindTestMethods(
+                context.Compilation,
+                recognizer,
+                context.CancellationToken
+            );
+
+            if (!testMethods.IsEmpty)
+            {
+                builder.Add(new AwakeFramework(candidate, recognizer));
+            }
+        }
+
+        return builder.ToImmutable();
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="probe" /> is the one framework that handles the manifest, which
+    /// is the first awake one in the order of <see cref="TestFrameworkProbeRegistry.All" />.
+    /// </summary>
+    /// <param name="probe">The probe of the running analyzer.</param>
+    /// <param name="awake">The awake frameworks, in registry order.</param>
+    /// <returns>
+    /// <see langword="true" /> if the manifest has to be compared by this run; otherwise
+    /// <see langword="false" />.
+    /// </returns>
+    /// <remarks>
+    /// A probe that is not registered at all leads by itself: nothing else would ever look at the
+    /// manifest on its behalf, and staying silent would be worse than reporting once.
+    /// </remarks>
+    private static bool LeadsManifestComparison(ITestFrameworkProbe probe, ImmutableArray<AwakeFramework> awake) =>
+        !awake.Any(framework => IsSameFramework(framework.Probe, probe)) || IsSameFramework(awake[0].Probe, probe);
+
+    private static bool IsSameFramework(ITestFrameworkProbe left, ITestFrameworkProbe right) =>
+        ReferenceEquals(left, right) || left.GetType() == right.GetType();
+
+    /// <summary>
+    /// Collects the union of the test surfaces of every awake framework, so that the manifest of a
+    /// project using several frameworks is judged by everything it is supposed to contain.
+    /// </summary>
+    /// <param name="context">The context of the analyzed compilation.</param>
+    /// <param name="probe">The probe of the running analyzer.</param>
+    /// <param name="recognizer">The recogniser of the running analyzer.</param>
+    /// <param name="awake">The awake frameworks, in registry order.</param>
+    /// <returns>The combined test surface of the compilation.</returns>
+    private static TestSurfaceManifest CollectUnion(
+        CompilationAnalysisContext context,
+        ITestFrameworkProbe probe,
+        ITestMethodRecognizer recognizer,
+        ImmutableArray<AwakeFramework> awake
+    )
+    {
+        var recognizers = awake
+            .Where(framework => !IsSameFramework(framework.Probe, probe))
+            .Select(framework => framework.Recognizer)
+            .Append(recognizer);
+
+        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
+        foreach (var current in recognizers)
+        {
+            context.CancellationToken.ThrowIfCancellationRequested();
+
+            var collected = TestSurfaceCollector.Collect(context.Compilation, current, context.CancellationToken);
+
+            testMethodIds.UnionWith(collected.TestMethodIds);
+            referencedMemberIds.UnionWith(collected.ReferencedMemberIds);
+        }
+
+        return new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
     }
 
     /// <summary>
@@ -247,4 +366,32 @@ internal static class TestSurfaceAnalysis
     /// <returns>The created location.</returns>
     private static Location CreateFileLocation(string path) =>
         Location.Create(path, new TextSpan(0, 0), new LinePositionSpan(new LinePosition(0, 0), new LinePosition(0, 0)));
+
+    /// <summary>
+    /// A test framework that is awake on the analyzed compilation, paired with the recogniser its probe
+    /// created for that compilation, so that the recogniser is never built twice.
+    /// </summary>
+    private sealed class AwakeFramework
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AwakeFramework" /> class.
+        /// </summary>
+        /// <param name="probe">The probe that recognised the framework.</param>
+        /// <param name="recognizer">The recogniser the probe created.</param>
+        public AwakeFramework(ITestFrameworkProbe probe, ITestMethodRecognizer recognizer)
+        {
+            Probe = probe;
+            Recognizer = recognizer;
+        }
+
+        /// <summary>
+        /// Gets the probe that recognised the framework.
+        /// </summary>
+        public ITestFrameworkProbe Probe { get; }
+
+        /// <summary>
+        /// Gets the recogniser deciding which methods are test methods of the framework.
+        /// </summary>
+        public ITestMethodRecognizer Recognizer { get; }
+    }
 }

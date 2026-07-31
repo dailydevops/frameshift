@@ -66,7 +66,25 @@ internal static class CompilationFactory
         bool includeTUnit = false,
         IEnumerable<MetadataReference>? additionalReferences = null,
         string filePath = DefaultFilePath
-    ) => Create([(filePath, source)], assemblyName, includeTUnit, additionalReferences);
+    ) => Create(source, ToFramework(includeTUnit), assemblyName, additionalReferences, filePath);
+
+    /// <summary>
+    /// Creates a compilation from a single source file, referencing the assemblies of
+    /// <paramref name="framework" />.
+    /// </summary>
+    /// <param name="source">The C# source text.</param>
+    /// <param name="framework">The test framework the compilation references.</param>
+    /// <param name="assemblyName">The assembly name of the compilation.</param>
+    /// <param name="additionalReferences">References added on top of the framework's ones.</param>
+    /// <param name="filePath">The path the single syntax tree reports.</param>
+    /// <returns>The created compilation.</returns>
+    public static CSharpCompilation Create(
+        string source,
+        TestFramework framework,
+        string assemblyName = DefaultAssemblyName,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string filePath = DefaultFilePath
+    ) => Create([(filePath, source)], framework, assemblyName, additionalReferences);
 
     /// <summary>
     /// Creates a compilation from several source files, which is what the reachability tests need.
@@ -82,12 +100,29 @@ internal static class CompilationFactory
         string assemblyName = DefaultAssemblyName,
         bool includeTUnit = false,
         IEnumerable<MetadataReference>? additionalReferences = null
+    ) => Create(sources, ToFramework(includeTUnit), assemblyName, additionalReferences);
+
+    /// <summary>
+    /// Creates a compilation from several source files, referencing the assemblies of
+    /// <paramref name="framework" />.
+    /// </summary>
+    /// <param name="sources">The files of the compilation, each one a path and its source text.</param>
+    /// <param name="framework">The test framework the compilation references.</param>
+    /// <param name="assemblyName">The assembly name of the compilation.</param>
+    /// <param name="additionalReferences">References added on top of the framework's ones.</param>
+    /// <returns>The created compilation.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="sources" /> is <see langword="null" />.</exception>
+    public static CSharpCompilation Create(
+        IEnumerable<(string FilePath, string Source)> sources,
+        TestFramework framework,
+        string assemblyName = DefaultAssemblyName,
+        IEnumerable<MetadataReference>? additionalReferences = null
     )
     {
         ArgumentNullException.ThrowIfNull(sources);
 
         var trees = sources.Select(source => ParseTree(source.Source, source.FilePath));
-        var references = ReferenceAssemblies.For(includeTUnit);
+        var references = ReferenceAssemblies.For(framework);
 
         if (additionalReferences is not null)
         {
@@ -113,13 +148,39 @@ internal static class CompilationFactory
         bool includeTUnit = false,
         IEnumerable<MetadataReference>? additionalReferences = null,
         string filePath = DefaultFilePath
+    ) => CreateWithModel(source, ToFramework(includeTUnit), assemblyName, additionalReferences, filePath);
+
+    /// <summary>
+    /// Creates a single-file compilation for <paramref name="framework" /> and hands back its semantic
+    /// model and syntax tree.
+    /// </summary>
+    /// <param name="source">The C# source text.</param>
+    /// <param name="framework">The test framework the compilation references.</param>
+    /// <param name="assemblyName">The assembly name of the compilation.</param>
+    /// <param name="additionalReferences">References added on top of the framework's ones.</param>
+    /// <param name="filePath">The path the single syntax tree reports.</param>
+    /// <returns>The compilation, the semantic model of its only tree, and that tree.</returns>
+    public static (CSharpCompilation Compilation, SemanticModel SemanticModel, SyntaxTree Tree) CreateWithModel(
+        string source,
+        TestFramework framework,
+        string assemblyName = DefaultAssemblyName,
+        IEnumerable<MetadataReference>? additionalReferences = null,
+        string filePath = DefaultFilePath
     )
     {
-        var compilation = Create(source, assemblyName, includeTUnit, additionalReferences, filePath);
+        var compilation = Create(source, framework, assemblyName, additionalReferences, filePath);
         var tree = compilation.SyntaxTrees[0];
 
         return (compilation, compilation.GetSemanticModel(tree), tree);
     }
+
+    /// <summary>
+    /// Maps the historic <c>includeTUnit</c> switch to its enum value, so that both APIs share one path.
+    /// </summary>
+    /// <param name="includeTUnit">Whether the TUnit assemblies are referenced.</param>
+    /// <returns>The matching framework.</returns>
+    private static TestFramework ToFramework(bool includeTUnit) =>
+        includeTUnit ? TestFramework.TUnit : TestFramework.None;
 
     /// <summary>
     /// Collects the errors of <paramref name="compilation" />, so that a test can prove its own fixture

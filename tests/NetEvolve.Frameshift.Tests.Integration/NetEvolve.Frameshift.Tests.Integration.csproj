@@ -10,6 +10,12 @@
     <PackageReference Include="NetEvolve.Extensions.TUnit" />
     <PackageReference Include="TUnit" />
   </ItemGroup>
+  <ItemGroup Label="Test framework metadata, compile-time only">
+    <PackageReference Include="MSTest.TestFramework" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
+    <PackageReference Include="NUnit" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
+    <PackageReference Include="xunit.core" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
+    <PackageReference Include="xunit.v3.core" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/NetEvolve.Frameshift/NetEvolve.Frameshift.csproj" />
   </ItemGroup>
