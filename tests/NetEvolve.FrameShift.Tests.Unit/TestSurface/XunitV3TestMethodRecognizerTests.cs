@@ -10,11 +10,19 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers how an xUnit.net v3 test method is recognised: by <c>[Fact]</c>, by <c>[Theory]</c>, by an
-/// attribute that derives from <c>FactAttribute</c>, and never by an attribute that only happens to carry
-/// the same simple name — not even when that attribute derives from the <c>FactAttribute</c> of version 2.
+/// Covers how an xUnit.net v3 test method is recognised: by <c>[Fact]</c>, by <c>[Theory]</c>, by
+/// <c>[CulturedFact]</c> and <c>[CulturedTheory]</c>, by an attribute that derives from
+/// <c>FactAttribute</c>, by an attribute that merely implements <c>Xunit.v3.IFactAttribute</c> — and never by
+/// a data source alone, nor by an attribute or interface that only happens to carry the same simple name, not
+/// even when that attribute derives from the <c>FactAttribute</c> of version 2.
 /// </summary>
 /// <remarks>
+/// <para>
+/// The marker of version 3 is the interface, not the class: discovery collects a method's attributes as
+/// <c>Xunit.v3.IFactAttribute</c>, so an attribute implementing it directly is a test although it shares no
+/// base type with <c>FactAttribute</c>. That case is asserted on its own, and against each rule in isolation,
+/// because a recogniser hooking only the base attribute passes every other test in this file.
+/// </para>
 /// <para>
 /// The whole file is conditional, because every fixture needs the real <c>xunit.v3.core</c> assembly and
 /// that package ships no assets for net6.0 and net7.0. The version 2 suite needs no such guard, its
@@ -39,21 +47,63 @@ internal sealed class XunitV3TestMethodRecognizerTests
     private const string VersionThreeAssemblyName = "Helper.VersionThree";
 
     private const string ExpectedTestMethods =
-        "Cases.FactTest|Cases.TheoryTest|Cases.DerivedAttributeTest|Cases.StaticTest|"
-        + "Cases.GenericTest|Cases.PrivateTest|AbstractCases.AbstractTest|AbstractCases.InheritedTest";
+        "Cases.FactTest|Cases.TheoryTest|Cases.DerivedAttributeTest|Cases.CulturedFactTest|"
+        + "Cases.CulturedTheoryTest|Cases.MarkerInterfaceTest|Cases.StaticTest|Cases.GenericTest|"
+        + "Cases.PrivateTest|AbstractCases.AbstractTest|AbstractCases.InheritedTest";
 
     /// <summary>
     /// The fixture spells the attributes exactly as a version 2 fixture would, because
     /// <c>Xunit.FactAttribute</c>, <c>Xunit.TheoryAttribute</c> and <c>Xunit.InlineDataAttribute</c> exist in
     /// both major versions. Which version the names bind to is decided by the referenced assembly alone.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// It carries one method per marker version 3 knows: <c>[Fact]</c>, <c>[Theory]</c>, an attribute derived
+    /// from <c>FactAttribute</c>, the two shipped <c>[CulturedFact]</c> and <c>[CulturedTheory]</c>, and an
+    /// attribute that implements <c>Xunit.v3.IFactAttribute</c> without deriving from <c>FactAttribute</c> at
+    /// all. The last one is the case the base type alone cannot see, and version 3 runs it: discovery
+    /// collects a method's attributes as <c>IFactAttribute</c>.
+    /// </para>
+    /// <para>
+    /// It also carries one method per data-source attribute without any marker. Those derive from
+    /// <c>Xunit.v3.DataAttribute</c> and implement <c>Xunit.v3.IDataAttribute</c>, never the marker
+    /// interface, so version 3 would not run them and they must not be recognised.
+    /// </para>
+    /// </remarks>
     private const string XunitFixtureSource = """
         namespace Fixture;
 
+        using System;
+        using System.Collections.Generic;
         using Xunit;
+        using Xunit.v3;
 
         public sealed class ScenarioFactAttribute : FactAttribute
         {
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class MarkerInterfaceFactAttribute : Attribute, IFactAttribute
+        {
+            public string? DisplayName => null;
+
+            public bool Explicit => false;
+
+            public string? Skip => null;
+
+            public Type[]? SkipExceptions => null;
+
+            public Type? SkipType => null;
+
+            public string? SkipUnless => null;
+
+            public string? SkipWhen => null;
+
+            public string? SourceFilePath => null;
+
+            public int? SourceLineNumber => null;
+
+            public int Timeout => 0;
         }
 
         public class Cases
@@ -74,6 +124,22 @@ internal sealed class XunitV3TestMethodRecognizerTests
             {
             }
 
+            [CulturedFact(new string[] { "en-US" })]
+            public void CulturedFactTest()
+            {
+            }
+
+            [CulturedTheory(new string[] { "en-US" })]
+            [InlineData(1)]
+            public void CulturedTheoryTest(int value)
+            {
+            }
+
+            [MarkerInterfaceFact]
+            public void MarkerInterfaceTest()
+            {
+            }
+
             [Fact]
             public static void StaticTest()
             {
@@ -89,9 +155,30 @@ internal sealed class XunitV3TestMethodRecognizerTests
             {
             }
 
+            [InlineData(1)]
+            public void InlineDataOnlyMethod(int value)
+            {
+            }
+
+            [MemberData(nameof(Rows))]
+            public void MemberDataOnlyMethod(int value)
+            {
+            }
+
+            [ClassData(typeof(RowSource))]
+            public void ClassDataOnlyMethod(int value)
+            {
+            }
+
+            public static IEnumerable<object[]> Rows => new[] { new object[] { 1 } };
+
             public void PlainMethod()
             {
             }
+        }
+
+        public sealed class RowSource
+        {
         }
 
         public abstract class AbstractCases
@@ -114,8 +201,10 @@ internal sealed class XunitV3TestMethodRecognizerTests
         """;
 
     /// <summary>
-    /// A <c>FactAttribute</c> of the project itself, which shares nothing with the framework but its
-    /// simple name and must therefore never mark a test.
+    /// A <c>FactAttribute</c> and an <c>IFactAttribute</c> of the project itself, which share nothing with the
+    /// framework but their simple names and must therefore never mark a test. The look-alike interface is the
+    /// counterpart of the look-alike attribute: now that the marker is an interface, a project declaring one
+    /// under that name must not be able to smuggle a method onto the test surface either.
     /// </summary>
     private const string UnrelatedFixtureSource = """
         namespace Fixture;
@@ -127,10 +216,24 @@ internal sealed class XunitV3TestMethodRecognizerTests
         {
         }
 
+        public interface IFactAttribute
+        {
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class LookAlikeMarkerAttribute : Attribute, IFactAttribute
+        {
+        }
+
         public class UnrelatedCases
         {
             [Fact]
             public void LooksLikeATest()
+            {
+            }
+
+            [LookAlikeMarker]
+            public void AlsoLooksLikeATest()
             {
             }
         }
@@ -233,10 +336,16 @@ internal sealed class XunitV3TestMethodRecognizerTests
     [Arguments("FactTest", true)]
     [Arguments("TheoryTest", true)]
     [Arguments("DerivedAttributeTest", true)]
+    [Arguments("CulturedFactTest", true)]
+    [Arguments("CulturedTheoryTest", true)]
+    [Arguments("MarkerInterfaceTest", true)]
     [Arguments("StaticTest", true)]
     [Arguments("GenericTest", true)]
     [Arguments("PrivateTest", true)]
     [Arguments("PlainMethod", false)]
+    [Arguments("InlineDataOnlyMethod", false)]
+    [Arguments("MemberDataOnlyMethod", false)]
+    [Arguments("ClassDataOnlyMethod", false)]
     public async Task IsTestMethod_Method_IsClassifiedByItsAttributes(string methodName, bool expected)
     {
         var compilation = CreateXunitFixture();
@@ -259,8 +368,70 @@ internal sealed class XunitV3TestMethodRecognizerTests
     }
 
     /// <summary>
+    /// The marker interface is what version 3 itself keys on, so an attribute implementing
+    /// <c>Xunit.v3.IFactAttribute</c> without deriving from <c>FactAttribute</c> is a test — and it is the one
+    /// case the base type alone cannot see. Hooking the base attribute only would leave the method off the
+    /// test surface and make the production analyzer report its references as unreached.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_AttributeImplementingTheMarkerInterfaceOnly_IsClassifiedAsATest()
+    {
+        var compilation = CreateXunitFixture();
+        var method = FindMethod(compilation, CasesTypeName, "MarkerInterfaceTest");
+        var attributeType = XunitV3TestFrameworkProbe.GetTestAttributeType(compilation);
+        var markerInterface = XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation);
+
+        _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsTrue();
+        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
+        _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsFalse();
+    }
+
+    /// <summary>
+    /// The shipped markers stay recognised through the base attribute alone, so the interface rule adds cases
+    /// instead of replacing them. <c>[CulturedFact]</c> and <c>[CulturedTheory]</c> are the two markers
+    /// version 3 ships beyond <c>[Fact]</c> and <c>[Theory]</c>, and version 2 has neither.
+    /// </summary>
+    [Test]
+    [Arguments("FactTest")]
+    [Arguments("TheoryTest")]
+    [Arguments("DerivedAttributeTest")]
+    [Arguments("CulturedFactTest")]
+    [Arguments("CulturedTheoryTest")]
+    public async Task IsTestMethod_ShippedMarker_IsClassifiedByEitherRuleAlone(string methodName)
+    {
+        var compilation = CreateXunitFixture();
+        var method = FindMethod(compilation, CasesTypeName, methodName);
+        var attributeType = XunitV3TestFrameworkProbe.GetTestAttributeType(compilation);
+        var markerInterface = XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation);
+
+        _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsTrue();
+        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
+    }
+
+    /// <summary>
+    /// A data source marks no test on its own. <c>[InlineData]</c>, <c>[MemberData]</c> and
+    /// <c>[ClassData]</c> implement <c>Xunit.v3.IDataAttribute</c>, never the marker interface, and version 3
+    /// requires <c>[Theory]</c> next to them; a recogniser accepting them would put methods on the test
+    /// surface that no test run ever executes.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_DataSourceAttributeWithoutAMarker_IsNotClassifiedAsATest()
+    {
+        var compilation = CreateXunitFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var dataOnly = new[] { "InlineDataOnlyMethod", "MemberDataOnlyMethod", "ClassDataOnlyMethod" };
+
+        var recognized = dataOnly
+            .Where(methodName => recognizer.IsTestMethod(FindMethod(compilation, CasesTypeName, methodName)))
+            .ToArray();
+
+        _ = await Assert.That(string.Join("|", recognized)).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
     /// An attribute that only shares the simple name is not a test attribute, no matter whether the
-    /// framework is referenced at all. The judgement rests on symbol identity, never on a name.
+    /// framework is referenced at all. The judgement rests on symbol identity, never on a name — for the
+    /// marker interface just as much as for the base attribute.
     /// </summary>
     [Test]
     public async Task IsTestMethod_FactAttributeFromAnUnrelatedNamespace_IsNotClassifiedAsATest()
@@ -270,28 +441,44 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
 
         _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(null).IsTestMethod(method)).IsFalse();
+        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, null).IsTestMethod(method)).IsFalse();
     }
 
     /// <summary>
-    /// Judging a method fails closed. Without the resolved attribute type — the framework is referenced by
-    /// name but its metadata is unavailable — there is no positive evidence for anything, and the recogniser
+    /// The same for the interface rule: an <c>IFactAttribute</c> the project declares itself is a different
+    /// symbol than the one of <c>xunit.v3.core</c>, and an attribute implementing it marks no test.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_MarkerInterfaceFromAnUnrelatedNamespace_IsNotClassifiedAsATest()
+    {
+        var compilation = CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.XunitV3);
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, "Fixture.UnrelatedCases", "AlsoLooksLikeATest");
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+    }
+
+    /// <summary>
+    /// Judging a method fails closed. Without the resolved types — the framework is referenced by name but
+    /// its metadata is unavailable — there is no positive evidence for anything, and the recogniser
     /// recognises nothing instead of guessing from a name.
     /// </summary>
     [Test]
     public async Task IsTestMethod_RecognizerWithoutAnAttributeType_RecognizesNothing()
     {
         var compilation = CreateXunitFixture();
-        var recognizer = new XunitV3TestMethodRecognizer(null);
+        var recognizer = new XunitV3TestMethodRecognizer(null, null);
 
         var fact = FindMethod(compilation, CasesTypeName, "FactTest");
         var theory = FindMethod(compilation, CasesTypeName, "TheoryTest");
         var derived = FindMethod(compilation, CasesTypeName, "DerivedAttributeTest");
+        var markerInterface = FindMethod(compilation, CasesTypeName, "MarkerInterfaceTest");
         var plain = FindMethod(compilation, CasesTypeName, "PlainMethod");
 
         _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
         _ = await Assert.That(recognizer.IsTestMethod(theory)).IsFalse();
         _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
+        _ = await Assert.That(recognizer.IsTestMethod(markerInterface)).IsFalse();
         _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
     }
 
@@ -337,7 +524,7 @@ internal sealed class XunitV3TestMethodRecognizerTests
     [Test]
     public async Task IsTestMethod_MethodIsNull_ThrowsArgumentNullException()
     {
-        var recognizer = new XunitV3TestMethodRecognizer(null);
+        var recognizer = new XunitV3TestMethodRecognizer(null, null);
 
         var exception = Assert.Throws<ArgumentNullException>(() => _ = recognizer.IsTestMethod(null!));
 
@@ -382,7 +569,10 @@ internal sealed class XunitV3TestMethodRecognizerTests
         );
 
     private static XunitV3TestMethodRecognizer CreateRecognizer(Compilation compilation) =>
-        new XunitV3TestMethodRecognizer(XunitV3TestFrameworkProbe.GetTestAttributeType(compilation));
+        new XunitV3TestMethodRecognizer(
+            XunitV3TestFrameworkProbe.GetTestAttributeType(compilation),
+            XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation)
+        );
 
     private static IMethodSymbol FindMethod(Compilation compilation, string typeName, string methodName) =>
         compilation.GetTypeByMetadataName(typeName)!.GetMembers(methodName).OfType<IMethodSymbol>().First();

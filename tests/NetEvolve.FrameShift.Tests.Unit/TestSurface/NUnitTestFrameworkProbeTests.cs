@@ -24,26 +24,41 @@ public class NUnitTestFrameworkProbeTests
     private const string XunitScenario = "xUnit v2";
 
     /// <summary>
-    /// A satellite that carries the simple name of an NUnit test attribute in a namespace of its own, so
-    /// that the well-known metadata names stay unresolvable and only the name rule can recognise it.
+    /// A satellite that carries the simple names of the two test builder interfaces in a namespace of its
+    /// own, so that the well-known metadata names stay unresolvable and only the name rule can recognise an
+    /// attribute implementing them.
     /// </summary>
     private const string SatelliteSource = """
-        namespace Satellite;
+        namespace NUnit.Framework.Satellite.Interfaces;
 
-        using System;
+        public interface ISimpleTestBuilder
+        {
+        }
 
-        [AttributeUsage(AttributeTargets.Method)]
-        public class TestCaseAttribute : Attribute
+        public interface ITestBuilder
         {
         }
         """;
 
+    /// <summary>
+    /// A consumer whose attribute is a test marker only because it implements a builder interface the
+    /// satellite declares. Nothing about the attribute's own name says "test", which is what makes this
+    /// fixture exercise the interface name rule rather than an attribute name rule.
+    /// </summary>
     private const string CasesSource = """
         namespace Fixture;
 
+        using System;
+        using NUnit.Framework.Satellite.Interfaces;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class ExerciseAttribute : Attribute, ITestBuilder
+        {
+        }
+
         public class Cases
         {
-            [Satellite.TestCase]
+            [Exercise]
             public void DecoratedTest()
             {
             }
@@ -157,8 +172,9 @@ public class NUnitTestFrameworkProbeTests
     }
 
     /// <summary>
-    /// A recogniser that was created without the well-known attribute types still has to recognise a test
-    /// attribute declared in a framework assembly, which is the only rule available in that state.
+    /// A recogniser that was created without the well-known types still has to recognise a test attribute
+    /// declared against a framework assembly, which is the only rule available in that state. Both
+    /// resolutions are asserted empty first, so the recognition below can only come from the name rule.
     /// </summary>
     [Test]
     public async Task IsTestMethod_RecognizerWithoutTheWellKnownTypes_UsesTheNameRule()
@@ -170,6 +186,7 @@ public class NUnitTestFrameworkProbeTests
         var plain = FindMethod(compilation, "PlainMethod");
 
         _ = await Assert.That(NUnitTestFrameworkProbe.GetTestAttributeTypes(compilation)).IsEmpty();
+        _ = await Assert.That(NUnitTestFrameworkProbe.GetTestBuilderInterfaceTypes(compilation)).IsEmpty();
         _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsTrue();
         _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
     }

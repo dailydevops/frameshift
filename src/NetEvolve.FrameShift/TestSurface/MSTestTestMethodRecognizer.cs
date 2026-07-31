@@ -10,9 +10,18 @@ using Microsoft.CodeAnalysis;
 /// <remarks>
 /// <para>
 /// Unlike the well-known test attributes of other frameworks, <c>TestMethodAttribute</c> is not sealed:
-/// MSTest itself derives <c>DataTestMethodAttribute</c> from it, and extending it is the documented way
-/// of writing a custom test attribute. Walking the base chain therefore covers both the framework's own
-/// specialisations and user-defined ones, without hard-coding a list of attribute names.
+/// MSTest itself derives <c>DataTestMethodAttribute</c> and <c>STATestMethodAttribute</c> from it, and
+/// extending it is the documented way of writing a custom test attribute. Walking the base chain
+/// therefore covers both the framework's own specialisations and user-defined ones, without hard-coding a
+/// list of attribute names.
+/// </para>
+/// <para>
+/// The base type genuinely is the marker here, so no second one has to be looked for. Every attribute of
+/// the framework that makes a method a test derives from <c>TestMethodAttribute</c>, up to and including
+/// MSTest 4, which added no marker outside that chain. <c>DataRowAttribute</c> and
+/// <c>DynamicDataAttribute</c> in particular are not markers: they derive from <see cref="Attribute" />
+/// and implement <c>ITestDataSource</c>, they only feed arguments to a method that is already a test, and
+/// a method carrying nothing but one of them is not discovered by MSTest at all.
 /// </para>
 /// <para>
 /// The name-based rule is the fallback for a compilation in which
@@ -26,7 +35,9 @@ using Microsoft.CodeAnalysis;
 /// <para>
 /// <c>TestClassAttribute</c> marks the declaring type, not the method, and does not derive from
 /// <c>TestMethodAttribute</c>. A method is consequently never recognised because of it — only an
-/// attribute on the method itself makes the method a test.
+/// attribute on the method itself makes the method a test. The same holds for the fixture attributes
+/// <c>TestInitializeAttribute</c> and <c>TestCleanupAttribute</c>, which sit on a method but derive
+/// straight from <see cref="Attribute" />.
 /// </para>
 /// </remarks>
 internal sealed class MSTestTestMethodRecognizer : ITestMethodRecognizer

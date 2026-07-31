@@ -9,18 +9,40 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers how an NUnit test method is recognised: by <c>[Test]</c>, <c>[TestCase]</c> and
-/// <c>[TestCaseSource]</c>, by an attribute deriving from one of them, and never by <c>[TestFixture]</c>,
-/// which marks the class rather than the method.
+/// Covers how an NUnit test method is recognised: by an attribute implementing
+/// <c>ISimpleTestBuilder</c> or <c>ITestBuilder</c>, which is the rule NUnit's own discovery applies.
 /// </summary>
 /// <remarks>
+/// <para>
+/// Every attribute NUnit ships that builds tests from a method is asserted individually, because a
+/// recogniser keyed on the three obvious names silently misses <c>[Theory]</c> and the combining
+/// strategies, and every method it misses drops its production references from the manifest and makes the
+/// production side report reachable code as untested.
+/// </para>
+/// <para>
+/// The counter-direction is asserted just as explicitly: the attributes that decorate a test without
+/// making a method one — <c>[Repeat]</c>, <c>[Retry]</c>, <c>[Values]</c>, <c>[SetUp]</c>,
+/// <c>[TearDown]</c>, <c>[Category]</c> and the class-level <c>[TestFixture]</c> — must all be refused, as
+/// must a look-alike from an assembly that is not NUnit's.
+/// </para>
+/// <para>
 /// The shapes a test method can take — static, generic, inherited, abstract and private — are covered
 /// deliberately: whichever of them the recogniser dropped would silently shrink the recorded test surface
 /// and make the production side claim mutations are unreachable when they are not.
+/// </para>
 /// </remarks>
 public class NUnitTestMethodRecognizerTests
 {
     private const string CasesTypeName = "Fixture.Cases";
+    private const string MarkerCasesTypeName = "Fixture.MarkerCases";
+    private const string NonMarkerCasesTypeName = "Fixture.NonMarkerCases";
+    private const string LookAlikeCasesTypeName = "Fixture.LookAlikeCases";
+
+    private const string FrameworkAssemblyName = "nunit.framework.satellite";
+    private const string ForeignAssemblyName = "Foreign.Satellite";
+
+    private const string CasesPath = "Cases.cs";
+    private const string SatellitePath = "Satellite.cs";
 
     private const string ExpectedTestMethods =
         "Cases.PlainTest|Cases.TestCaseTest|Cases.TestCaseSourceTest|Cases.DerivedAttributeTest|"
@@ -112,6 +134,143 @@ public class NUnitTestMethodRecognizerTests
         """;
 
     /// <summary>
+    /// One method per attribute of the framework that builds tests from a method, and one per attribute
+    /// that decorates a method without making it a test. Derivations of the less obvious markers are
+    /// included, because a specialisation inherits the builder interface from its base attribute.
+    /// </summary>
+    private const string MarkerFixtureSource = """
+        namespace Fixture;
+
+        using System.Collections.Generic;
+        using NUnit.Framework;
+
+        public sealed class ScenarioTestAttribute : TestAttribute
+        {
+        }
+
+        public sealed class ScenarioTheoryAttribute : TheoryAttribute
+        {
+        }
+
+        public sealed class ScenarioTestCaseSourceAttribute : TestCaseSourceAttribute
+        {
+            public ScenarioTestCaseSourceAttribute(string sourceName)
+                : base(sourceName)
+            {
+            }
+        }
+
+        public class MarkerCases
+        {
+            [Test]
+            public void TestMarked()
+            {
+            }
+
+            [TestCase(1)]
+            public void TestCaseMarked(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(Values))]
+            public void TestCaseSourceMarked(int value)
+            {
+            }
+
+            [Theory]
+            public void TheoryMarked(bool value)
+            {
+            }
+
+            [Combinatorial]
+            public void CombinatorialMarked([Values(1, 2)] int value)
+            {
+            }
+
+            [Pairwise]
+            public void PairwiseMarked([Values(1, 2)] int value)
+            {
+            }
+
+            [Sequential]
+            public void SequentialMarked([Values(1, 2)] int value)
+            {
+            }
+
+            [ScenarioTest]
+            public void DerivedFromTestMarked()
+            {
+            }
+
+            [ScenarioTheory]
+            public void DerivedFromTheoryMarked(bool value)
+            {
+            }
+
+            [ScenarioTestCaseSource(nameof(Values))]
+            public void DerivedFromTestCaseSourceMarked(int value)
+            {
+            }
+
+            public static IEnumerable<int> Values()
+            {
+                return new int[] { 1 };
+            }
+        }
+
+        public class NonMarkerCases
+        {
+            [Repeat(2)]
+            public void RepeatOnly()
+            {
+            }
+
+            [Retry(2)]
+            public void RetryOnly()
+            {
+            }
+
+            [Category("slow")]
+            public void CategoryOnly()
+            {
+            }
+
+            [Description("documented")]
+            public void DescriptionOnly()
+            {
+            }
+
+            [Order(1)]
+            public void OrderOnly()
+            {
+            }
+
+            [SetUp]
+            public void SetUpOnly()
+            {
+            }
+
+            [TearDown]
+            public void TearDownOnly()
+            {
+            }
+
+            [Explicit]
+            public void ExplicitOnly()
+            {
+            }
+
+            public void ValuesOnly([Values(1, 2)] int value)
+            {
+            }
+
+            public void Undecorated()
+            {
+            }
+        }
+        """;
+
+    /// <summary>
     /// A <c>TestAttribute</c> of the project itself, which shares nothing with the framework but its
     /// simple name and must therefore never mark a test.
     /// </summary>
@@ -134,14 +293,68 @@ public class NUnitTestMethodRecognizerTests
         }
         """;
 
+    /// <summary>
+    /// A satellite declaring interfaces under the framework's exact full names, so that a fixture can
+    /// control which assembly the builder interfaces are declared in and thereby exercise the name-based
+    /// rule on its own.
+    /// </summary>
+    private const string SatelliteSource = """
+        namespace NUnit.Framework.Interfaces;
+
+        public interface ISimpleTestBuilder
+        {
+        }
+
+        public interface ITestBuilder
+        {
+        }
+        """;
+
+    private const string SatelliteConsumerSource = """
+        namespace Fixture;
+
+        using System;
+        using NUnit.Framework.Interfaces;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class SimpleBuilderAttribute : Attribute, ISimpleTestBuilder
+        {
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class BuilderAttribute : Attribute, ITestBuilder
+        {
+        }
+
+        public class LookAlikeCases
+        {
+            [SimpleBuilder]
+            public void SimpleBuilderMarked()
+            {
+            }
+
+            [Builder]
+            public void BuilderMarked()
+            {
+            }
+
+            public void Undecorated()
+            {
+            }
+        }
+        """;
+
     [Test]
     public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
     {
         var errors = new[]
         {
             Describe(CreateNUnitFixture()),
+            Describe(CreateMarkerFixture()),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.NUnit)),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource)),
+            Describe(CreateSatelliteConsumer(FrameworkAssemblyName)),
+            Describe(CreateSatelliteConsumer(ForeignAssemblyName)),
         };
 
         _ = await Assert
@@ -195,6 +408,95 @@ public class NUnitTestMethodRecognizerTests
         _ = await Assert.That(recognizer.IsTestMethod(method)).IsEqualTo(expected);
     }
 
+    /// <summary>
+    /// Each attribute of the framework that implements <c>ISimpleTestBuilder</c> or <c>ITestBuilder</c>
+    /// makes the method a test, including <c>[Theory]</c> and the three combining strategies, which no list
+    /// of the obvious attribute names covers, and including a user-written specialisation of each.
+    /// </summary>
+    /// <param name="methodName">The name of the method under judgement.</param>
+    [Test]
+    [Arguments("TestMarked")]
+    [Arguments("TestCaseMarked")]
+    [Arguments("TestCaseSourceMarked")]
+    [Arguments("TheoryMarked")]
+    [Arguments("CombinatorialMarked")]
+    [Arguments("PairwiseMarked")]
+    [Arguments("SequentialMarked")]
+    [Arguments("DerivedFromTestMarked")]
+    [Arguments("DerivedFromTheoryMarked")]
+    [Arguments("DerivedFromTestCaseSourceMarked")]
+    public async Task IsTestMethod_EveryTestBuilderAttribute_IsClassifiedAsATest(string methodName)
+    {
+        var compilation = CreateMarkerFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, MarkerCasesTypeName, methodName);
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsTrue();
+    }
+
+    /// <summary>
+    /// The attributes that configure or describe a test build no test of their own. Accepting any of them
+    /// would turn a set-up method or a plain helper into recorded test surface.
+    /// </summary>
+    /// <param name="methodName">The name of the method under judgement.</param>
+    [Test]
+    [Arguments("RepeatOnly")]
+    [Arguments("RetryOnly")]
+    [Arguments("CategoryOnly")]
+    [Arguments("DescriptionOnly")]
+    [Arguments("OrderOnly")]
+    [Arguments("SetUpOnly")]
+    [Arguments("TearDownOnly")]
+    [Arguments("ExplicitOnly")]
+    [Arguments("ValuesOnly")]
+    [Arguments("Undecorated")]
+    public async Task IsTestMethod_AttributeThatBuildsNoTest_IsNotClassifiedAsATest(string methodName)
+    {
+        var compilation = CreateMarkerFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, NonMarkerCasesTypeName, methodName);
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+    }
+
+    /// <summary>
+    /// The same set of methods once more, judged by a recogniser that has nothing but the name-based rule.
+    /// The fallback must draw the very same line, because a compilation in which the interfaces cannot be
+    /// resolved is otherwise analysed against a different notion of what a test is.
+    /// </summary>
+    /// <param name="typeName">The type declaring the method.</param>
+    /// <param name="methodName">The name of the method under judgement.</param>
+    /// <param name="expected">Whether the method is an NUnit test.</param>
+    [Test]
+    [Arguments(MarkerCasesTypeName, "TestMarked", true)]
+    [Arguments(MarkerCasesTypeName, "TestCaseMarked", true)]
+    [Arguments(MarkerCasesTypeName, "TestCaseSourceMarked", true)]
+    [Arguments(MarkerCasesTypeName, "TheoryMarked", true)]
+    [Arguments(MarkerCasesTypeName, "CombinatorialMarked", true)]
+    [Arguments(MarkerCasesTypeName, "PairwiseMarked", true)]
+    [Arguments(MarkerCasesTypeName, "SequentialMarked", true)]
+    [Arguments(MarkerCasesTypeName, "DerivedFromTestMarked", true)]
+    [Arguments(MarkerCasesTypeName, "DerivedFromTheoryMarked", true)]
+    [Arguments(MarkerCasesTypeName, "DerivedFromTestCaseSourceMarked", true)]
+    [Arguments(NonMarkerCasesTypeName, "RepeatOnly", false)]
+    [Arguments(NonMarkerCasesTypeName, "RetryOnly", false)]
+    [Arguments(NonMarkerCasesTypeName, "CategoryOnly", false)]
+    [Arguments(NonMarkerCasesTypeName, "SetUpOnly", false)]
+    [Arguments(NonMarkerCasesTypeName, "ValuesOnly", false)]
+    [Arguments(NonMarkerCasesTypeName, "Undecorated", false)]
+    public async Task IsTestMethod_RecognizerWithoutAnyInterfaceType_FallsBackToTheNameRule(
+        string typeName,
+        string methodName,
+        bool expected
+    )
+    {
+        var compilation = CreateMarkerFixture();
+        var recognizer = new NUnitTestMethodRecognizer([]);
+        var method = FindMethod(compilation, typeName, methodName);
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsEqualTo(expected);
+    }
+
     [Test]
     [Arguments("AbstractTest")]
     [Arguments("InheritedTest")]
@@ -237,21 +539,31 @@ public class NUnitTestMethodRecognizerTests
     }
 
     /// <summary>
-    /// Without the resolved attribute types only the name rule is left, and it has to carry the
-    /// recognition of the real framework attributes on its own.
+    /// The interface name alone is never enough. An attribute implementing an <c>ISimpleTestBuilder</c> or
+    /// <c>ITestBuilder</c> of the framework's own assembly is a test attribute even when the recogniser
+    /// could not resolve the interfaces; the very same interface names declared in a foreign assembly must
+    /// leave the method unrecognised.
     /// </summary>
+    /// <param name="satelliteAssemblyName">The assembly the look-alike interfaces are declared in.</param>
+    /// <param name="expected">Whether an attribute implementing them makes the method a test.</param>
     [Test]
-    [Arguments("PlainTest")]
-    [Arguments("TestCaseTest")]
-    [Arguments("TestCaseSourceTest")]
-    [Arguments("DerivedAttributeTest")]
-    public async Task IsTestMethod_RecognizerWithoutAnyAttributeType_FallsBackToTheNameRule(string methodName)
+    [Arguments(FrameworkAssemblyName, true)]
+    [Arguments(ForeignAssemblyName, false)]
+    public async Task IsTestMethod_LookAlikeBuilderInterface_IsJudgedByItsDeclaringAssembly(
+        string satelliteAssemblyName,
+        bool expected
+    )
     {
-        var compilation = CreateNUnitFixture();
+        var compilation = CreateSatelliteConsumer(satelliteAssemblyName);
         var recognizer = new NUnitTestMethodRecognizer([]);
-        var method = FindMethod(compilation, CasesTypeName, methodName);
 
-        _ = await Assert.That(recognizer.IsTestMethod(method)).IsTrue();
+        var simple = FindMethod(compilation, LookAlikeCasesTypeName, "SimpleBuilderMarked");
+        var builder = FindMethod(compilation, LookAlikeCasesTypeName, "BuilderMarked");
+        var plain = FindMethod(compilation, LookAlikeCasesTypeName, "Undecorated");
+
+        _ = await Assert.That(recognizer.IsTestMethod(simple)).IsEqualTo(expected);
+        _ = await Assert.That(recognizer.IsTestMethod(builder)).IsEqualTo(expected);
+        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
     }
 
     /// <summary>
@@ -271,29 +583,68 @@ public class NUnitTestMethodRecognizerTests
         _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
     }
 
+    /// <summary>
+    /// A method whose attribute cannot be bound at all must not crash the recogniser, because an analyzer
+    /// runs on incomplete code all day long.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_AttributeThatCannotBeBound_ReturnsFalse()
+    {
+        var source = """
+            namespace Fixture;
+
+            public class Cases
+            {
+                [Nonexistent]
+                public void PlainTest()
+                {
+                }
+            }
+            """;
+
+        var compilation = CompilationFactory.Create(source, filePath: CasesPath);
+        var recognizer = new NUnitTestMethodRecognizer([]);
+        var method = FindMethod(compilation, CasesTypeName, "PlainTest");
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+    }
+
     [Test]
     public async Task IsTestMethod_MethodIsNull_ThrowsArgumentNullException()
     {
         var recognizer = new NUnitTestMethodRecognizer([]);
-        var threw = false;
 
-        try
-        {
-            _ = recognizer.IsTestMethod(null!);
-        }
-        catch (ArgumentNullException)
-        {
-            threw = true;
-        }
+        var exception = Assert.Throws<ArgumentNullException>(() => recognizer.IsTestMethod(null!));
 
-        _ = await Assert.That(threw).IsTrue();
+        _ = await Assert.That(exception.ParamName).IsEqualTo("method");
     }
 
     private static CSharpCompilation CreateNUnitFixture() =>
-        CompilationFactory.Create(NUnitFixtureSource, TestFramework.NUnit, filePath: "Cases.cs");
+        CompilationFactory.Create(NUnitFixtureSource, TestFramework.NUnit, filePath: CasesPath);
+
+    private static CSharpCompilation CreateMarkerFixture() =>
+        CompilationFactory.Create(MarkerFixtureSource, TestFramework.NUnit, filePath: CasesPath);
+
+    /// <summary>
+    /// Compiles the look-alike interfaces into an assembly called
+    /// <paramref name="satelliteAssemblyName" /> and builds a compilation referencing it, which is how a
+    /// fixture controls the assembly the well-known interface names are declared in.
+    /// </summary>
+    /// <param name="satelliteAssemblyName">The assembly name of the satellite.</param>
+    /// <returns>The consuming compilation.</returns>
+    private static CSharpCompilation CreateSatelliteConsumer(string satelliteAssemblyName)
+    {
+        var satellite = CompilationFactory.Create(SatelliteSource, satelliteAssemblyName, filePath: SatellitePath);
+
+        return CompilationFactory.Create(
+            SatelliteConsumerSource,
+            additionalReferences: [satellite.ToMetadataReference()],
+            filePath: CasesPath
+        );
+    }
 
     private static NUnitTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
-        new NUnitTestMethodRecognizer(NUnitTestFrameworkProbe.GetTestAttributeTypes(compilation));
+        new NUnitTestMethodRecognizer(NUnitTestFrameworkProbe.GetTestBuilderInterfaceTypes(compilation));
 
     private static IMethodSymbol FindMethod(Compilation compilation, string typeName, string methodName) =>
         compilation.GetTypeByMetadataName(typeName)!.GetMembers(methodName).OfType<IMethodSymbol>().First();

@@ -5,12 +5,23 @@ using Microsoft.CodeAnalysis;
 
 /// <summary>
 /// Detects NUnit in a compilation. The framework lives in the assembly <c>nunit.framework</c> and marks
-/// its tests with <c>NUnit.Framework.TestAttribute</c>, <c>NUnit.Framework.TestCaseAttribute</c> or
-/// <c>NUnit.Framework.TestCaseSourceAttribute</c>.
+/// its tests with an attribute implementing <c>NUnit.Framework.Interfaces.ISimpleTestBuilder</c> or
+/// <c>NUnit.Framework.Interfaces.ITestBuilder</c> — <c>NUnit.Framework.TestAttribute</c> being the most
+/// prominent of them.
 /// </summary>
 /// <remarks>
-/// Unlike other frameworks, these three attributes are siblings rather than a base type and its
-/// derivations, so a recogniser has to accept any of them instead of walking a single base type.
+/// <para>
+/// Unlike other frameworks, NUnit has no single test attribute a recogniser could walk towards. Its test
+/// attributes are siblings under <c>NUnit.Framework.NUnitAttribute</c>, an attribute base type that says
+/// nothing about being a test — <c>SetUpAttribute</c> and <c>TestFixtureAttribute</c> derive from it just
+/// as <c>TestAttribute</c> does. What NUnit itself keys on is the pair of builder interfaces, so that is
+/// what the probe resolves and what <see cref="NUnitTestMethodRecognizer" /> matches.
+/// </para>
+/// <para>
+/// The well-known attribute types are still resolved, but only to decide whether NUnit is present at
+/// all. They are deliberately not the marker: the set of attributes implementing the builder interfaces
+/// is larger than any list of names would be.
+/// </para>
 /// </remarks>
 internal sealed class NUnitTestFrameworkProbe : ITestFrameworkProbe
 {
@@ -34,10 +45,24 @@ internal sealed class NUnitTestFrameworkProbe : ITestFrameworkProbe
     /// </summary>
     internal const string TestCaseSourceAttributeMetadataName = "NUnit.Framework.TestCaseSourceAttribute";
 
+    /// <summary>
+    /// The metadata name of the interface an attribute implements to build a single test from a method.
+    /// </summary>
+    internal const string SimpleTestBuilderInterfaceMetadataName = "NUnit.Framework.Interfaces.ISimpleTestBuilder";
+
+    /// <summary>
+    /// The metadata name of the interface an attribute implements to build one or more test cases from a
+    /// method.
+    /// </summary>
+    internal const string TestBuilderInterfaceMetadataName = "NUnit.Framework.Interfaces.ITestBuilder";
+
     private const string AssemblyPrefix = "nunit";
 
     /// <summary>
-    /// The metadata names of every attribute that marks a method as an NUnit test.
+    /// The metadata names of the well-known test attributes of the framework, whose presence establishes
+    /// that a compilation is an NUnit one. They are not the full set of attributes that mark a method as a
+    /// test — <c>TheoryAttribute</c> and the combining strategies do so as well — and are therefore never
+    /// used to judge a single method.
     /// </summary>
     internal static readonly ImmutableArray<string> TestAttributeMetadataNames =
     [
@@ -47,18 +72,23 @@ internal sealed class NUnitTestFrameworkProbe : ITestFrameworkProbe
     ];
 
     /// <summary>
-    /// The simple type names an attribute has to carry to be recognised by name. They are matched only
-    /// in combination with a declaring assembly that belongs to the framework.
+    /// The metadata names of the interfaces whose implementation makes an attribute mark a method as an
+    /// NUnit test.
     /// </summary>
-    /// <remarks>
-    /// <c>TestFixtureAttribute</c> is deliberately absent: it marks the class, never the method, and
-    /// must therefore never turn a method into a test.
-    /// </remarks>
-    internal static readonly ImmutableArray<string> TestAttributeTypeNames =
+    internal static readonly ImmutableArray<string> TestBuilderInterfaceMetadataNames =
     [
-        "TestAttribute",
-        "TestCaseAttribute",
-        "TestCaseSourceAttribute",
+        SimpleTestBuilderInterfaceMetadataName,
+        TestBuilderInterfaceMetadataName,
+    ];
+
+    /// <summary>
+    /// The simple type names an interface has to carry to be recognised by name. They are matched only in
+    /// combination with a declaring assembly that belongs to the framework.
+    /// </summary>
+    internal static readonly ImmutableArray<string> TestBuilderInterfaceTypeNames =
+    [
+        "ISimpleTestBuilder",
+        "ITestBuilder",
     ];
 
     /// <summary>
@@ -85,12 +115,28 @@ internal sealed class NUnitTestFrameworkProbe : ITestFrameworkProbe
             return null;
         }
 
-        return new NUnitTestMethodRecognizer(testAttributeTypes);
+        return new NUnitTestMethodRecognizer(GetTestBuilderInterfaceTypes(compilation));
     }
 
     /// <summary>
+    /// Resolves the NUnit test-builder interfaces of <paramref name="compilation" />, which is empty if
+    /// the compilation does not reference NUnit, and also for any name that is declared more than once and
+    /// therefore ambiguous.
+    /// </summary>
+    /// <param name="compilation">The compilation to resolve the types in.</param>
+    /// <returns>The resolved interface types, which may be empty.</returns>
+    internal static ImmutableArray<INamedTypeSymbol> GetTestBuilderInterfaceTypes(Compilation compilation) =>
+        TestBuilderInterfaceMetadataNames
+            .Select(compilation.GetTypeByMetadataName)
+            .Where(type => type is not null)
+            .Select(type => type!)
+            .ToImmutableArray();
+
+    /// <summary>
     /// Resolves the well-known NUnit test attribute types of <paramref name="compilation" />, which is
-    /// empty if the compilation does not reference NUnit.
+    /// empty if the compilation does not reference NUnit. They establish that NUnit is present; the
+    /// decision whether a single attribute marks a test is taken on the builder interfaces instead, by
+    /// <see cref="NUnitTestMethodRecognizer" />.
     /// </summary>
     /// <param name="compilation">The compilation to resolve the types in.</param>
     /// <returns>The resolved attribute types, which may be empty.</returns>

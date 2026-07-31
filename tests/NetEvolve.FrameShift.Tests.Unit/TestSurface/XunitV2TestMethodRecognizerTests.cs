@@ -40,9 +40,16 @@ public class XunitV2TestMethodRecognizerTests
         "Cases.FactTest|Cases.TheoryTest|Cases.DerivedAttributeTest|Cases.StaticTest|"
         + "Cases.GenericTest|Cases.PrivateTest|AbstractCases.AbstractTest|AbstractCases.InheritedTest";
 
+    /// <summary>
+    /// The fixture carries one method per marker version 2 has - <c>[Fact]</c>, <c>[Theory]</c> and an
+    /// attribute derived from <c>FactAttribute</c> - and one method per data-source attribute without any
+    /// marker. A data source derives from <c>Xunit.Sdk.DataAttribute</c> and never from
+    /// <c>FactAttribute</c>, so version 2 would not run those methods and they must not be recognised.
+    /// </summary>
     private const string XunitFixtureSource = """
         namespace Fixture;
 
+        using System.Collections.Generic;
         using Xunit;
 
         public sealed class ScenarioFactAttribute : FactAttribute
@@ -82,9 +89,30 @@ public class XunitV2TestMethodRecognizerTests
             {
             }
 
+            [InlineData(1)]
+            public void InlineDataOnlyMethod(int value)
+            {
+            }
+
+            [MemberData(nameof(Rows))]
+            public void MemberDataOnlyMethod(int value)
+            {
+            }
+
+            [ClassData(typeof(RowSource))]
+            public void ClassDataOnlyMethod(int value)
+            {
+            }
+
+            public static IEnumerable<object[]> Rows => new[] { new object[] { 1 } };
+
             public void PlainMethod()
             {
             }
+        }
+
+        public sealed class RowSource
+        {
         }
 
         public abstract class AbstractCases
@@ -179,6 +207,9 @@ public class XunitV2TestMethodRecognizerTests
     [Arguments("GenericTest", true)]
     [Arguments("PrivateTest", true)]
     [Arguments("PlainMethod", false)]
+    [Arguments("InlineDataOnlyMethod", false)]
+    [Arguments("MemberDataOnlyMethod", false)]
+    [Arguments("ClassDataOnlyMethod", false)]
     public async Task IsTestMethod_Method_IsClassifiedByItsAttributes(string methodName, bool expected)
     {
         var compilation = CreateXunitV2Fixture();
@@ -198,6 +229,26 @@ public class XunitV2TestMethodRecognizerTests
         var method = FindMethod(compilation, AbstractCasesTypeName, methodName);
 
         _ = await Assert.That(recognizer.IsTestMethod(method)).IsTrue();
+    }
+
+    /// <summary>
+    /// A data source marks no test on its own. <c>[InlineData]</c>, <c>[MemberData]</c> and
+    /// <c>[ClassData]</c> derive from <c>Xunit.Sdk.DataAttribute</c>, not from <c>FactAttribute</c>, and
+    /// version 2 requires <c>[Theory]</c> next to them; a recogniser accepting them would put methods on the
+    /// test surface that no test run ever executes.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_DataSourceAttributeWithoutAMarker_IsNotClassifiedAsATest()
+    {
+        var compilation = CreateXunitV2Fixture();
+        var recognizer = CreateRecognizer(compilation);
+        var dataOnly = new[] { "InlineDataOnlyMethod", "MemberDataOnlyMethod", "ClassDataOnlyMethod" };
+
+        var recognized = dataOnly
+            .Where(methodName => recognizer.IsTestMethod(FindMethod(compilation, CasesTypeName, methodName)))
+            .ToArray();
+
+        _ = await Assert.That(string.Join("|", recognized)).IsEqualTo(string.Empty);
     }
 
     /// <summary>
