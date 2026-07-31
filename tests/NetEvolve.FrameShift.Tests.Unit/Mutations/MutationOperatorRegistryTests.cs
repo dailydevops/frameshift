@@ -14,10 +14,10 @@ public class MutationOperatorRegistryTests
 {
     /// <summary>
     /// The number of operators the registry must expose: the fifteen expression operators, the six
-    /// operators of the culture sensitivity family and the four operators of the regular expression
+    /// operators of the culture sensitivity family and the eight operators of the regular expression
     /// pattern family.
     /// </summary>
-    private const int ExpectedOperatorCount = 25;
+    private const int ExpectedOperatorCount = 29;
 
     private static readonly string[] _expectedOperatorIds =
     [
@@ -41,7 +41,11 @@ public class MutationOperatorRegistryTests
         "numeric-literal",
         "regex.alternation",
         "regex.anchor",
+        "regex.backreference",
+        "regex.character-class",
+        "regex.escape",
         "regex.group",
+        "regex.lookaround",
         "regex.quantifier",
         "relational",
         "string-literal",
@@ -165,7 +169,9 @@ public class MutationOperatorRegistryTests
                 .IsEqualTo("culture.case-conversion, culture.format-provider");
             _ = await Assert
                 .That(Join(Sort(stringLiteralOperators.Select(item => item.Id))))
-                .IsEqualTo("regex.alternation, regex.anchor, regex.group, regex.quantifier, string-literal");
+                .IsEqualTo(
+                    "regex.alternation, regex.anchor, regex.backreference, regex.character-class, regex.escape, regex.group, regex.lookaround, regex.quantifier, string-literal"
+                );
         }
     }
 

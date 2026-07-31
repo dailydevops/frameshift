@@ -13,9 +13,12 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Drives the four operators of the regular expression pattern family - anchors, quantifiers, groups and
-/// alternation - through <see cref="MutationCoverageAnalyzer" /> end to end, so that a pattern mutation is
-/// proven to reach the build log of a consumer as an <c>FSH0001</c> instead of merely to be constructed.
+/// Drives the operators of the regular expression pattern family - anchors, quantifiers, groups and
+/// alternation, plus character classes, escapes, lookaround and backreferences - through
+/// <see cref="MutationCoverageAnalyzer" /> end to end, so that a pattern mutation is proven to reach the
+/// build log of a consumer as an <c>FSH0001</c> instead of merely to be constructed. The boundary between
+/// the classifier's quantifier shorthand equivalence and a merely similar-looking bound shift is proven
+/// end to end here too - the former is an <c>FSH0002</c>, the latter stays the <c>FSH0001</c> it is.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -244,6 +247,134 @@ public class RegexPatternMutationAnalysisTests
 
         _ = await Assert.That(PatternGaps(enabled)).IsEqualTo(PatternGaps(byDefault));
         _ = await Assert.That(OtherGaps(enabled)).IsEqualTo(OtherGaps(byDefault));
+    }
+
+    /// <summary>
+    /// The character-class shorthand swap of <c>RegexCharacterClassMutator</c> reaches the build log as an
+    /// <c>FSH0001</c> through the very same pipeline as the four structural operators above, proving the
+    /// operator is wired into the analyzer rather than merely constructed in isolation.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task Analyze_UntestedCharacterClassPattern_ReportsFSH0001ForTheShorthandSwap()
+    {
+        const string source = """
+            namespace Fixture;
+
+            using System.Text.RegularExpressions;
+
+            public static class CharacterClassPatterns
+            {
+                public static bool IsCovered(string value)
+                {
+                    return new Regex(@"\d").IsMatch(value);
+                }
+
+                public static bool IsUncovered(string value)
+                {
+                    return new Regex(@"\d").IsMatch(value);
+                }
+            }
+            """;
+        const string coveredId = "M:Fixture.CharacterClassPatterns.IsCovered(System.String)~System.Boolean";
+
+        var compilation = CompilationFactory.Create(source, ProductionAssemblyName);
+        var diagnostics = await RunAsync(compilation, [CreateManifest(coveredId)]).ConfigureAwait(false);
+        var messages = Summaries(diagnostics).Select(summary => summary.Message).ToArray();
+
+        _ = await Assert.That(Errors(compilation)).IsEmpty();
+        _ = await Assert
+            .That(messages.Any(message => message.Contains(@"pattern '\d' => '\D'", StringComparison.Ordinal)))
+            .IsTrue();
+    }
+
+    /// <summary>
+    /// The lookaround negation of <c>RegexLookaroundMutator</c> reaches the build log as an <c>FSH0001</c>
+    /// through the same pipeline, exactly like the character-class swap above.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task Analyze_UntestedLookaroundPattern_ReportsFSH0001ForTheNegation()
+    {
+        const string source = """
+            namespace Fixture;
+
+            using System.Text.RegularExpressions;
+
+            public static class LookaroundPatterns
+            {
+                public static bool IsCovered(string value)
+                {
+                    return new Regex("a(?=b)").IsMatch(value);
+                }
+
+                public static bool IsUncovered(string value)
+                {
+                    return new Regex("a(?=b)").IsMatch(value);
+                }
+            }
+            """;
+        const string coveredId = "M:Fixture.LookaroundPatterns.IsCovered(System.String)~System.Boolean";
+
+        var compilation = CompilationFactory.Create(source, ProductionAssemblyName);
+        var diagnostics = await RunAsync(compilation, [CreateManifest(coveredId)]).ConfigureAwait(false);
+        var messages = Summaries(diagnostics).Select(summary => summary.Message).ToArray();
+
+        _ = await Assert.That(Errors(compilation)).IsEmpty();
+        _ = await Assert
+            .That(messages.Any(message => message.Contains("pattern 'a(?=b)' => 'a(?!b)'", StringComparison.Ordinal)))
+            .IsTrue();
+    }
+
+    /// <summary>
+    /// A bound shift is never the shorthand equivalence the classifier recognises: shifting <c>{0,1}</c>
+    /// up to <c>{1,1}</c> narrows the accepted count from "zero or one" to "exactly one", which is an
+    /// observable change under the real regular expression engine - the empty string matches the
+    /// former and not the latter - so the classifier must decline to call it trivial and the mutant must
+    /// surface as the <c>FSH0001</c> gap it actually is, even though its reason text superficially
+    /// resembles the exact-one shorthand reason.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task Analyze_QuantifierBoundShiftToExactOne_ReportsFSH0001NotFSH0002()
+    {
+        const string source = """
+            namespace Fixture;
+
+            using System.Text.RegularExpressions;
+
+            public static class QuantifierShorthandPatterns
+            {
+                public static bool IsCovered(string value)
+                {
+                    return value.Length > 0;
+                }
+
+                public static bool IsUncovered(string value)
+                {
+                    return new Regex("a{0,1}").IsMatch(value);
+                }
+            }
+            """;
+        const string coveredId = "M:Fixture.QuantifierShorthandPatterns.IsCovered(System.String)~System.Boolean";
+        const string mutation = "pattern 'a{0,1}' => 'a{1,1}'";
+
+        var compilation = CompilationFactory.Create(source, ProductionAssemblyName);
+        var diagnostics = await RunAsync(compilation, [CreateManifest(coveredId)]).ConfigureAwait(false);
+
+        var gapMessages = Summaries(diagnostics).Select(summary => summary.Message).ToArray();
+        var trivialMessages = DiagnosticAssertions
+            .Summarise(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.TrivialMutant))
+            .Select(summary => summary.Message)
+            .ToArray();
+
+        _ = await Assert.That(Errors(compilation)).IsEmpty();
+        _ = await Assert
+            .That(gapMessages.Any(message => message.Contains(mutation, StringComparison.Ordinal)))
+            .IsTrue();
+        _ = await Assert
+            .That(trivialMessages.Any(message => message.Contains(mutation, StringComparison.Ordinal)))
+            .IsFalse();
     }
 
     private static Task<ImmutableArray<Diagnostic>> RunAsync(

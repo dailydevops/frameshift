@@ -149,7 +149,11 @@ internal sealed class FrameShiftOptions
             MutationKind.RegexAnchor
             or MutationKind.RegexQuantifier
             or MutationKind.RegexGroup
-            or MutationKind.RegexAlternation => EnableRegexPatternMutations,
+            or MutationKind.RegexAlternation
+            or MutationKind.RegexCharacterClass
+            or MutationKind.RegexEscape
+            or MutationKind.RegexLookaround
+            or MutationKind.RegexBackreference => EnableRegexPatternMutations,
             _ => true,
         };
 
