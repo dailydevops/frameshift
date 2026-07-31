@@ -3,7 +3,7 @@
   sources: [
     /*
 frameshift-test-surface/1
-T M:Tests.BoxTests.Box_ExercisesTheAwkwardMembers
+T M:Tests.BoxTests.Box_ExercisesTheAwkwardMembers 1
 R M:Fixture.Box`1.#ctor
 R M:Fixture.Box`1.Convert``1(`0,``0)~``0
 R M:Fixture.Box`1.Nested.#ctor
