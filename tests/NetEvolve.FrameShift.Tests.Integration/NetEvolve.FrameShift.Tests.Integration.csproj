@@ -15,6 +15,13 @@
       compile; on net6.0 and later the package deliberately contributes nothing, so there is no ambiguity.
     -->
     <PolyArgumentExceptions>true</PolyArgumentExceptions>
+    <!--
+      Stated explicitly rather than relied upon: the analyzer grants `InternalsVisibleTo` to both test
+      assemblies, so public polyfill types would leak across that boundary and collide with the type
+      forwards of the framework they polyfill. If such a collision ever reappears, the next step is
+      `PolyUseEmbeddedAttribute`, which gives every project its own embedded copy.
+    -->
+    <PolyPublic>false</PolyPublic>
   </PropertyGroup>
   <PropertyGroup Label="xUnit v3 availability">
     <!--
