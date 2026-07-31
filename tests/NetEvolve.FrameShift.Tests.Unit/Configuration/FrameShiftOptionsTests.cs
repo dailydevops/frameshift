@@ -20,7 +20,8 @@ public class FrameShiftOptionsTests
     /// <c>MutationKind.RegexOptions</c> is deliberately not among them: it belongs to the culture
     /// sensitivity family.
     /// </summary>
-    private const string PatternKindNames = "RegexAlternation, RegexAnchor, RegexGroup, RegexQuantifier";
+    private const string PatternKindNames =
+        "RegexAlternation, RegexAnchor, RegexBackreference, RegexCharacterClass, RegexEscape, RegexGroup, RegexLookaround, RegexQuantifier";
 
     private static string DocumentedDefaults =>
         Describe(
