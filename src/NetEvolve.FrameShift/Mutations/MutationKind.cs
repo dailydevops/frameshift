@@ -26,7 +26,8 @@ internal enum MutationKind
     EqualityOperator,
 
     /// <summary>
-    /// Logical and conditional operators, such as <c>&amp;&amp;</c>, <c>||</c>, <c>&amp;</c> and <c>|</c>.
+    /// Logical and conditional operators, such as <c>&amp;&amp;</c>, <c>||</c>, <c>&amp;</c>, <c>|</c> and
+    /// boolean <c>^</c>.
     /// </summary>
     LogicalOperator,
 

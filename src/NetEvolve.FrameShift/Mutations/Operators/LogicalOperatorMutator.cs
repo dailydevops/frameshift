@@ -7,7 +7,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Mutates <c>&amp;&amp;</c> into <c>||</c> and back, as well as <c>&amp;</c> into <c>|</c> and back
-/// whenever both operands are boolean. Bitwise expressions over integral operands are left to the
+/// whenever both operands are boolean, and rewrites boolean <c>^</c> into <c>==</c> (its logical
+/// negation). Bitwise expressions over integral operands, including <c>^</c>, are left to the
 /// bitwise mutation operator.
 /// </summary>
 internal sealed class LogicalOperatorMutator : MutationOperatorBase
@@ -18,6 +19,7 @@ internal sealed class LogicalOperatorMutator : MutationOperatorBase
         SyntaxKind.LogicalOrExpression,
         SyntaxKind.BitwiseAndExpression,
         SyntaxKind.BitwiseOrExpression,
+        SyntaxKind.ExclusiveOrExpression,
     ];
 
     /// <summary>
@@ -43,6 +45,12 @@ internal sealed class LogicalOperatorMutator : MutationOperatorBase
         cancellationToken.ThrowIfCancellationRequested();
 
         var originalKind = binary.Kind();
+
+        if (originalKind == SyntaxKind.ExclusiveOrExpression)
+        {
+            return CreateExclusiveOrMutations(binary, semanticModel, cancellationToken);
+        }
+
         var isBitwise = originalKind is SyntaxKind.BitwiseAndExpression or SyntaxKind.BitwiseOrExpression;
 
         if (isBitwise && !HasBooleanOperands(binary, semanticModel, cancellationToken))
@@ -78,6 +86,31 @@ internal sealed class LogicalOperatorMutator : MutationOperatorBase
                 $"{GetText(originalKind)} => {GetText(targetKind)}"
             ),
         ];
+    }
+
+    private IEnumerable<Mutation> CreateExclusiveOrMutations(
+        BinaryExpressionSyntax binary,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!HasBooleanOperands(binary, semanticModel, cancellationToken))
+        {
+            return [];
+        }
+
+        var replacement = SyntaxFactory.BinaryExpression(
+            SyntaxKind.EqualsExpression,
+            binary.Left,
+            SyntaxFactory.Token(
+                binary.OperatorToken.LeadingTrivia,
+                SyntaxKind.EqualsEqualsToken,
+                binary.OperatorToken.TrailingTrivia
+            ),
+            binary.Right
+        );
+
+        return [CreateMutation(binary, replacement, "boolean-xor-to-equals", "^ => ==")];
     }
 
     private static bool HasBooleanOperands(
