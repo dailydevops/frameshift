@@ -76,11 +76,14 @@ public class BooleanLiteralMutatorTests
         var mutator = new BooleanLiteralMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("boolean-literal");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.BooleanLiteral);
-        _ = await Assert.That(supported).Count().IsEqualTo(2);
-        _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
-        _ = await Assert.That(supported).Contains(SyntaxKind.FalseLiteralExpression);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("boolean-literal");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.BooleanLiteral);
+            _ = await Assert.That(supported).Count().IsEqualTo(2);
+            _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
+            _ = await Assert.That(supported).Contains(SyntaxKind.FalseLiteralExpression);
+        }
     }
 
     [Test]
@@ -88,12 +91,15 @@ public class BooleanLiteralMutatorTests
     {
         var (tree, mutations) = Run(TrueSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.BooleanLiteral);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("true => false");
-        _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(FalseSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.BooleanLiteral);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("true => false");
+            _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(FalseSource);
+        }
     }
 
     [Test]
@@ -101,11 +107,14 @@ public class BooleanLiteralMutatorTests
     {
         var (tree, mutations) = Run(FalseSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.false-to-true");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("false => true");
-        _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(TrueSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.false-to-true");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("false => true");
+            _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(TrueSource);
+        }
     }
 
     [Test]
@@ -113,8 +122,11 @@ public class BooleanLiteralMutatorTests
     {
         var (_, mutations) = Run(InstanceFieldSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+        }
     }
 
     /// <summary>
@@ -127,9 +139,12 @@ public class BooleanLiteralMutatorTests
         var expected = LocalDeclarationSource.Replace("= true", "= false", StringComparison.Ordinal);
         var (tree, mutations) = Run(LocalDeclarationSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -252,9 +267,12 @@ public class BooleanLiteralMutatorTests
 
         var mutations = mutator.CreateMutations(literal, semanticModel, CancellationToken.None).ToArray();
 
-        _ = await Assert.That(literal.Parent).IsNull();
-        _ = await Assert.That(mutations.Length).IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Parent).IsNull();
+            _ = await Assert.That(mutations.Length).IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("boolean-literal.true-to-false");
+        }
     }
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindBooleanLiteral);

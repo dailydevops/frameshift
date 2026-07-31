@@ -81,10 +81,13 @@ public class NullCoalescingMutatorTests
         var mutator = new NullCoalescingMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("null-coalescing");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullCoalescing);
-        _ = await Assert.That(supported).Count().IsEqualTo(1);
-        _ = await Assert.That(supported).Contains(SyntaxKind.CoalesceExpression);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("null-coalescing");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullCoalescing);
+            _ = await Assert.That(supported).Count().IsEqualTo(1);
+            _ = await Assert.That(supported).Contains(SyntaxKind.CoalesceExpression);
+        }
     }
 
     [Test]
@@ -92,18 +95,21 @@ public class NullCoalescingMutatorTests
     {
         var (tree, mutations) = Run(ReferenceSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.NullCoalescing);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("a ?? b => a");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("a ?? b => b");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public string Get(string? a, string b) => a; }");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[1]))
-            .IsEqualTo("public class Sample { public string Get(string? a, string b) => b; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.NullCoalescing);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("a ?? b => a");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("a ?? b => b");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public string Get(string? a, string b) => a; }");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[1]))
+                .IsEqualTo("public class Sample { public string Get(string? a, string b) => b; }");
+        }
     }
 
     [Test]
@@ -111,11 +117,14 @@ public class NullCoalescingMutatorTests
     {
         var (tree, mutations) = Run(ThrowSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public string Get(string? a) => a; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public string Get(string? a) => a; }");
+        }
     }
 
     [Test]
@@ -123,11 +132,14 @@ public class NullCoalescingMutatorTests
     {
         var (tree, mutations) = Run(NullableValueSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-right");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public int Get(int? a) => 0; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-right");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get(int? a) => 0; }");
+        }
     }
 
     [Test]
@@ -152,9 +164,12 @@ public class NullCoalescingMutatorTests
         var (tree, mutations) = Run(ReferenceSource);
         var coalesce = FindCoalesce(tree);
 
-        _ = await Assert.That(mutations[0].Original.ToString()).IsEqualTo("a ?? b");
-        _ = await Assert.That(mutations[0].Original.Span).IsEqualTo(coalesce.Span);
-        _ = await Assert.That(mutations[0].Location.SourceSpan).IsEqualTo(coalesce.Span);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations[0].Original.ToString()).IsEqualTo("a ?? b");
+            _ = await Assert.That(mutations[0].Original.Span).IsEqualTo(coalesce.Span);
+            _ = await Assert.That(mutations[0].Location.SourceSpan).IsEqualTo(coalesce.Span);
+        }
     }
 
     /// <summary>
@@ -168,10 +183,13 @@ public class NullCoalescingMutatorTests
         var coalesce = (BinaryExpressionSyntax)FindCoalesce(tree);
         var targetType = semanticModel.GetTypeInfo(coalesce).ConvertedType;
 
-        _ = await Assert.That(targetType is null || targetType.TypeKind == TypeKind.Error).IsTrue();
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(targetType is null || targetType.TypeKind == TypeKind.Error).IsTrue();
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
+        }
     }
 
     /// <summary>
@@ -184,10 +202,13 @@ public class NullCoalescingMutatorTests
         var coalesce = (BinaryExpressionSyntax)FindCoalesce(tree);
         var targetType = semanticModel.GetTypeInfo(coalesce).ConvertedType!;
 
-        _ = await Assert.That(targetType.Name).IsEqualTo("Euro");
-        _ = await Assert.That(semanticModel.ClassifyConversion(coalesce.Left, targetType).Exists).IsFalse();
-        _ = await Assert.That(semanticModel.ClassifyConversion(coalesce.Right, targetType).Exists).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(targetType.Name).IsEqualTo("Euro");
+            _ = await Assert.That(semanticModel.ClassifyConversion(coalesce.Left, targetType).Exists).IsFalse();
+            _ = await Assert.That(semanticModel.ClassifyConversion(coalesce.Right, targetType).Exists).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -199,15 +220,18 @@ public class NullCoalescingMutatorTests
     {
         var (tree, mutations) = Run(NonNullableValueLeftSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo(NonNullableValueLeftSource.Replace("a ?? b", "a", StringComparison.Ordinal));
-        _ = await Assert
-            .That(Rewrite(tree, mutations[1]))
-            .IsEqualTo(NonNullableValueLeftSource.Replace("a ?? b", "b", StringComparison.Ordinal));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.keep-left");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("null-coalescing.keep-right");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo(NonNullableValueLeftSource.Replace("a ?? b", "a", StringComparison.Ordinal));
+            _ = await Assert
+                .That(Rewrite(tree, mutations[1]))
+                .IsEqualTo(NonNullableValueLeftSource.Replace("a ?? b", "b", StringComparison.Ordinal));
+        }
     }
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindCoalesce);

@@ -21,8 +21,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.Exact(value);
 
-        _ = await Assert.That(count.Value).IsEqualTo(value);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(value);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]
@@ -34,8 +37,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.AtLeast(value);
 
-        _ = await Assert.That(count.Value).IsEqualTo(value);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(value);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     [Test]
@@ -67,9 +73,12 @@ public class TestCaseCountTests
     {
         var count = default(TestCaseCount);
 
-        _ = await Assert.That(count.Value).IsEqualTo(0);
-        _ = await Assert.That(count.IsExact).IsFalse();
-        _ = await Assert.That(count.ToString()).IsEqualTo("0+");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(0);
+            _ = await Assert.That(count.IsExact).IsFalse();
+            _ = await Assert.That(count.ToString()).IsEqualTo("0+");
+        }
     }
 
     [Test]
@@ -77,8 +86,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.Exact(2).Add(TestCaseCount.Exact(3));
 
-        _ = await Assert.That(count.Value).IsEqualTo(5);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(5);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]
@@ -86,8 +98,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.Exact(2).Add(TestCaseCount.AtLeast(3));
 
-        _ = await Assert.That(count.Value).IsEqualTo(5);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(5);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     [Test]
@@ -95,8 +110,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.AtLeast(2).Add(TestCaseCount.Exact(3));
 
-        _ = await Assert.That(count.Value).IsEqualTo(5);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(5);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     [Test]
@@ -104,8 +122,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.AtLeast(2).Add(TestCaseCount.AtLeast(3));
 
-        _ = await Assert.That(count.Value).IsEqualTo(5);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(5);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -117,8 +138,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.Exact(int.MaxValue).Add(TestCaseCount.Exact(2));
 
-        _ = await Assert.That(count.Value).IsEqualTo(int.MaxValue);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(int.MaxValue);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]
@@ -147,9 +171,12 @@ public class TestCaseCountTests
     {
         var parsed = TestCaseCount.TryParse(text, out var count);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]
@@ -161,9 +188,12 @@ public class TestCaseCountTests
     {
         var parsed = TestCaseCount.TryParse(text, out var count);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -194,8 +224,11 @@ public class TestCaseCountTests
     {
         var parsed = TestCaseCount.TryParse(text, out var count);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(count).IsEqualTo(default(TestCaseCount));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(count).IsEqualTo(default(TestCaseCount));
+        }
     }
 
     [Test]
@@ -203,8 +236,11 @@ public class TestCaseCountTests
     {
         var parsed = TestCaseCount.TryParse(null, out var count);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(count).IsEqualTo(default(TestCaseCount));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(count).IsEqualTo(default(TestCaseCount));
+        }
     }
 
     [Test]
@@ -218,8 +254,11 @@ public class TestCaseCountTests
     {
         var parsed = TestCaseCount.TryParse(text, out var count);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(count.ToString()).IsEqualTo(text);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(count.ToString()).IsEqualTo(text);
+        }
     }
 
     [Test]
@@ -228,10 +267,13 @@ public class TestCaseCountTests
         var left = TestCaseCount.Exact(3);
         var right = TestCaseCount.Exact(3);
 
-        _ = await Assert.That(left.Equals(right)).IsTrue();
-        _ = await Assert.That(left == right).IsTrue();
-        _ = await Assert.That(left != right).IsFalse();
-        _ = await Assert.That(left.GetHashCode()).IsEqualTo(right.GetHashCode());
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(left.Equals(right)).IsTrue();
+            _ = await Assert.That(left == right).IsTrue();
+            _ = await Assert.That(left != right).IsFalse();
+            _ = await Assert.That(left.GetHashCode()).IsEqualTo(right.GetHashCode());
+        }
     }
 
     /// <summary>
@@ -244,18 +286,24 @@ public class TestCaseCountTests
         var exact = TestCaseCount.Exact(3);
         var lowerBound = TestCaseCount.AtLeast(3);
 
-        _ = await Assert.That(exact.Equals(lowerBound)).IsFalse();
-        _ = await Assert.That(exact == lowerBound).IsFalse();
-        _ = await Assert.That(exact != lowerBound).IsTrue();
-        _ = await Assert.That(exact.GetHashCode()).IsNotEqualTo(lowerBound.GetHashCode());
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exact.Equals(lowerBound)).IsFalse();
+            _ = await Assert.That(exact == lowerBound).IsFalse();
+            _ = await Assert.That(exact != lowerBound).IsTrue();
+            _ = await Assert.That(exact.GetHashCode()).IsNotEqualTo(lowerBound.GetHashCode());
+        }
     }
 
     [Test]
     public async Task Equals_DifferentValue_AreNotEqual()
     {
-        _ = await Assert.That(TestCaseCount.Exact(3).Equals(TestCaseCount.Exact(4))).IsFalse();
-        _ = await Assert.That(TestCaseCount.Exact(3) == TestCaseCount.Exact(4)).IsFalse();
-        _ = await Assert.That(TestCaseCount.Exact(3) != TestCaseCount.Exact(4)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TestCaseCount.Exact(3).Equals(TestCaseCount.Exact(4))).IsFalse();
+            _ = await Assert.That(TestCaseCount.Exact(3) == TestCaseCount.Exact(4)).IsFalse();
+            _ = await Assert.That(TestCaseCount.Exact(3) != TestCaseCount.Exact(4)).IsTrue();
+        }
     }
 
     [Test]
@@ -263,8 +311,11 @@ public class TestCaseCountTests
     {
         var count = TestCaseCount.Exact(3);
 
-        _ = await Assert.That(count.Equals("3")).IsFalse();
-        _ = await Assert.That(count.Equals(null)).IsFalse();
-        _ = await Assert.That(count.Equals((object)TestCaseCount.Exact(3))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Equals("3")).IsFalse();
+            _ = await Assert.That(count.Equals(null)).IsFalse();
+            _ = await Assert.That(count.Equals((object)TestCaseCount.Exact(3))).IsTrue();
+        }
     }
 }

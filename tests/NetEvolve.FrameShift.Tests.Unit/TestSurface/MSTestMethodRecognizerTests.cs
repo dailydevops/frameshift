@@ -453,8 +453,11 @@ public class MSTestMethodRecognizerTests
         var compilation = CreateSatelliteConsumer(FrameworkAssemblyName);
         var recognizer = new MSTestTestMethodRecognizer(null);
 
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     /// <summary>
@@ -489,8 +492,13 @@ public class MSTestMethodRecognizerTests
         var compilation = CreateSatelliteConsumer(SatelliteDerivedConsumerSource, satelliteAssemblyName);
         var recognizer = new MSTestTestMethodRecognizer(null);
 
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsEqualTo(expected);
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName)))
+                .IsEqualTo(expected);
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     /// <summary>
@@ -573,8 +581,11 @@ public class MSTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -598,8 +609,11 @@ public class MSTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -643,8 +657,11 @@ public class MSTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]

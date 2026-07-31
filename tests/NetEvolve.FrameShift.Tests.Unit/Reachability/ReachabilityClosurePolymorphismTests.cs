@@ -428,9 +428,16 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Renderer", "Render"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Render"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Decorate"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Renderer", "Render"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Render")))
+                .IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Decorate")))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -441,8 +448,11 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Shadowed", "Render"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Shadowed", "Hidden"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Shadowed", "Render"))).IsFalse();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Shadowed", "Hidden"))).IsFalse();
+        }
     }
 
     [Test]
@@ -464,13 +474,16 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Untouched", "Idle"))).IsFalse();
-        _ = await Assert
-            .That(reachable.Contains(Member(compilation, "Production.UntouchedOverride", "Idle")))
-            .IsFalse();
-        _ = await Assert
-            .That(reachable.Contains(Member(compilation, "Production.UntouchedOverride", "Never")))
-            .IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Untouched", "Idle"))).IsFalse();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.UntouchedOverride", "Idle")))
+                .IsFalse();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.UntouchedOverride", "Never")))
+                .IsFalse();
+        }
     }
 
     [Test]
@@ -481,10 +494,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LayerBase", "Describe"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.MiddleLayer", "Describe"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Describe"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Detail"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LayerBase", "Describe"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.MiddleLayer", "Describe")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Describe"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Detail"))).IsTrue();
+        }
     }
 
     [Test]
@@ -495,9 +513,16 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.MiddleLayer", "Describe"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Describe"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LayerBase", "Describe"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.MiddleLayer", "Describe")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.LeafLayer", "Describe"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.LayerBase", "Describe")))
+                .IsFalse();
+        }
     }
 
     [Test]
@@ -508,9 +533,12 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.SettingsBase", "Name"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Name"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Compose"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.SettingsBase", "Name"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Name"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Compose"))).IsTrue();
+        }
     }
 
     [Test]
@@ -521,9 +549,14 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.SettingsBase", "Changed"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Changed"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Track"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.SettingsBase", "Changed")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Changed"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Track"))).IsTrue();
+        }
     }
 
     [Test]
@@ -534,8 +567,11 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Name"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Compose"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Name"))).IsFalse();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Settings", "Compose"))).IsFalse();
+        }
     }
 
     [Test]
@@ -546,10 +582,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.AlwaysValid", "IsValid"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.AlwaysValid", "Accept"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.NeverValid", "IsValid"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.NeverValid", "Reject"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.AlwaysValid", "IsValid")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.AlwaysValid", "Accept"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.NeverValid", "IsValid"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.NeverValid", "Reject"))).IsTrue();
+        }
     }
 
     [Test]
@@ -560,9 +601,12 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.TerminalBase", "Stop"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Terminal", "Stop"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Terminal", "Cleanup"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.TerminalBase", "Stop"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Terminal", "Stop"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Terminal", "Cleanup"))).IsTrue();
+        }
     }
 
     [Test]
@@ -573,11 +617,20 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IHandler", "Handle"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Handle"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Log"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Handle"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ExplicitHandler", "Trace"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IHandler", "Handle"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Handle")))
+                .IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Log")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Handle"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ExplicitHandler", "Trace")))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -588,9 +641,14 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IHandler", "Reset"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Reset"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Reset"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IHandler", "Reset"))).IsFalse();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Reset")))
+                .IsFalse();
+            _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Reset"))).IsFalse();
+        }
     }
 
     [Test]
@@ -601,9 +659,14 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IStarter", "Start"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StarterBase", "Start"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StarterBase", "Prepare"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IStarter", "Start"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StarterBase", "Start"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.StarterBase", "Prepare")))
+                .IsTrue();
+        }
     }
 
 #if !NETFRAMEWORK
@@ -615,10 +678,13 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IPinger", "Ping"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IPinger", "Pong"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Pong"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Track"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IPinger", "Ping"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IPinger", "Pong"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Pong"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Track"))).IsTrue();
+        }
     }
 #endif
 
@@ -630,9 +696,16 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IRepository`1", "Get"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StringRepository", "Get"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StringRepository", "Load"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.IRepository`1", "Get"))).IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.StringRepository", "Get")))
+                .IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.StringRepository", "Load")))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -643,8 +716,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Int32Repository", "Get"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Int32Repository", "Count"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.Int32Repository", "Get")))
+                .IsFalse();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.Int32Repository", "Count")))
+                .IsFalse();
+        }
     }
 
     [Test]
@@ -655,9 +735,12 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.MapperBase", "Map"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Mapper", "Map"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Mapper", "Create"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.MapperBase", "Map"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Mapper", "Map"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Mapper", "Create"))).IsTrue();
+        }
     }
 
     [Test]
@@ -696,10 +779,13 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert
-            .That(reachable.Contains(Member(compilation, "Production.TypeReferences", "ArrayType")))
-            .IsTrue();
-        _ = await Assert.That(reachable.Count).IsEqualTo(1);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.TypeReferences", "ArrayType")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Count).IsEqualTo(1);
+        }
     }
 
     /// <summary>
@@ -714,9 +800,18 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ExternalConsumer", "Use"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "External.ExternalWorkerBase", "Work"))).IsFalse();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "External.IExternalWorker", "Work"))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ExternalConsumer", "Use")))
+                .IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "External.ExternalWorkerBase", "Work")))
+                .IsFalse();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "External.IExternalWorker", "Work")))
+                .IsFalse();
+        }
     }
 
     /// <summary>
@@ -733,8 +828,13 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Handle"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Handle"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.ImplicitHandler", "Handle")))
+                .IsTrue();
+            _ = await Assert.That(reachable.Contains(ExplicitImplementation(compilation, "Handle"))).IsTrue();
+        }
     }
 
     /// <summary>
@@ -749,8 +849,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Render"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Decorate"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Render")))
+                .IsTrue();
+            _ = await Assert
+                .That(reachable.Contains(Member(compilation, "Production.HtmlRenderer", "Decorate")))
+                .IsTrue();
+        }
     }
 
     private static CSharpCompilation CreateExternalConsumerCompilation() =>
@@ -794,12 +901,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Describe")))
-            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.MiddleLayer", "Describe")))
-            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Describe")))
+                .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.MiddleLayer", "Describe")))
+                .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        }
     }
 
     /// <summary>
@@ -817,12 +927,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.LayerBase", "Describe")))
-            .IsEqualTo(BaseTestId);
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Detail")))
-            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.LayerBase", "Describe")))
+                .IsEqualTo(BaseTestId);
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Detail")))
+                .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        }
     }
 
     /// <summary>
@@ -837,13 +950,18 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Handle")))
-            .IsEqualTo(BaseTestId);
-        _ = await Assert.That(Describe(reachable, ExplicitImplementation(compilation, "Handle"))).IsEqualTo(BaseTestId);
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Log")))
-            .IsEqualTo(BaseTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Handle")))
+                .IsEqualTo(BaseTestId);
+            _ = await Assert
+                .That(Describe(reachable, ExplicitImplementation(compilation, "Handle")))
+                .IsEqualTo(BaseTestId);
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Log")))
+                .IsEqualTo(BaseTestId);
+        }
     }
 
     [Test]
@@ -857,12 +975,15 @@ public class ReachabilityClosurePolymorphismTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.AlwaysValid", "Accept")))
-            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
-        _ = await Assert
-            .That(Describe(reachable, Member(compilation, "Production.NeverValid", "Reject")))
-            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.AlwaysValid", "Accept")))
+                .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+            _ = await Assert
+                .That(Describe(reachable, Member(compilation, "Production.NeverValid", "Reject")))
+                .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        }
     }
 
     private static TestSurfaceManifest Manifest(params string[] referencedMemberIds) =>

@@ -179,9 +179,12 @@ public class ReachabilityClosureTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "A"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "B"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "C"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "A"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "B"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "C"))).IsTrue();
+        }
     }
 
     [Test]
@@ -195,8 +198,11 @@ public class ReachabilityClosureTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "D"))).IsFalse();
-        _ = await Assert.That(reachable.Count).IsEqualTo(3);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "D"))).IsFalse();
+            _ = await Assert.That(reachable.Count).IsEqualTo(3);
+        }
     }
 
     [Test]
@@ -218,8 +224,11 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "A"))).IsTrue();
-        _ = await Assert.That(reachable.Count).IsEqualTo(3);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "A"))).IsTrue();
+            _ = await Assert.That(reachable.Count).IsEqualTo(3);
+        }
     }
 
     [Test]
@@ -229,8 +238,11 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.Compute(compilation, TestSurfaceManifest.Empty, CancellationToken.None);
 
-        _ = await Assert.That(reachable.IsEmpty).IsTrue();
-        _ = await Assert.That(reachable.Count).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.IsEmpty).IsTrue();
+            _ = await Assert.That(reachable.Count).IsEqualTo(0);
+        }
     }
 
     [Test]
@@ -244,9 +256,12 @@ public class ReachabilityClosureTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Cycle", "First"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Cycle", "Second"))).IsTrue();
-        _ = await Assert.That(reachable.Count).IsEqualTo(2);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Cycle", "First"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Cycle", "Second"))).IsTrue();
+            _ = await Assert.That(reachable.Count).IsEqualTo(2);
+        }
     }
 
     [Test]
@@ -257,8 +272,11 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.IGreeter", "Greet"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Greeter", "Greet"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.IGreeter", "Greet"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Greeter", "Greet"))).IsTrue();
+        }
     }
 
     [Test]
@@ -269,8 +287,11 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.Compute(compilation, manifest, CancellationToken.None);
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.ShapeBase", "Area"))).IsTrue();
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Square", "Area"))).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.ShapeBase", "Area"))).IsTrue();
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Square", "Area"))).IsTrue();
+        }
     }
 
     [Test]
@@ -292,8 +313,11 @@ public class ReachabilityClosureTests
         var lambdaSymbol = semanticModel.GetSymbolInfo(lambda).Symbol!;
         var reachable = new ReachableSymbolSet([Method(compilation, "Production.Enclosing", "WithLambda")]);
 
-        _ = await Assert.That(reachable.Contains(lambdaSymbol)).IsFalse();
-        _ = await Assert.That(reachable.ContainsEnclosing(lambdaSymbol)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(lambdaSymbol)).IsFalse();
+            _ = await Assert.That(reachable.ContainsEnclosing(lambdaSymbol)).IsTrue();
+        }
     }
 
     [Test]
@@ -304,8 +328,11 @@ public class ReachabilityClosureTests
         var localFunctionSymbol = semanticModel.GetDeclaredSymbol(localFunction)!;
         var reachable = new ReachableSymbolSet([Method(compilation, "Production.Enclosing", "WithLocalFunction")]);
 
-        _ = await Assert.That(reachable.Contains(localFunctionSymbol)).IsFalse();
-        _ = await Assert.That(reachable.ContainsEnclosing(localFunctionSymbol)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(localFunctionSymbol)).IsFalse();
+            _ = await Assert.That(reachable.ContainsEnclosing(localFunctionSymbol)).IsTrue();
+        }
     }
 
     [Test]
@@ -373,9 +400,18 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert.That(Describe(reachable, Method(compilation, "Production.Chain", "A"))).IsEqualTo(LeftTestId);
-        _ = await Assert.That(Describe(reachable, Method(compilation, "Production.Chain", "B"))).IsEqualTo(LeftTestId);
-        _ = await Assert.That(Describe(reachable, Method(compilation, "Production.Chain", "C"))).IsEqualTo(LeftTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "A")))
+                .IsEqualTo(LeftTestId);
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "B")))
+                .IsEqualTo(LeftTestId);
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "C")))
+                .IsEqualTo(LeftTestId);
+        }
     }
 
     [Test]
@@ -405,12 +441,15 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Diamond", "Shared")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Diamond", "Deep")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Diamond", "Shared")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Diamond", "Deep")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        }
     }
 
     [Test]
@@ -424,12 +463,15 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Diamond", "ThroughLeft")))
-            .IsEqualTo(LeftTestId);
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Diamond", "ThroughRight")))
-            .IsEqualTo(RightTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Diamond", "ThroughLeft")))
+                .IsEqualTo(LeftTestId);
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Diamond", "ThroughRight")))
+                .IsEqualTo(RightTestId);
+        }
     }
 
     /// <summary>
@@ -448,12 +490,15 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Lengths", "Target")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Lengths", "Tail")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Lengths", "Target")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Lengths", "Tail")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        }
     }
 
     [Test]
@@ -464,12 +509,15 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Chain", "A")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Chain", "C")))
-            .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "A")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "C")))
+                .IsEqualTo($"{LeftTestId}, {RightTestId}");
+        }
     }
 
     [Test]
@@ -480,12 +528,15 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Cycle", "First")))
-            .IsEqualTo(LeftTestId);
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Cycle", "Second")))
-            .IsEqualTo(LeftTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Cycle", "First")))
+                .IsEqualTo(LeftTestId);
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Cycle", "Second")))
+                .IsEqualTo(LeftTestId);
+        }
     }
 
     [Test]
@@ -510,8 +561,11 @@ public class ReachabilityClosureTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(reachable.IsEmpty).IsTrue();
-        _ = await Assert.That(reachable.Count).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.IsEmpty).IsTrue();
+            _ = await Assert.That(reachable.Count).IsEqualTo(0);
+        }
     }
 
     [Test]
@@ -569,8 +623,13 @@ public class ReachabilityClosureTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "C"))).IsTrue();
-        _ = await Assert.That(Describe(reachable, Method(compilation, "Production.Chain", "C"))).IsEqualTo(NoTestIds);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachable.Contains(Method(compilation, "Production.Chain", "C"))).IsTrue();
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Chain", "C")))
+                .IsEqualTo(NoTestIds);
+        }
     }
 
     [Test]
@@ -605,10 +664,13 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert
-            .That(Describe(reachable, Method(compilation, "Production.Enclosing", "WithLambda")))
-            .IsEqualTo(LeftTestId);
-        _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(lambdaSymbol))).IsEqualTo(LeftTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(reachable, Method(compilation, "Production.Enclosing", "WithLambda")))
+                .IsEqualTo(LeftTestId);
+            _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(lambdaSymbol))).IsEqualTo(LeftTestId);
+        }
     }
 
     [Test]
@@ -639,8 +701,11 @@ public class ReachabilityClosureTests
 
         var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
 
-        _ = await Assert.That(Describe(reachable, localFunctionSymbol)).IsEqualTo(LeftTestId);
-        _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(localFunctionSymbol))).IsEqualTo(LeftTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(reachable, localFunctionSymbol)).IsEqualTo(LeftTestId);
+            _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(localFunctionSymbol))).IsEqualTo(LeftTestId);
+        }
     }
 
     private static TestSurfaceManifest Manifest(params string[] referencedMemberIds) =>

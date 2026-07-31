@@ -359,9 +359,12 @@ public class CultureInfoMutatorTests
         var mutator = new CultureInfoMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("culture.culture-info");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.CultureInfo);
-        _ = await Assert.That(supported).IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression });
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("culture.culture-info");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.CultureInfo);
+            _ = await Assert.That(supported).IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression });
+        }
     }
 
     /// <summary>
@@ -374,10 +377,13 @@ public class CultureInfoMutatorTests
         var expected = InvariantSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(InvariantSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.CultureInfo);
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("InvariantCulture => CurrentCulture");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.CultureInfo);
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("InvariantCulture => CurrentCulture");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -392,13 +398,16 @@ public class CultureInfoMutatorTests
         var expectedUi = CurrentSource.Replace("CurrentCulture", "CurrentUICulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(CurrentSource);
 
-        _ = await Assert
-            .That(Ids(mutations))
-            .IsEqualTo("culture.culture-info.current-to-invariant, culture.culture-info.current-to-current-ui");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("CurrentCulture => InvariantCulture");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("CurrentCulture => CurrentUICulture");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expectedInvariant);
-        _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(expectedUi);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Ids(mutations))
+                .IsEqualTo("culture.culture-info.current-to-invariant, culture.culture-info.current-to-current-ui");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("CurrentCulture => InvariantCulture");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("CurrentCulture => CurrentUICulture");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expectedInvariant);
+            _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(expectedUi);
+        }
     }
 
     /// <summary>
@@ -412,9 +421,12 @@ public class CultureInfoMutatorTests
         var expected = CurrentUiSource.Replace("CurrentUICulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(CurrentUiSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.current-ui-to-current");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("CurrentUICulture => CurrentCulture");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.current-ui-to-current");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("CurrentUICulture => CurrentCulture");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -423,9 +435,14 @@ public class CultureInfoMutatorTests
         var expected = FullyQualifiedSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(FullyQualifiedSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
-        _ = await Assert.That(Rewrite(tree, mutations[0])).Contains("System.Globalization.CultureInfo.CurrentCulture");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .Contains("System.Globalization.CultureInfo.CurrentCulture");
+        }
     }
 
     [Test]
@@ -434,8 +451,11 @@ public class CultureInfoMutatorTests
         var expected = CommentedSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(CommentedSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -447,9 +467,12 @@ public class CultureInfoMutatorTests
         var expected = TriviaInsideAccessSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(TriviaInsideAccessSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).Contains("CultureInfo. /* pinned */ CurrentCulture");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).Contains("CultureInfo. /* pinned */ CurrentCulture");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -458,8 +481,11 @@ public class CultureInfoMutatorTests
         var expected = ParseSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(ParseSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -468,8 +494,11 @@ public class CultureInfoMutatorTests
         var expected = StringFormatSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(StringFormatSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -478,8 +507,11 @@ public class CultureInfoMutatorTests
         var expected = ConvertSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(ConvertSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -488,8 +520,11 @@ public class CultureInfoMutatorTests
         var expected = LambdaSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(LambdaSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -498,8 +533,11 @@ public class CultureInfoMutatorTests
         var expected = LocalFunctionSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(LocalFunctionSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -512,8 +550,11 @@ public class CultureInfoMutatorTests
         var expected = NestedAccessSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(NestedAccessSource);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -557,8 +598,11 @@ public class CultureInfoMutatorTests
         var mutator = new CultureInfoMutator();
         var (_, mutations) = Run(ObjectCreationSource, SyntaxNodeLocator.FindFirst<ObjectCreationExpressionSyntax>);
 
-        _ = await Assert.That(mutator.SupportedSyntaxKinds.Contains(SyntaxKind.ObjectCreationExpression)).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.SupportedSyntaxKinds.Contains(SyntaxKind.ObjectCreationExpression)).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -582,8 +626,11 @@ public class CultureInfoMutatorTests
         var expected = AssignmentSourceSource.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(AssignmentSourceSource, SyntaxNodeLocator.FindMarked<MemberAccessExpressionSyntax>);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -648,9 +695,14 @@ public class CultureInfoMutatorTests
         var info = semanticModel.GetSymbolInfo(access);
         var symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
 
-        _ = await Assert.That(symbol?.Name).IsEqualTo("InvariantCulture");
-        _ = await Assert.That(symbol?.ContainingType.ToDisplayString()).IsEqualTo("System.Globalization.CultureInfo");
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(symbol?.Name).IsEqualTo("InvariantCulture");
+            _ = await Assert
+                .That(symbol?.ContainingType.ToDisplayString())
+                .IsEqualTo("System.Globalization.CultureInfo");
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -670,8 +722,11 @@ public class CultureInfoMutatorTests
         var expected = source.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
         var (tree, mutations) = Run(source);
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]

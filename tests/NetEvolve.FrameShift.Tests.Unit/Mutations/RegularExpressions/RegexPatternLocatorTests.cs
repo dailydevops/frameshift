@@ -418,13 +418,16 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("_ = new Regex(/*!*/\"a+\");");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
-        _ = await Assert.That(site.OptionsExpression).IsNull();
-        _ = await Assert.That(site.AttributeArgument).IsNull();
-        _ = await Assert.That(site.PatternLiteral.Token.ValueText).IsEqualTo("a+");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+            _ = await Assert.That(site.OptionsExpression).IsNull();
+            _ = await Assert.That(site.AttributeArgument).IsNull();
+            _ = await Assert.That(site.PatternLiteral.Token.ValueText).IsEqualTo("a+");
+        }
     }
 
     [Test]
@@ -432,11 +435,14 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("_ = new Regex(/*!*/\"a+\", RegexOptions.IgnoreCase);");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
-        _ = await Assert.That(site.OptionsExpression).IsNotNull();
-        _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo("RegexOptions.IgnoreCase");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
+            _ = await Assert.That(site.OptionsExpression).IsNotNull();
+            _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo("RegexOptions.IgnoreCase");
+        }
     }
 
     /// <summary>
@@ -452,10 +458,13 @@ public class RegexPatternLocatorTests
                 + "TimeSpan.FromSeconds(1));"
         );
 
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert
-            .That(site.Options!.Value)
-            .IsEqualTo(RegexOptions.IgnorePatternWhitespace | RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert
+                .That(site.Options!.Value)
+                .IsEqualTo(RegexOptions.IgnorePatternWhitespace | RegexOptions.Multiline);
+        }
     }
 
     [Test]
@@ -463,10 +472,13 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("_ = new Regex(options: RegexOptions.Multiline, pattern: /*!*/\"a+\");");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        }
     }
 
     /// <summary>
@@ -479,12 +491,15 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("_ = new Regex(/*!*/\"a+\", runtimeOptions);");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsFalse();
-        _ = await Assert.That(site.Options.HasValue).IsFalse();
-        _ = await Assert.That(site.OptionsExpression).IsNotNull();
-        _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo("runtimeOptions");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsFalse();
+            _ = await Assert.That(site.Options.HasValue).IsFalse();
+            _ = await Assert.That(site.OptionsExpression).IsNotNull();
+            _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo("runtimeOptions");
+        }
     }
 
     [Test]
@@ -492,8 +507,11 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(ConstantOptionsSource);
 
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase | RegexOptions.Multiline);
+        }
     }
 
     /// <summary>
@@ -505,10 +523,13 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("_ = new Regex(pattern: /*!*/\"a+\", RegexOptions.Multiline);");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        }
     }
 
     /// <summary>
@@ -523,10 +544,13 @@ public class RegexPatternLocatorTests
                 + "pattern: /*!*/\"a+\");"
         );
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        }
     }
 
     /// <summary>
@@ -538,10 +562,13 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall("Regex regex = new(/*!*/\"a+\", RegexOptions.IgnoreCase);");
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
+        }
     }
 
     /// <summary>
@@ -561,9 +588,12 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(CreateOptionsSource(options));
 
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(expected);
-        _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo(options);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(expected);
+            _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo(options);
+        }
     }
 
     /// <summary>
@@ -585,11 +615,14 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(CreateOptionsSource(options));
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsFalse();
-        _ = await Assert.That(site.Options.HasValue).IsFalse();
-        _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo(options);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsFalse();
+            _ = await Assert.That(site.Options.HasValue).IsFalse();
+            _ = await Assert.That(site.OptionsExpression!.ToString()).IsEqualTo(options);
+        }
     }
 
     /// <summary>
@@ -601,8 +634,11 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(BaseInitializerSource);
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexConstructor);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+        }
     }
 
     [Test]
@@ -620,11 +656,14 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall(statement);
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
-        _ = await Assert.That(site.OptionsExpression).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+            _ = await Assert.That(site.OptionsExpression).IsNull();
+        }
     }
 
     [Test]
@@ -645,9 +684,12 @@ public class RegexPatternLocatorTests
     {
         var site = LocateInCall(statement);
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Singleline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Singleline);
+        }
     }
 
     [Test]
@@ -657,10 +699,13 @@ public class RegexPatternLocatorTests
             "_ = Regex.IsMatch(options: RegexOptions.RightToLeft, pattern: /*!*/\"a+\", input: input);"
         );
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.RightToLeft);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.RegexStaticMethod);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.RightToLeft);
+        }
     }
 
     /// <summary>
@@ -770,8 +815,11 @@ public class RegexPatternLocatorTests
 
         var site = RegexPatternLocator.TryLocate(node, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(semanticModel.GetSymbolInfo(invocation!).Symbol).IsNull();
-        _ = await Assert.That(site).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(semanticModel.GetSymbolInfo(invocation!).Symbol).IsNull();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 
     /// <summary>
@@ -787,9 +835,12 @@ public class RegexPatternLocatorTests
 
         var site = RegexPatternLocator.TryLocate(node, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(node.Parent is ArgumentSyntax).IsTrue();
-        _ = await Assert.That(node.Parent!.Parent is ArgumentListSyntax).IsFalse();
-        _ = await Assert.That(site).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Parent is ArgumentSyntax).IsTrue();
+            _ = await Assert.That(node.Parent!.Parent is ArgumentListSyntax).IsFalse();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 
     /// <summary>
@@ -807,9 +858,12 @@ public class RegexPatternLocatorTests
 
         var site = RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(literal.Parent is ArgumentSyntax).IsTrue();
-        _ = await Assert.That(list.Parent).IsNull();
-        _ = await Assert.That(site).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Parent is ArgumentSyntax).IsTrue();
+            _ = await Assert.That(list.Parent).IsNull();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 
     /// <summary>
@@ -827,9 +881,12 @@ public class RegexPatternLocatorTests
 
         var site = RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(literal.Parent is AttributeArgumentSyntax).IsTrue();
-        _ = await Assert.That(list.Parent).IsNull();
-        _ = await Assert.That(site).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Parent is AttributeArgumentSyntax).IsTrue();
+            _ = await Assert.That(list.Parent).IsNull();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 
     /// <summary>
@@ -864,9 +921,12 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(VerbatimPatternSource);
 
-        _ = await Assert.That(site.Pattern).IsEqualTo("\\d+\\s");
-        _ = await Assert.That(site.PatternLiteral.Token.Text).IsEqualTo("@\"\\d+\\s\"");
-        _ = await Assert.That(site.PatternLiteral.Token.Text).IsNotEqualTo(site.Pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Pattern).IsEqualTo("\\d+\\s");
+            _ = await Assert.That(site.PatternLiteral.Token.Text).IsEqualTo("@\"\\d+\\s\"");
+            _ = await Assert.That(site.PatternLiteral.Token.Text).IsNotEqualTo(site.Pattern);
+        }
     }
 
     [Test]
@@ -874,9 +934,12 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(RawStringPatternSource);
 
-        _ = await Assert.That(site.Pattern).IsEqualTo("\\d+\\s");
-        _ = await Assert.That(site.PatternLiteral.Token.Text).IsEqualTo("\"\"\"\\d+\\s\"\"\"");
-        _ = await Assert.That(site.PatternLiteral.Token.Text).IsNotEqualTo(site.Pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Pattern).IsEqualTo("\\d+\\s");
+            _ = await Assert.That(site.PatternLiteral.Token.Text).IsEqualTo("\"\"\"\\d+\\s\"\"\"");
+            _ = await Assert.That(site.PatternLiteral.Token.Text).IsNotEqualTo(site.Pattern);
+        }
     }
 
 #if NET7_0_OR_GREATER
@@ -885,13 +948,16 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(CreateGeneratedRegexSource("[GeneratedRegex(/*!*/\"a+\")]"));
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
-        _ = await Assert.That(site.OptionsExpression).IsNull();
-        _ = await Assert.That(site.AttributeArgument).IsNotNull();
-        _ = await Assert.That(ReferenceEquals(site.AttributeArgument!.Expression, site.PatternLiteral)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+            _ = await Assert.That(site.OptionsExpression).IsNull();
+            _ = await Assert.That(site.AttributeArgument).IsNotNull();
+            _ = await Assert.That(ReferenceEquals(site.AttributeArgument!.Expression, site.PatternLiteral)).IsTrue();
+        }
     }
 
     [Test]
@@ -903,9 +969,14 @@ public class RegexPatternLocatorTests
             )
         );
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert
+                .That(site.Options!.Value)
+                .IsEqualTo(RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
     }
 
     [Test]
@@ -915,10 +986,13 @@ public class RegexPatternLocatorTests
             CreateGeneratedRegexSource("[GeneratedRegex(options: RegexOptions.Multiline, pattern: /*!*/\"a+\")]")
         );
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Multiline);
+        }
     }
 
     [Test]
@@ -928,8 +1002,11 @@ public class RegexPatternLocatorTests
             CreateGeneratedRegexSource("[GeneratedRegex(/*!*/\"a+\", RegexOptions.Singleline, 250)]")
         );
 
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Singleline);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.Singleline);
+        }
     }
 
     /// <summary>
@@ -962,10 +1039,13 @@ public class RegexPatternLocatorTests
             CreateGeneratedRegexSource("[GeneratedRegex(/*!*/\"a+\", RegexOptions.IgnoreCase, \"en-US\")]")
         );
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.GeneratedRegex);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.IgnoreCase);
+        }
     }
 
     /// <summary>
@@ -984,8 +1064,11 @@ public class RegexPatternLocatorTests
 
         var site = RegexPatternLocator.TryLocate(node, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(node.Token.Value is string).IsTrue();
-        _ = await Assert.That(site).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Token.Value is string).IsTrue();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 #endif
 #endif
@@ -1000,12 +1083,15 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(RegularExpressionSource);
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.DataAnnotationsRegularExpression);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
-        _ = await Assert.That(site.OptionsExpression).IsNull();
-        _ = await Assert.That(site.AttributeArgument).IsNotNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.DataAnnotationsRegularExpression);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+            _ = await Assert.That(site.OptionsExpression).IsNull();
+            _ = await Assert.That(site.AttributeArgument).IsNotNull();
+        }
     }
 
     /// <summary>
@@ -1018,10 +1104,13 @@ public class RegexPatternLocatorTests
     {
         var site = LocateSite(RegularExpressionWithErrorMessageSource);
 
-        _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.DataAnnotationsRegularExpression);
-        _ = await Assert.That(site.Pattern).IsEqualTo("a+");
-        _ = await Assert.That(site.AreOptionsKnown).IsTrue();
-        _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(site.Origin).IsEqualTo(RegexPatternOrigin.DataAnnotationsRegularExpression);
+            _ = await Assert.That(site.Pattern).IsEqualTo("a+");
+            _ = await Assert.That(site.AreOptionsKnown).IsTrue();
+            _ = await Assert.That(site.Options!.Value).IsEqualTo(RegexOptions.None);
+        }
     }
 
     /// <summary>

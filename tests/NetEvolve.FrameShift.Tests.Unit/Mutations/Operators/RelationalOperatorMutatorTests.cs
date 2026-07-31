@@ -64,8 +64,11 @@ public class RelationalOperatorMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheRelationalFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo("relational");
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.RelationalOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo("relational");
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.RelationalOperator);
+        }
     }
 
     [Test]
@@ -83,8 +86,11 @@ public class RelationalOperatorMutatorTests
         string[] expected = [first, second, third];
         var (mutations, _, _, errors) = Mutate(CreateSource(source));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     [Test]
@@ -109,8 +115,11 @@ public class RelationalOperatorMutatorTests
         var (mutations, _, _, _) = Mutate(CreateSource(source));
         var mutation = Single(mutations, $"{source} => {target}");
 
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo(expectedId);
-        _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.RelationalOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo(expectedId);
+            _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.RelationalOperator);
+        }
     }
 
     [Test]
@@ -121,9 +130,12 @@ public class RelationalOperatorMutatorTests
 
         foreach (var mutation in mutations)
         {
-            _ = await Assert.That(mutation.Original.Span).IsEqualTo(binary.Span);
-            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("left < right");
-            _ = await Assert.That(mutation.Location.GetLineSpan().StartLinePosition.Line).IsEqualTo(2);
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(mutation.Original.Span).IsEqualTo(binary.Span);
+                _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("left < right");
+                _ = await Assert.That(mutation.Location.GetLineSpan().StartLinePosition.Line).IsEqualTo(2);
+            }
         }
     }
 
@@ -137,8 +149,11 @@ public class RelationalOperatorMutatorTests
         var (mutations, tree, _, errors) = Mutate(TriviaSource);
         var mutation = Single(mutations, $"< => {target}");
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -160,8 +175,11 @@ public class RelationalOperatorMutatorTests
     {
         var (mutations, _, _, errors) = Mutate(EqualitySource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     private static string CreateSource(string source) =>

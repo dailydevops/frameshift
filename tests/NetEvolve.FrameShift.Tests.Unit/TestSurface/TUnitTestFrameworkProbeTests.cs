@@ -187,8 +187,11 @@ public class TUnitTestFrameworkProbeTests
         var decorated = FindMethod(compilation, "DecoratedTest");
         var plain = FindMethod(compilation, "PlainMethod");
 
-        _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     [Test]
@@ -223,8 +226,11 @@ public class TUnitTestFrameworkProbeTests
         var frameworkAssembly = SatelliteAssembly(framework, FrameworkLikeAssemblyName);
         var foreignAssembly = SatelliteAssembly(foreign, ForeignAssemblyName);
 
-        _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(frameworkAssembly)).IsTrue();
-        _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(foreignAssembly)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(frameworkAssembly)).IsTrue();
+            _ = await Assert.That(TUnitTestFrameworkProbe.IsFrameworkAssembly(foreignAssembly)).IsFalse();
+        }
     }
 
     [Test]
@@ -250,8 +256,11 @@ public class TUnitTestFrameworkProbeTests
 
         var resolved = TUnitTestFrameworkProbe.GetBaseTestAttributeType(compilation);
 
-        _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
-        _ = await Assert.That(resolved!.IsAbstract).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
+            _ = await Assert.That(resolved!.IsAbstract).IsTrue();
+        }
     }
 
     [Test]

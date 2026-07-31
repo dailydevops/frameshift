@@ -108,12 +108,15 @@ public class MSTestSurfaceAnalyzerTests
         var production = CreateProduction();
         var test = CreateTest(production);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -144,10 +147,15 @@ public class MSTestSurfaceAnalyzerTests
 
         var diagnostics = await RunAllAsync(compilation, MalformedManifest).ConfigureAwait(false);
 
-        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     [Test]
@@ -171,11 +179,14 @@ public class MSTestSurfaceAnalyzerTests
 
         var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
-        _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
-        _ = await Assert
-            .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
+            _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
+            _ = await Assert
+                .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -287,10 +298,15 @@ public class MSTestSurfaceAnalyzerTests
             reported.AddRange(DiagnosticAssertions.Ids(await RunAllAsync(test, shape).ConfigureAwait(false)));
         }
 
-        _ = await Assert.That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal)).IsFalse();
-        _ = await Assert
-            .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal))
+                .IsFalse();
+            _ = await Assert
+                .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]

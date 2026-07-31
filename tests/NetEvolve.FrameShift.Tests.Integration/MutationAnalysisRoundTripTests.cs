@@ -313,10 +313,13 @@ public class MutationAnalysisRoundTripTests
         var cycle = await RunCycleAsync(AddCoveredSource).ConfigureAwait(false);
         var lines = GapLines(cycle.Diagnostics);
 
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
-        _ = await Assert.That(lines.Contains(SubtractLine)).IsTrue();
-        _ = await Assert.That(lines.Contains(AddLine)).IsFalse();
-        _ = await Assert.That(lines.Contains(TwiceLine)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+            _ = await Assert.That(lines.Contains(SubtractLine)).IsTrue();
+            _ = await Assert.That(lines.Contains(AddLine)).IsFalse();
+            _ = await Assert.That(lines.Contains(TwiceLine)).IsFalse();
+        }
 
         _ = await Verify(DescribeCycle(cycle)).ConfigureAwait(false);
     }
@@ -341,10 +344,13 @@ public class MutationAnalysisRoundTripTests
         var removed = GapEntries(before.Diagnostics).Except(GapEntries(after.Diagnostics), StringComparer.Ordinal);
         var added = GapEntries(after.Diagnostics).Except(GapEntries(before.Diagnostics), StringComparer.Ordinal);
 
-        _ = await Assert.That(string.Join("|", removed)).IsEqualTo(Gap(SubtractLine));
-        _ = await Assert.That(string.Join("|", added)).IsEqualTo(string.Empty);
-        _ = await Assert.That(OnlyGaps(after.Diagnostics).IsEmpty).IsTrue();
-        _ = await Assert.That(DescribeGaps(after.Diagnostics)).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(string.Join("|", removed)).IsEqualTo(Gap(SubtractLine));
+            _ = await Assert.That(string.Join("|", added)).IsEqualTo(string.Empty);
+            _ = await Assert.That(OnlyGaps(after.Diagnostics).IsEmpty).IsTrue();
+            _ = await Assert.That(DescribeGaps(after.Diagnostics)).IsEqualTo(string.Empty);
+        }
 
         _ = await Verify(DescribeTransition(before, after)).ConfigureAwait(false);
     }
@@ -360,8 +366,11 @@ public class MutationAnalysisRoundTripTests
         var before = await RunCycleAsync(BothCoveredSource).ConfigureAwait(false);
         var after = await RunCycleAsync(SubtractCoveredSource).ConfigureAwait(false);
 
-        _ = await Assert.That(DescribeGaps(before.Diagnostics)).IsEqualTo(string.Empty);
-        _ = await Assert.That(DescribeGaps(after.Diagnostics)).IsEqualTo(Gap(AddLine) + "|" + Gap(TwiceLine));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeGaps(before.Diagnostics)).IsEqualTo(string.Empty);
+            _ = await Assert.That(DescribeGaps(after.Diagnostics)).IsEqualTo(Gap(AddLine) + "|" + Gap(TwiceLine));
+        }
 
         _ = await Verify(DescribeCycle(after)).ConfigureAwait(false);
     }
@@ -382,10 +391,13 @@ public class MutationAnalysisRoundTripTests
         var cycle = await RunCycleAsync(ConstructionOnlySource).ConfigureAwait(false);
         var expected = Gap(AddLine) + "|" + Gap(SubtractLine) + "|" + Gap(TwiceLine);
 
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(expected);
-        _ = await Assert
-            .That(string.Join("|", DiagnosticAssertions.Ids(cycle.Diagnostics).Distinct(StringComparer.Ordinal)))
-            .IsEqualTo(DiagnosticIds.UnreachableMutationPoint);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(expected);
+            _ = await Assert
+                .That(string.Join("|", DiagnosticAssertions.Ids(cycle.Diagnostics).Distinct(StringComparer.Ordinal)))
+                .IsEqualTo(DiagnosticIds.UnreachableMutationPoint);
+        }
 
         _ = await Verify(DescribeCycle(cycle)).ConfigureAwait(false);
     }
@@ -408,18 +420,21 @@ public class MutationAnalysisRoundTripTests
     {
         var cycle = await RunCycleAsync(WithoutAnyTestSource).ConfigureAwait(false);
 
-        _ = await Assert
-            .That(string.Join("|", DiagnosticAssertions.Ids(cycle.Diagnostics)))
-            .IsEqualTo(DiagnosticIds.InvalidTestSurfaceManifest);
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(string.Join("|", DiagnosticAssertions.Ids(cycle.Diagnostics)))
+                .IsEqualTo(DiagnosticIds.InvalidTestSurfaceManifest);
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(string.Empty);
 
-        var message = Message(cycle.Diagnostics[0]);
-        var namesTheEmptyManifest = message.Contains(
-            "does not record a single referenced production member",
-            StringComparison.Ordinal
-        );
+            var message = Message(cycle.Diagnostics[0]);
+            var namesTheEmptyManifest = message.Contains(
+                "does not record a single referenced production member",
+                StringComparison.Ordinal
+            );
 
-        _ = await Assert.That(namesTheEmptyManifest).IsTrue();
+            _ = await Assert.That(namesTheEmptyManifest).IsTrue();
+        }
 
         _ = await Verify(DescribeCycle(cycle)).ConfigureAwait(false);
     }
@@ -447,8 +462,13 @@ public class MutationAnalysisRoundTripTests
 
         var hasCanonicalHeader = manifest.StartsWith("frameshift-test-surface/1\n", StringComparison.Ordinal);
 
-        _ = await Assert.That(hasCanonicalHeader).IsTrue();
-        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(hasCanonicalHeader).IsTrue();
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -469,13 +489,16 @@ public class MutationAnalysisRoundTripTests
     {
         var cycle = await RunCycleAsync(AddCoveredSource).ConfigureAwait(false);
 
-        _ = await Assert
-            .That(DescribeSingleCases(cycle.Diagnostics))
-            .IsEqualTo(SingleCase(AddLine) + "|" + SingleCase(TwiceLine));
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
-        _ = await Assert
-            .That(SingleCaseTestNames(cycle.Diagnostics))
-            .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DescribeSingleCases(cycle.Diagnostics))
+                .IsEqualTo(SingleCase(AddLine) + "|" + SingleCase(TwiceLine));
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+            _ = await Assert
+                .That(SingleCaseTestNames(cycle.Diagnostics))
+                .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+        }
     }
 
     /// <summary>
@@ -495,11 +518,14 @@ public class MutationAnalysisRoundTripTests
     {
         var cycle = await RunCycleAsync(SharedHelperSource).ConfigureAwait(false);
 
-        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(SingleCase(AddLine));
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
-        _ = await Assert
-            .That(SingleCaseTestNames(cycle.Diagnostics))
-            .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(SingleCase(AddLine));
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+            _ = await Assert
+                .That(SingleCaseTestNames(cycle.Diagnostics))
+                .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+        }
     }
 
     /// <summary>
@@ -512,9 +538,12 @@ public class MutationAnalysisRoundTripTests
     {
         var cycle = await RunCycleAsync(ThreeCaseSource).ConfigureAwait(false);
 
-        _ = await Assert.That(cycle.Manifest.Contains(" 3\n", StringComparison.Ordinal)).IsTrue();
-        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(cycle.Manifest.Contains(" 3\n", StringComparison.Ordinal)).IsTrue();
+            _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        }
     }
 
     /// <summary>
@@ -528,9 +557,12 @@ public class MutationAnalysisRoundTripTests
     {
         var cycle = await RunCycleAsync(DataSourceSource).ConfigureAwait(false);
 
-        _ = await Assert.That(cycle.Manifest.Contains(" 1+\n", StringComparison.Ordinal)).IsTrue();
-        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(cycle.Manifest.Contains(" 1+\n", StringComparison.Ordinal)).IsTrue();
+            _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        }
     }
 
     private static IEnumerable<string> GetTestSources() =>

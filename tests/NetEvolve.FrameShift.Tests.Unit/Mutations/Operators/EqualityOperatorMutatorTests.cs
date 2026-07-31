@@ -304,8 +304,11 @@ public class EqualityOperatorMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheEqualityFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo("equality");
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.EqualityOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo("equality");
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.EqualityOperator);
+        }
     }
 
     [Test]
@@ -320,10 +323,13 @@ public class EqualityOperatorMutatorTests
         string[] expected = [expectedName];
         var (mutations, _, _, errors) = Mutate(CreateSource(source));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
-        _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
-        _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.EqualityOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
+            _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.EqualityOperator);
+        }
     }
 
     [Test]
@@ -334,9 +340,12 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -352,10 +361,13 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
-        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(0);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
+            _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(0);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -369,10 +381,13 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("op_Inequality");
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
-        _ = await Assert.That(CounterpartCount(method, "op_Equality")).IsEqualTo(0);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("op_Inequality");
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
+            _ = await Assert.That(CounterpartCount(method, "op_Equality")).IsEqualTo(0);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -381,8 +396,11 @@ public class EqualityOperatorMutatorTests
         var expected = TriviaSource.Replace("== right", "!= right", StringComparison.Ordinal);
         var (mutations, tree, _, errors) = Mutate(TriviaSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -392,8 +410,11 @@ public class EqualityOperatorMutatorTests
         var mutated = mutations.Single().ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(mutated).Contains("left != right");
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated).Contains("left != right");
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -401,8 +422,11 @@ public class EqualityOperatorMutatorTests
     {
         var (mutations, _, _, errors) = Mutate(RelationalSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -420,9 +444,12 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo(expectedTypeName);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo(expectedTypeName);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -436,9 +463,12 @@ public class EqualityOperatorMutatorTests
         var (mutations, tree, model, errors) = Mutate(LiftedPairSource);
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("Money?");
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("Money?");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -454,9 +484,12 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
-        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+            _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -470,9 +503,12 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
-        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+            _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -487,10 +523,13 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
-        _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Money");
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -512,10 +551,13 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.MethodKind).IsNotEqualTo(MethodKind.UserDefinedOperator);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
-        _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo("equality.equals-to-not-equals");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.MethodKind).IsNotEqualTo(MethodKind.UserDefinedOperator);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo("equality.equals-to-not-equals");
+        }
     }
 
     /// <summary>
@@ -531,9 +573,12 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.BuiltinOperator);
-        _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("object.operator ==(object, object)");
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.BuiltinOperator);
+            _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("object.operator ==(object, object)");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -555,10 +600,13 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
-        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
-        _ = await Assert.That(CounterpartOperatorCount(method, "op_Inequality")).IsEqualTo(0);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("op_Equality");
+            _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+            _ = await Assert.That(CounterpartOperatorCount(method, "op_Inequality")).IsEqualTo(0);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -573,12 +621,15 @@ public class EqualityOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var method = model.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Parameters.Length).IsEqualTo(2);
-        _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
-        _ = await Assert
-            .That(CounterpartParameterCounts(method, "op_Inequality"))
-            .IsEquivalentTo(expectedParameterCounts);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Parameters.Length).IsEqualTo(2);
+            _ = await Assert.That(CounterpartCount(method, "op_Inequality")).IsEqualTo(1);
+            _ = await Assert
+                .That(CounterpartParameterCounts(method, "op_Inequality"))
+                .IsEquivalentTo(expectedParameterCounts);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     private static string CreateSource(string source) =>

@@ -104,8 +104,11 @@ public class MutationTests
 
         var mutation = CreateMutation(original, replacement);
 
-        _ = await Assert.That(mutation.Location.SourceTree).IsEqualTo(tree);
-        _ = await Assert.That(mutation.Location.SourceSpan).IsEqualTo(original.Span);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.Location.SourceTree).IsEqualTo(tree);
+            _ = await Assert.That(mutation.Location.SourceSpan).IsEqualTo(original.Span);
+        }
     }
 
     [Test]
@@ -133,11 +136,14 @@ public class MutationTests
 
         var mutation = CreateMutation(original, replacement);
 
-        _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.BooleanLiteral);
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo("boolean-literal.true-to-false");
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("true => false");
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("true");
-        _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("false");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.BooleanLiteral);
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo("boolean-literal.true-to-false");
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("true => false");
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("true");
+            _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("false");
+        }
     }
 
     [Test]
@@ -147,8 +153,11 @@ public class MutationTests
 
         var mutation = CreateMutation(original, replacement);
 
-        _ = await Assert.That(mutation.ToString()).IsEqualTo(mutation.DisplayName);
-        _ = await Assert.That(mutation.ToString()).IsEqualTo("true => false");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.ToString()).IsEqualTo(mutation.DisplayName);
+            _ = await Assert.That(mutation.ToString()).IsEqualTo("true => false");
+        }
     }
 
     [Test]
@@ -159,8 +168,11 @@ public class MutationTests
 
         var mutated = mutation.ApplyTo(tree);
 
-        _ = await Assert.That(mutated.ToString()).IsEqualTo(MutatedSource);
-        _ = await Assert.That(tree.ToString()).IsEqualTo(Source);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated.ToString()).IsEqualTo(MutatedSource);
+            _ = await Assert.That(tree.ToString()).IsEqualTo(Source);
+        }
     }
 
     [Test]
@@ -171,9 +183,12 @@ public class MutationTests
 
         var mutated = mutation.ApplyTo(tree);
 
-        _ = await Assert.That(mutated.FilePath).IsEqualTo(CompilationFactory.DefaultFilePath);
-        _ = await Assert.That(mutated.Options).IsEqualTo(tree.Options);
-        _ = await Assert.That(ReferenceEquals(mutated, tree)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated.FilePath).IsEqualTo(CompilationFactory.DefaultFilePath);
+            _ = await Assert.That(mutated.Options).IsEqualTo(tree.Options);
+            _ = await Assert.That(ReferenceEquals(mutated, tree)).IsFalse();
+        }
     }
 
     [Test]

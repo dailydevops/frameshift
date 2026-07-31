@@ -330,11 +330,14 @@ public class RegexOptionsMutatorTests
     {
         var mutator = new RegexOptionsMutator();
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("culture.regex-options");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexOptions);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression, SyntaxKind.BitwiseOrExpression });
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("culture.regex-options");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexOptions);
+            _ = await Assert
+                .That(mutator.SupportedSyntaxKinds)
+                .IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression, SyntaxKind.BitwiseOrExpression });
+        }
     }
 
     /// <summary>
@@ -360,12 +363,15 @@ public class RegexOptionsMutatorTests
             .Where(mutation => !mutation.OperatorId.StartsWith(OperatorIdPrefix, StringComparison.Ordinal))
             .Select(mutation => mutation.OperatorId);
 
-        _ = await Assert.That(offenders).IsEmpty();
-        _ = await Assert
-            .That(mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.RegexOptions });
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("culture.regex-options.remove-ignore-case");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("RegexOptions - IgnoreCase");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(offenders).IsEmpty();
+            _ = await Assert
+                .That(mutations.Select(mutation => mutation.Kind).Distinct())
+                .IsEquivalentTo(new[] { MutationKind.RegexOptions });
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("culture.regex-options.remove-ignore-case");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("RegexOptions - IgnoreCase");
+        }
     }
 
     [Test]
@@ -373,14 +379,17 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(ConstructorSource);
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert
-            .That(DisplayNames(mutations))
-            .IsEqualTo(
-                "RegexOptions - IgnoreCase, RegexOptions + CultureInvariant, RegexOptions + Multiline, "
-                    + "RegexOptions + Singleline, RegexOptions + ExplicitCapture, "
-                    + "RegexOptions + IgnorePatternWhitespace, RegexOptions + RightToLeft"
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert
+                .That(DisplayNames(mutations))
+                .IsEqualTo(
+                    "RegexOptions - IgnoreCase, RegexOptions + CultureInvariant, RegexOptions + Multiline, "
+                        + "RegexOptions + Singleline, RegexOptions + ExplicitCapture, "
+                        + "RegexOptions + IgnorePatternWhitespace, RegexOptions + RightToLeft"
+                );
+        }
     }
 
     /// <summary>
@@ -392,20 +401,23 @@ public class RegexOptionsMutatorTests
     {
         var (tree, mutations) = Mutate(ConstructorSource);
 
-        _ = await Assert
-            .That(Rewrite(tree, Single(mutations, "remove-ignore-case")))
-            .IsEqualTo(
-                ConstructorSource.Replace("RegexOptions.IgnoreCase", "RegexOptions.None", StringComparison.Ordinal)
-            );
-        _ = await Assert
-            .That(Rewrite(tree, Single(mutations, "add-culture-invariant")))
-            .IsEqualTo(
-                ConstructorSource.Replace(
-                    "RegexOptions.IgnoreCase",
-                    "RegexOptions.IgnoreCase | RegexOptions.CultureInvariant",
-                    StringComparison.Ordinal
-                )
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Rewrite(tree, Single(mutations, "remove-ignore-case")))
+                .IsEqualTo(
+                    ConstructorSource.Replace("RegexOptions.IgnoreCase", "RegexOptions.None", StringComparison.Ordinal)
+                );
+            _ = await Assert
+                .That(Rewrite(tree, Single(mutations, "add-culture-invariant")))
+                .IsEqualTo(
+                    ConstructorSource.Replace(
+                        "RegexOptions.IgnoreCase",
+                        "RegexOptions.IgnoreCase | RegexOptions.CultureInvariant",
+                        StringComparison.Ordinal
+                    )
+                );
+        }
     }
 
     [Test]
@@ -413,17 +425,20 @@ public class RegexOptionsMutatorTests
     {
         var (tree, mutations) = Mutate(StaticIsMatchSource);
 
-        _ = await Assert
-            .That(Suffixes(mutations))
-            .IsEqualTo(
-                "remove-multiline, add-ignore-case, add-culture-invariant, add-singleline, add-explicit-capture, "
-                    + "add-ignore-pattern-whitespace, add-right-to-left"
-            );
-        _ = await Assert
-            .That(Rewrite(tree, Single(mutations, "remove-multiline")))
-            .IsEqualTo(
-                StaticIsMatchSource.Replace("RegexOptions.Multiline", "RegexOptions.None", StringComparison.Ordinal)
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Suffixes(mutations))
+                .IsEqualTo(
+                    "remove-multiline, add-ignore-case, add-culture-invariant, add-singleline, add-explicit-capture, "
+                        + "add-ignore-pattern-whitespace, add-right-to-left"
+                );
+            _ = await Assert
+                .That(Rewrite(tree, Single(mutations, "remove-multiline")))
+                .IsEqualTo(
+                    StaticIsMatchSource.Replace("RegexOptions.Multiline", "RegexOptions.None", StringComparison.Ordinal)
+                );
+        }
     }
 
     [Test]
@@ -431,17 +446,20 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(TwoOperandSource);
 
-        _ = await Assert
-            .That(Suffixes(mutations))
-            .IsEqualTo(
-                "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
-                    + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
-            );
-        _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.Multiline");
-        _ = await Assert.That(Replacement(mutations, "remove-multiline")).IsEqualTo("RegexOptions.IgnoreCase");
-        _ = await Assert
-            .That(Replacement(mutations, "add-singleline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Suffixes(mutations))
+                .IsEqualTo(
+                    "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
+                        + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
+                );
+            _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.Multiline");
+            _ = await Assert.That(Replacement(mutations, "remove-multiline")).IsEqualTo("RegexOptions.IgnoreCase");
+            _ = await Assert
+                .That(Replacement(mutations, "add-singleline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        }
     }
 
     [Test]
@@ -453,8 +471,11 @@ public class RegexOptionsMutatorTests
             .SelectMany(source => CompilationFactory.GetCompileErrors(CompilationFactory.Create(source)))
             .Select(diagnostic => diagnostic.Id);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(7);
-        _ = await Assert.That(errors).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(7);
+            _ = await Assert.That(errors).IsEmpty();
+        }
     }
 
     [Test]
@@ -462,27 +483,30 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(ThreeOperandSource);
 
-        _ = await Assert
-            .That(Suffixes(mutations))
-            .IsEqualTo(
-                "remove-ignore-case, remove-multiline, remove-singleline, add-culture-invariant, "
-                    + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
-            );
-        _ = await Assert
-            .That(Replacement(mutations, "remove-ignore-case"))
-            .IsEqualTo("RegexOptions.Multiline | RegexOptions.Singleline");
-        _ = await Assert
-            .That(Replacement(mutations, "remove-multiline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Singleline");
-        _ = await Assert
-            .That(Replacement(mutations, "remove-singleline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline");
-        _ = await Assert
-            .That(Replacement(mutations, "add-culture-invariant"))
-            .IsEqualTo(
-                "RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline "
-                    + "| RegexOptions.CultureInvariant"
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Suffixes(mutations))
+                .IsEqualTo(
+                    "remove-ignore-case, remove-multiline, remove-singleline, add-culture-invariant, "
+                        + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
+                );
+            _ = await Assert
+                .That(Replacement(mutations, "remove-ignore-case"))
+                .IsEqualTo("RegexOptions.Multiline | RegexOptions.Singleline");
+            _ = await Assert
+                .That(Replacement(mutations, "remove-multiline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Singleline");
+            _ = await Assert
+                .That(Replacement(mutations, "remove-singleline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline");
+            _ = await Assert
+                .That(Replacement(mutations, "add-culture-invariant"))
+                .IsEqualTo(
+                    "RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline "
+                        + "| RegexOptions.CultureInvariant"
+                );
+        }
     }
 
     /// <summary>
@@ -494,12 +518,17 @@ public class RegexOptionsMutatorTests
     {
         var (tree, mutations) = Mutate(NoneSource);
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
-        _ = await Assert.That(Replacement(mutations, "add-ignore-case")).IsEqualTo("RegexOptions.IgnoreCase");
-        _ = await Assert.That(Replacement(mutations, "add-right-to-left")).IsEqualTo("RegexOptions.RightToLeft");
-        _ = await Assert
-            .That(Rewrite(tree, Single(mutations, "add-ignore-case")))
-            .IsEqualTo(NoneSource.Replace("RegexOptions.None", "RegexOptions.IgnoreCase", StringComparison.Ordinal));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
+            _ = await Assert.That(Replacement(mutations, "add-ignore-case")).IsEqualTo("RegexOptions.IgnoreCase");
+            _ = await Assert.That(Replacement(mutations, "add-right-to-left")).IsEqualTo("RegexOptions.RightToLeft");
+            _ = await Assert
+                .That(Rewrite(tree, Single(mutations, "add-ignore-case")))
+                .IsEqualTo(
+                    NoneSource.Replace("RegexOptions.None", "RegexOptions.IgnoreCase", StringComparison.Ordinal)
+                );
+        }
     }
 
     /// <summary>
@@ -511,16 +540,19 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(NoneCombinedSource);
 
-        _ = await Assert
-            .That(Suffixes(mutations))
-            .IsEqualTo(
-                "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
-                    + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
-            );
-        _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.Multiline");
-        _ = await Assert
-            .That(Replacement(mutations, "add-singleline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Suffixes(mutations))
+                .IsEqualTo(
+                    "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
+                        + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
+                );
+            _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.Multiline");
+            _ = await Assert
+                .That(Replacement(mutations, "add-singleline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        }
     }
 
     /// <summary>
@@ -533,11 +565,14 @@ public class RegexOptionsMutatorTests
         var (_, mutations) = Mutate(CompiledSource);
         var offenders = Mentioning(mutations, "Compiled");
 
-        _ = await Assert.That(offenders).IsEmpty();
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
-        _ = await Assert
-            .That(Replacement(mutations, "add-ignore-case"))
-            .IsEqualTo("RegexOptions.Compiled | RegexOptions.IgnoreCase");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(offenders).IsEmpty();
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
+            _ = await Assert
+                .That(Replacement(mutations, "add-ignore-case"))
+                .IsEqualTo("RegexOptions.Compiled | RegexOptions.IgnoreCase");
+        }
     }
 
     /// <summary>
@@ -551,12 +586,15 @@ public class RegexOptionsMutatorTests
         var (_, mutations) = Mutate(EcmaScriptSource);
         var offenders = Mentioning(mutations, "ECMAScript");
 
-        _ = await Assert.That(offenders).IsEmpty();
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.ECMAScript");
-        _ = await Assert
-            .That(Replacement(mutations, "add-multiline"))
-            .IsEqualTo("RegexOptions.ECMAScript | RegexOptions.IgnoreCase | RegexOptions.Multiline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(offenders).IsEmpty();
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("RegexOptions.ECMAScript");
+            _ = await Assert
+                .That(Replacement(mutations, "add-multiline"))
+                .IsEqualTo("RegexOptions.ECMAScript | RegexOptions.IgnoreCase | RegexOptions.Multiline");
+        }
     }
 
 #if NET7_0_OR_GREATER
@@ -578,12 +616,15 @@ public class RegexOptionsMutatorTests
         var (_, mutations) = Mutate(NonBacktrackingSource);
         var offenders = Mentioning(mutations, "NonBacktracking");
 
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
-        _ = await Assert.That(offenders).IsEmpty();
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
-        _ = await Assert
-            .That(Replacement(mutations, "add-ignore-case"))
-            .IsEqualTo("RegexOptions.NonBacktracking | RegexOptions.IgnoreCase");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+            _ = await Assert.That(offenders).IsEmpty();
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_allAdditionSuffixes));
+            _ = await Assert
+                .That(Replacement(mutations, "add-ignore-case"))
+                .IsEqualTo("RegexOptions.NonBacktracking | RegexOptions.IgnoreCase");
+        }
     }
 
     /// <summary>
@@ -602,16 +643,19 @@ public class RegexOptionsMutatorTests
     {
         var (tree, mutations) = Mutate(GeneratedRegexSource);
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert
-            .That(Rewrite(tree, Single(mutations, "add-culture-invariant")))
-            .IsEqualTo(
-                GeneratedRegexSource.Replace(
-                    "RegexOptions.IgnoreCase",
-                    "RegexOptions.IgnoreCase | RegexOptions.CultureInvariant",
-                    StringComparison.Ordinal
-                )
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert
+                .That(Rewrite(tree, Single(mutations, "add-culture-invariant")))
+                .IsEqualTo(
+                    GeneratedRegexSource.Replace(
+                        "RegexOptions.IgnoreCase",
+                        "RegexOptions.IgnoreCase | RegexOptions.CultureInvariant",
+                        StringComparison.Ordinal
+                    )
+                );
+        }
     }
 #endif
 
@@ -624,10 +668,13 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(CustomAttributeSource);
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert
-            .That(Replacement(mutations, "add-multiline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert
+                .That(Replacement(mutations, "add-multiline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline");
+        }
     }
 
     /// <summary>
@@ -640,8 +687,11 @@ public class RegexOptionsMutatorTests
         var (tree, mutations) = Mutate(ConstantFieldSource);
         var mutated = Rewrite(tree, Single(mutations, "add-multiline"));
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(CompilationFactory.Create(mutated))).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(CompilationFactory.Create(mutated))).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -653,16 +703,19 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(QualifiedSource);
 
-        _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
-        _ = await Assert
-            .That(Replacement(mutations, "remove-ignore-case"))
-            .IsEqualTo("System.Text.RegularExpressions.RegexOptions.None");
-        _ = await Assert
-            .That(Replacement(mutations, "add-multiline"))
-            .IsEqualTo(
-                "System.Text.RegularExpressions.RegexOptions.IgnoreCase "
-                    + "| System.Text.RegularExpressions.RegexOptions.Multiline"
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Suffixes(mutations)).IsEqualTo(Join(_singleFlagSuffixes));
+            _ = await Assert
+                .That(Replacement(mutations, "remove-ignore-case"))
+                .IsEqualTo("System.Text.RegularExpressions.RegexOptions.None");
+            _ = await Assert
+                .That(Replacement(mutations, "add-multiline"))
+                .IsEqualTo(
+                    "System.Text.RegularExpressions.RegexOptions.IgnoreCase "
+                        + "| System.Text.RegularExpressions.RegexOptions.Multiline"
+                );
+        }
     }
 
     /// <summary>
@@ -693,16 +746,19 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(UsingStaticSource);
 
-        _ = await Assert
-            .That(Suffixes(mutations))
-            .IsEqualTo(
-                "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
-                    + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
-            );
-        _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("Multiline");
-        _ = await Assert
-            .That(Replacement(mutations, "add-singleline"))
-            .IsEqualTo("IgnoreCase | Multiline | Singleline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Suffixes(mutations))
+                .IsEqualTo(
+                    "remove-ignore-case, remove-multiline, add-culture-invariant, add-singleline, "
+                        + "add-explicit-capture, add-ignore-pattern-whitespace, add-right-to-left"
+                );
+            _ = await Assert.That(Replacement(mutations, "remove-ignore-case")).IsEqualTo("Multiline");
+            _ = await Assert
+                .That(Replacement(mutations, "add-singleline"))
+                .IsEqualTo("IgnoreCase | Multiline | Singleline");
+        }
     }
 
     /// <summary>
@@ -714,10 +770,13 @@ public class RegexOptionsMutatorTests
     {
         var (_, mutations) = Mutate(ParenthesizedSource);
 
-        _ = await Assert.That(Replacement(mutations, "remove-multiline")).IsEqualTo("RegexOptions.IgnoreCase");
-        _ = await Assert
-            .That(Replacement(mutations, "add-singleline"))
-            .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Replacement(mutations, "remove-multiline")).IsEqualTo("RegexOptions.IgnoreCase");
+            _ = await Assert
+                .That(Replacement(mutations, "add-singleline"))
+                .IsEqualTo("RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Singleline");
+        }
     }
 
     /// <summary>
@@ -757,11 +816,14 @@ public class RegexOptionsMutatorTests
         var mutations = mutator.CreateMutations(node, semanticModel, CancellationToken.None).ToArray();
         var bound = semanticModel.GetTypeInfo(node).Type;
 
-        _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("Fixtures.RegexOptions");
-        _ = await Assert
-            .That(compilation.GetTypeByMetadataName("System.Text.RegularExpressions.RegexOptions"))
-            .IsNotNull();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("Fixtures.RegexOptions");
+            _ = await Assert
+                .That(compilation.GetTypeByMetadataName("System.Text.RegularExpressions.RegexOptions"))
+                .IsNotNull();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -818,10 +880,13 @@ public class RegexOptionsMutatorTests
         var (tree, mutations) = Mutate(MultiLineCombinationSource);
         var mutated = Rewrite(tree, Single(mutations, "add-singleline"));
 
-        _ = await Assert.That(Replacement(mutations, "add-singleline")).IsEqualTo(collapsed);
-        _ = await Assert.That(Mentions(mutated, "/*!*/" + collapsed)).IsTrue();
-        _ = await Assert.That(Mentions(mutated, "internal static Regex Create() =>")).IsTrue();
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(CompilationFactory.Create(mutated))).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Replacement(mutations, "add-singleline")).IsEqualTo(collapsed);
+            _ = await Assert.That(Mentions(mutated, "/*!*/" + collapsed)).IsTrue();
+            _ = await Assert.That(Mentions(mutated, "internal static Regex Create() =>")).IsTrue();
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(CompilationFactory.Create(mutated))).IsEmpty();
+        }
     }
 
     [Test]

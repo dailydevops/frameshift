@@ -225,10 +225,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             out var error
         );
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
-        _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
-        _ = await Assert.That(DescribeTiling(pattern, tokens)).IsEqualTo("tiles");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
+            _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+            _ = await Assert.That(DescribeTiling(pattern, tokens)).IsEqualTo("tiles");
+        }
     }
 
     /// <summary>
@@ -276,11 +279,14 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             out var error
         );
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
-        _ = await Assert.That(tokenized).IsFalse();
-        _ = await Assert.That(tokens.IsEmpty).IsTrue();
-        _ = await Assert.That(index >= 0 && index < pattern.Length).IsTrue();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
+            _ = await Assert.That(tokenized).IsFalse();
+            _ = await Assert.That(tokens.IsEmpty).IsTrue();
+            _ = await Assert.That(index >= 0 && index < pattern.Length).IsTrue();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -336,9 +342,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
     {
         var tokens = RegexPatternTokenizer.Tokenize(pattern, options);
 
-        _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -421,9 +430,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
     {
         var tokens = RegexPatternTokenizer.Tokenize(pattern, options);
 
-        _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -448,10 +460,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
 
         var tokenized = RegexPatternTokenizer.TryTokenize(pattern, Strict, out _, out var index, out var error);
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsFalse();
-        _ = await Assert.That(tokenized).IsFalse();
-        _ = await Assert.That(error).Contains("is not recognized by .NET");
-        _ = await Assert.That(pattern.Substring(index, 2)).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsFalse();
+            _ = await Assert.That(tokenized).IsFalse();
+            _ = await Assert.That(error).Contains("is not recognized by .NET");
+            _ = await Assert.That(pattern.Substring(index, 2)).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -490,9 +505,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
     {
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Strict);
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
-        _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -516,9 +534,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Strict);
         var last = tokens[tokens.Length - 1];
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
-        _ = await Assert.That($"{last.Kind}:{last.Start}:{last.Text}").IsEqualTo(expectedLastToken);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
+            _ = await Assert.That($"{last.Kind}:{last.Start}:{last.Text}").IsEqualTo(expectedLastToken);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -562,10 +583,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var lazyMarker = tokenized ? tokens.FirstOrDefault(token => token.Start == lazyMarkerIndex) : null;
         var expectedMarker = $"Quantifier[{lazyMarkerIndex}..{lazyMarkerIndex + 1})='?'";
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
-        _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
-        _ = await Assert.That(lazyMarker?.ToString()).IsEqualTo(expectedMarker);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsTrue();
+            _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+            _ = await Assert.That(lazyMarker?.ToString()).IsEqualTo(expectedMarker);
+        }
     }
 
     /// <summary>
@@ -589,9 +613,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
     {
         var tokenized = RegexPatternTokenizer.TryTokenize(pattern, options, out _, out _, out var error);
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
-        _ = await Assert.That(tokenized).IsFalse();
-        _ = await Assert.That(error).Contains("nested quantifier");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, options)).IsFalse();
+            _ = await Assert.That(tokenized).IsFalse();
+            _ = await Assert.That(error).Contains("nested quantifier");
+        }
     }
 
     /// <summary>
@@ -621,11 +648,14 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             out var error
         );
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsFalse();
-        _ = await Assert.That(tokenized).IsFalse();
-        _ = await Assert.That(tokens.IsEmpty).IsTrue();
-        _ = await Assert.That(index >= 0 && index < pattern.Length).IsTrue();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsFalse();
+            _ = await Assert.That(tokenized).IsFalse();
+            _ = await Assert.That(tokens.IsEmpty).IsTrue();
+            _ = await Assert.That(index >= 0 && index < pattern.Length).IsTrue();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -679,10 +709,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             out var error
         );
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
-        _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
-        _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
+            _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -704,10 +737,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Strict);
         var subtraction = tokens.Single(token => token.Start == subtractionIndex);
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
-        _ = await Assert.That(subtraction.Kind).IsEqualTo(RegexTokenKind.CharacterClassSubtraction);
-        _ = await Assert.That(subtraction.Text).IsEqualTo("-");
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
+            _ = await Assert.That(subtraction.Kind).IsEqualTo(RegexTokenKind.CharacterClassSubtraction);
+            _ = await Assert.That(subtraction.Text).IsEqualTo("-");
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -744,10 +780,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             out var error
         );
 
-        _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
-        _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
-        _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(pattern, Strict)).IsTrue();
+            _ = await Assert.That($"{tokenized}:{index}:{error}").IsEqualTo("True:-1:");
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -778,9 +817,12 @@ internal sealed class RegexPatternTokenizerAdversarialTests
             : RegexTokenKind.Comment;
         var oracle = Matches(pattern, Strict, "ab") ? RegexTokenKind.WhitespaceIgnored : RegexTokenKind.Literal;
 
-        _ = await Assert.That(oracle).IsEqualTo(expectedKind);
-        _ = await Assert.That(tokenized).IsTrue();
-        _ = await Assert.That(space).IsEqualTo(expectedKind);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(oracle).IsEqualTo(expectedKind);
+            _ = await Assert.That(tokenized).IsTrue();
+            _ = await Assert.That(space).IsEqualTo(expectedKind);
+        }
     }
 
     /// <summary>
@@ -821,10 +863,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var middle = tokens.Single(token => token.Start == 1);
         var oracle = Matches(pattern, Extended, "ab") ? RegexTokenKind.WhitespaceIgnored : RegexTokenKind.Literal;
 
-        _ = await Assert.That(oracle).IsEqualTo(expectedKind);
-        _ = await Assert.That(middle.Kind).IsEqualTo(expectedKind);
-        _ = await Assert.That(middle.Text).IsEqualTo(candidate);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(oracle).IsEqualTo(expectedKind);
+            _ = await Assert.That(middle.Kind).IsEqualTo(expectedKind);
+            _ = await Assert.That(middle.Text).IsEqualTo(candidate);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -847,11 +892,14 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Extended);
         var kinds = tokens.Select(token => token.Kind).Distinct().OrderBy(kind => kind).ToArray();
 
-        _ = await Assert.That(Matches(pattern, Extended, " ")).IsTrue();
-        _ = await Assert.That(Matches(pattern, Extended, "#")).IsTrue();
-        _ = await Assert.That(tokens.Length).IsEqualTo(8);
-        _ = await Assert.That(kinds).IsEquivalentTo(expectedKinds);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Matches(pattern, Extended, " ")).IsTrue();
+            _ = await Assert.That(Matches(pattern, Extended, "#")).IsTrue();
+            _ = await Assert.That(tokens.Length).IsEqualTo(8);
+            _ = await Assert.That(kinds).IsEquivalentTo(expectedKinds);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -867,11 +915,14 @@ internal sealed class RegexPatternTokenizerAdversarialTests
 
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Strict);
 
-        _ = await Assert.That(Describe(tokens)).IsEqualTo("Literal:0:\uD83D|Literal:1:\uDE00|Quantifier:2:+");
-        _ = await Assert.That(char.IsHighSurrogate(tokens[0].Text[0])).IsTrue();
-        _ = await Assert.That(char.IsLowSurrogate(tokens[1].Text[0])).IsTrue();
-        _ = await Assert.That(Matches(pattern, Strict, "\U0001F600\uDE00")).IsTrue();
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(tokens)).IsEqualTo("Literal:0:\uD83D|Literal:1:\uDE00|Quantifier:2:+");
+            _ = await Assert.That(char.IsHighSurrogate(tokens[0].Text[0])).IsTrue();
+            _ = await Assert.That(char.IsLowSurrogate(tokens[1].Text[0])).IsTrue();
+            _ = await Assert.That(Matches(pattern, Strict, "\U0001F600\uDE00")).IsTrue();
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+        }
     }
 
     /// <summary>
@@ -895,14 +946,17 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var alternationTokens = RegexPatternTokenizer.Tokenize(alternations, Strict);
         watch.Stop();
 
-        _ = await Assert.That(literalTokens.Length).IsEqualTo(20000);
-        _ = await Assert.That(groupTokens.Length).IsEqualTo(6000);
-        _ = await Assert.That(classTokens.Length).IsEqualTo(20000);
-        _ = await Assert.That(alternationTokens.Length).IsEqualTo(10000);
-        _ = await Assert.That(Reconstruct(literalTokens)).IsEqualTo(literals);
-        _ = await Assert.That(Reconstruct(classTokens)).IsEqualTo(classes);
-        _ = await Assert.That(DescribeTiling(alternations, alternationTokens)).IsEqualTo("tiles");
-        _ = await Assert.That(watch.ElapsedMilliseconds).IsLessThan(30_000L);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literalTokens.Length).IsEqualTo(20000);
+            _ = await Assert.That(groupTokens.Length).IsEqualTo(6000);
+            _ = await Assert.That(classTokens.Length).IsEqualTo(20000);
+            _ = await Assert.That(alternationTokens.Length).IsEqualTo(10000);
+            _ = await Assert.That(Reconstruct(literalTokens)).IsEqualTo(literals);
+            _ = await Assert.That(Reconstruct(classTokens)).IsEqualTo(classes);
+            _ = await Assert.That(DescribeTiling(alternations, alternationTokens)).IsEqualTo("tiles");
+            _ = await Assert.That(watch.ElapsedMilliseconds).IsLessThan(30_000L);
+        }
     }
 
     /// <summary>
@@ -921,12 +975,15 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var groupTokens = RegexPatternTokenizer.Tokenize(groups, Strict);
         var classTokens = RegexPatternTokenizer.Tokenize(classes, Strict);
 
-        _ = await Assert.That(IsAcceptedByRegex(groups, Strict)).IsTrue();
-        _ = await Assert.That(IsAcceptedByRegex(classes, Strict)).IsTrue();
-        _ = await Assert.That(groupTokens.Length).IsEqualTo(401);
-        _ = await Assert.That(Reconstruct(groupTokens)).IsEqualTo(groups);
-        _ = await Assert.That(Reconstruct(classTokens)).IsEqualTo(classes);
-        _ = await Assert.That(DescribeTiling(classes, classTokens)).IsEqualTo("tiles");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(IsAcceptedByRegex(groups, Strict)).IsTrue();
+            _ = await Assert.That(IsAcceptedByRegex(classes, Strict)).IsTrue();
+            _ = await Assert.That(groupTokens.Length).IsEqualTo(401);
+            _ = await Assert.That(Reconstruct(groupTokens)).IsEqualTo(groups);
+            _ = await Assert.That(Reconstruct(classTokens)).IsEqualTo(classes);
+            _ = await Assert.That(DescribeTiling(classes, classTokens)).IsEqualTo("tiles");
+        }
     }
 
     /// <summary>
@@ -943,10 +1000,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var tokens = RegexPatternTokenizer.Tokenize(pattern, Strict);
         watch.Stop();
 
-        _ = await Assert.That(tokens.Length).IsGreaterThan(300);
-        _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
-        _ = await Assert.That(DescribeTiling(pattern, tokens)).IsEqualTo("tiles");
-        _ = await Assert.That(watch.ElapsedMilliseconds).IsLessThan(30_000L);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(tokens.Length).IsGreaterThan(300);
+            _ = await Assert.That(Reconstruct(tokens)).IsEqualTo(pattern);
+            _ = await Assert.That(DescribeTiling(pattern, tokens)).IsEqualTo("tiles");
+            _ = await Assert.That(watch.ElapsedMilliseconds).IsLessThan(30_000L);
+        }
     }
 
     /// <summary>
@@ -961,10 +1021,13 @@ internal sealed class RegexPatternTokenizerAdversarialTests
         var whitespaceOnly = RegexPatternTokenizer.Tokenize(" \t\n", Extended);
         var commentOnly = RegexPatternTokenizer.Tokenize("(?#)", Strict);
 
-        _ = await Assert.That(empty.IsEmpty).IsTrue();
-        _ = await Assert.That(Describe(whitespaceOnly)).IsEqualTo("WhitespaceIgnored:0: \t\n");
-        _ = await Assert.That(Describe(commentOnly)).IsEqualTo("Comment:0:(?#)");
-        _ = await Assert.That(Reconstruct(whitespaceOnly)).IsEqualTo(" \t\n");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(empty.IsEmpty).IsTrue();
+            _ = await Assert.That(Describe(whitespaceOnly)).IsEqualTo("WhitespaceIgnored:0: \t\n");
+            _ = await Assert.That(Describe(commentOnly)).IsEqualTo("Comment:0:(?#)");
+            _ = await Assert.That(Reconstruct(whitespaceOnly)).IsEqualTo(" \t\n");
+        }
     }
 
     /// <summary>
