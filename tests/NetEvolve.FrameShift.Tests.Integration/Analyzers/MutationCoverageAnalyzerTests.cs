@@ -33,8 +33,46 @@ public class MutationCoverageAnalyzerTests
     private const string BetaMemberId = "M:Fixture.Second.Beta(System.Int32)";
     private const string DescribeMemberId = "M:Toolbox.Describe(System.Int32)";
     private const string GhostMemberId = "M:Fixture.Ghost.Vanished(System.Int32)~System.Int32";
+    private const string AddMemberId = "M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32";
+    private const string IgnoreMemberId = "M:Fixture.Gap.Ignore(System.Int32)";
+    private const string CombineMemberId = "M:Fixture.Gap.Combine(System.Int32)~System.Int32";
+
+    /// <summary>
+    /// The test method id the manifests of the reachability tests are attributed to. Those tests state
+    /// nothing about test data, so the id is never asserted on.
+    /// </summary>
+    private const string AnonymousTestId = "M:Fixture.Tests.AnonymousTests.Reaches";
+
+    private const string FirstAddTestId = "M:Fixture.Tests.CalculatorTests.Add_AddsTheValues";
+    private const string SecondAddTestId = "M:Fixture.Tests.CalculatorTests.Add_AddsNegativeValues";
+
+    private const string FirstAddTestName = "Fixture.Tests.CalculatorTests.Add_AddsTheValues";
+    private const string IgnoreTestId = "M:Fixture.Tests.GapTests.Ignore_DiscardsTheValue";
+    private const string CombineTestId = "M:Fixture.Tests.GapTests.Combine_CombinesTheValue";
+
+    /// <summary>
+    /// The case count of a test declaring exactly one test case.
+    /// </summary>
+    private const string SingleCaseCount = "1";
+
+    /// <summary>
+    /// The case count of a test declaring exactly three test cases.
+    /// </summary>
+    private const string ThreeCasesCount = "3";
+
+    /// <summary>
+    /// The case count of a test whose exact number of cases cannot be determined statically.
+    /// </summary>
+    private const string LowerBoundCount = "1+";
+
+    /// <summary>
+    /// The part of the <c>FSH0006</c> message the single test method name follows.
+    /// </summary>
+    private const string TestMethodMarker = "the one of test method '";
 
     private const string BrokenManifestPath = "Broken.frameshift-tests";
+    private const string FirstManifestPath = "First.frameshift-tests";
+    private const string SecondManifestPath = "Second.frameshift-tests";
     private const string UnrelatedAdditionalFilePath = "Notes.txt";
 
     private const string DiscardedTrivialMessage =
@@ -47,6 +85,16 @@ public class MutationCoverageAnalyzerTests
     private const int ElapsedMemberLine = 17;
     private const int BetaMemberLine = 15;
     private const int GammaMemberLine = 23;
+    private const int AddMemberLine = 7;
+    private const int NormalizeMemberLine = 12;
+    private const int MultiplyMemberLine = 20;
+    private const int CombineMemberLine = 15;
+
+    /// <summary>
+    /// The number of meaningful mutants <c>Gap.Combine</c> of <see cref="BudgetSource" /> carries, and the
+    /// number of diagnostics it therefore produces without a budget.
+    /// </summary>
+    private const int CombineMutantCount = 15;
 
     /// <summary>
     /// The line feed the snapshots are built with, instead of <see cref="Environment.NewLine" />.
@@ -222,6 +270,37 @@ public class MutationCoverageAnalyzerTests
         """;
 
     /// <summary>
+    /// <c>Calculator.Add</c> (line 7) calls the private <c>Calculator.Normalize</c> (line 12), while
+    /// <c>Ignored.Multiply</c> (line 20) is called by nobody. Every one of the three expressions carries
+    /// meaningful mutants, so a manifest naming <c>Calculator.Add</c> alone separates the three verdicts:
+    /// directly reached, transitively reached and not reached at all.
+    /// </summary>
+    private const string CalculatorSource = """
+        namespace Fixture;
+
+        public static class Calculator
+        {
+            public static int Add(int left, int right)
+            {
+                return Normalize(left) + right;
+            }
+
+            private static int Normalize(int value)
+            {
+                return value * 2;
+            }
+        }
+
+        public static class Ignored
+        {
+            public static int Multiply(int left, int right)
+            {
+                return left * right;
+            }
+        }
+        """;
+
+    /// <summary>
     /// Three interchangeable members on lines 7, 15 and 23, so that each manifest can cover exactly
     /// one of them.
     /// </summary>
@@ -337,7 +416,7 @@ public class MutationCoverageAnalyzerTests
         var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
         var manifest = new InMemoryAdditionalText(
             "Empty.frameshift-tests",
-            TestSurfaceManifestFormat.Header + "\nT M:Fixture.Tests.ScaleTests.Scale_DoublesTheValue\n"
+            TestSurfaceManifestFormat.Header + "\nT M:Fixture.Tests.ScaleTests.Scale_DoublesTheValue 1\n"
         );
 
         var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
@@ -534,6 +613,194 @@ public class MutationCoverageAnalyzerTests
         _ = await Verify(Snapshot(diagnostics)).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// The whole point of <c>FSH0006</c>: <c>Calculator.Add</c> is covered, but by one test with one test
+    /// case, so a mutant that only differs for other inputs would survive. The transitively reached
+    /// <c>Calculator.Normalize</c> is attributed to the very same test case, while the member no test
+    /// reaches keeps reporting <c>FSH0001</c> and is never named as thinly covered.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachedByOneSingleCaseTest_ReportsTheSingleTestCaseHint()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest((FirstAddTestId, SingleCaseCount, [AddMemberId]));
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(Errors(compilation)).IsEmpty();
+        _ = await Assert.That(DiagnosticAssertions.Ids(diagnostics).Where(IsAnalyzerFailure)).IsEmpty();
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        _ = await Assert
+            .That(SingleTestCaseLines(diagnostics).Distinct())
+            .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+        _ = await Assert
+            .That(SingleTestCaseMethods(diagnostics).Distinct(StringComparer.Ordinal))
+            .IsEquivalentTo(new[] { FirstAddTestName });
+    }
+
+    /// <summary>
+    /// Two tests with one case each sum to two input combinations, which is not a single case any more.
+    /// The <c>FSH0001</c> set proves the run analysed the very same compilation.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachedByTwoSingleCaseTests_DoesNotReportTheSingleTestCaseHint()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest(
+            (FirstAddTestId, SingleCaseCount, [AddMemberId]),
+            (SecondAddTestId, SingleCaseCount, [AddMemberId])
+        );
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+    }
+
+    /// <summary>
+    /// One test with three inline data rows exercises three input combinations, so its coverage is not
+    /// narrow in the sense of <c>FSH0006</c>.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachedByOneTestWithThreeCases_DoesNotReportTheSingleTestCaseHint()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest((FirstAddTestId, ThreeCasesCount, [AddMemberId]));
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+    }
+
+    /// <summary>
+    /// A lower bound says "at least one case, the exact number is unknown", for example a data source whose
+    /// sequence only exists at run time. The true total could be far higher than one, so the finding is
+    /// suppressed instead of guessed.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachedByOneTestWithALowerBound_DoesNotReportTheSingleTestCaseHint()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest((FirstAddTestId, LowerBoundCount, [AddMemberId]));
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+    }
+
+    /// <summary>
+    /// One single-case test and one test with a lower bound reach the same member. The exact part alone
+    /// would sum to one, but the bound could contribute any number, so the sum is not exact and the finding
+    /// is suppressed for the directly and the transitively reached member alike.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachedByASingleCaseTestAndALowerBound_DoesNotReportTheSingleTestCaseHint()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest(
+            (FirstAddTestId, SingleCaseCount, [AddMemberId]),
+            (SecondAddTestId, LowerBoundCount, [AddMemberId])
+        );
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+    }
+
+    /// <summary>
+    /// Two manifests, each naming one single-case test for the same member, must aggregate to two cases
+    /// instead of being judged one file at a time.
+    /// </summary>
+    [Test]
+    public async Task Analyze_TwoManifestsEachNameOneSingleCaseTest_AggregatesThemToTwoCases()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var first = CreateTestManifestAt(FirstManifestPath, (FirstAddTestId, SingleCaseCount, [AddMemberId]));
+        var second = CreateTestManifestAt(SecondManifestPath, (SecondAddTestId, SingleCaseCount, [AddMemberId]));
+        var alone = await RunAsync(compilation, [first]).ConfigureAwait(false);
+
+        var merged = await RunAsync(compilation, [first, second]).ConfigureAwait(false);
+
+        _ = await Assert
+            .That(SingleTestCaseLines(alone).Distinct())
+            .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
+        _ = await Assert.That(SingleTestCaseDiagnostics(merged)).IsEmpty();
+    }
+
+    /// <summary>
+    /// The same test method recorded by two manifests, as a multi-targeted test project produces, is one
+    /// test method with one test case and must not be summed into two.
+    /// </summary>
+    [Test]
+    public async Task Analyze_TwoManifestsNameTheSameSingleCaseTest_StillCountsOneCase()
+    {
+        var compilation = CompilationFactory.Create(CalculatorSource, ProductionAssemblyName);
+        var first = CreateTestManifestAt(FirstManifestPath, (FirstAddTestId, SingleCaseCount, [AddMemberId]));
+        var second = CreateTestManifestAt(SecondManifestPath, (FirstAddTestId, SingleCaseCount, [AddMemberId]));
+
+        var diagnostics = await RunAsync(compilation, [first, second]).ConfigureAwait(false);
+
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        _ = await Assert
+            .That(SingleTestCaseLines(diagnostics).Distinct())
+            .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
+        _ = await Assert
+            .That(SingleTestCaseMethods(diagnostics).Distinct(StringComparer.Ordinal))
+            .IsEquivalentTo(new[] { FirstAddTestName });
+    }
+
+    /// <summary>
+    /// A mutant that cannot change observable behaviour is not made interesting by weak test data, so the
+    /// trivial verdict wins and <c>FSH0006</c> stays silent even though <c>Gap.Ignore</c> is reached by
+    /// exactly one test case.
+    /// </summary>
+    [Test]
+    public async Task Analyze_TrivialMutantIsReachedByOneSingleCaseTest_ReportsOnlyTheTrivialMutant()
+    {
+        var compilation = CompilationFactory.Create(TrivialSource, ProductionAssemblyName);
+        var manifest = CreateTestManifest((IgnoreTestId, SingleCaseCount, [IgnoreMemberId]));
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+        var trivial = DiagnosticAssertions.Summarise(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.TrivialMutant));
+
+        _ = await Assert
+            .That(trivial.Select(summary => summary.Line).Distinct())
+            .IsEquivalentTo(new[] { TrivialMutationLine });
+        _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
+        _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { TrivialFixtureGapLine });
+    }
+
+    /// <summary>
+    /// The mutant budget bounds the informational output exactly like it bounds the gaps: without a budget
+    /// <c>Gap.Combine</c> reports every one of its meaningful mutants as thinly covered, with a budget of
+    /// one it reports a single one.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MutantBudgetIsOneAndOneTestCaseReaches_BoundsTheSingleTestCaseHints()
+    {
+        var compilation = CompilationFactory.Create(BudgetSource, ProductionAssemblyName);
+        var manifest = new[] { CreateTestManifest((CombineTestId, SingleCaseCount, [CombineMemberId])) };
+        var unlimited = await RunAsync(compilation, manifest).ConfigureAwait(false);
+
+        var limited = await RunAsync(
+                compilation,
+                manifest,
+                new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["build_property.FrameShiftMaxMutantsPerMember"] = "1",
+                }
+            )
+            .ConfigureAwait(false);
+
+        _ = await Assert.That(SingleTestCaseDiagnostics(unlimited)).Count().IsEqualTo(CombineMutantCount);
+        _ = await Assert.That(SingleTestCaseDiagnostics(limited)).Count().IsEqualTo(1);
+        _ = await Assert.That(SingleTestCaseLines(limited)).IsEquivalentTo(new[] { CombineMemberLine });
+    }
+
     [Test]
     public async Task Initialize_ContextIsNull_ThrowsArgumentNullException()
     {
@@ -696,21 +963,61 @@ public class MutationCoverageAnalyzerTests
         );
     }
 
+    /// <summary>
+    /// Builds a manifest that attributes <paramref name="referencedMemberIds" /> to one anonymous test
+    /// whose case count is the lower bound <see cref="LowerBoundCount" />.
+    /// </summary>
+    /// <param name="referencedMemberIds">The production members the manifest records as referenced.</param>
+    /// <returns>The manifest as an additional file.</returns>
+    /// <remarks>
+    /// Every <c>R</c> line of the format belongs to the <c>T</c> line above it, so a manifest that records
+    /// a reference always names a test as well. A lower bound is the right default for the tests that are
+    /// about reachability alone: it says "at least one case, the exact number is unknown", which is exactly
+    /// what a hand-written member id expresses, and it keeps the single-test-case heuristic of
+    /// <c>FSH0006</c> out of a run that does not state anything about test data.
+    /// </remarks>
     private static InMemoryAdditionalText CreateManifest(params string[] referencedMemberIds) =>
         CreateManifestAt(InMemoryAdditionalText.DefaultPath, referencedMemberIds);
 
-    private static InMemoryAdditionalText CreateManifestAt(string path, params string[] referencedMemberIds)
+    private static InMemoryAdditionalText CreateManifestAt(string path, params string[] referencedMemberIds) =>
+        CreateTestManifestAt(path, (AnonymousTestId, LowerBoundCount, referencedMemberIds));
+
+    /// <summary>
+    /// Builds a manifest from complete test entries, so that a test can state which test reached what and
+    /// with how many cases.
+    /// </summary>
+    /// <param name="tests">The test entries, each a test method id, a case count and the referenced members.</param>
+    /// <returns>The manifest as an additional file.</returns>
+    private static InMemoryAdditionalText CreateTestManifest(
+        params (string TestMethodId, string Count, string[] ReferencedMemberIds)[] tests
+    ) => CreateTestManifestAt(InMemoryAdditionalText.DefaultPath, tests);
+
+    private static InMemoryAdditionalText CreateTestManifestAt(
+        string path,
+        params (string TestMethodId, string Count, string[] ReferencedMemberIds)[] tests
+    )
     {
         var builder = new StringBuilder();
         _ = builder.Append(TestSurfaceManifestFormat.Header).Append('\n');
 
-        foreach (var referencedMemberId in referencedMemberIds)
+        foreach (var (testMethodId, count, referencedMemberIds) in tests)
         {
             _ = builder
-                .Append(TestSurfaceManifestFormat.ReferencePrefix)
+                .Append(TestSurfaceManifestFormat.TestPrefix)
                 .Append(' ')
-                .Append(referencedMemberId)
+                .Append(testMethodId)
+                .Append(' ')
+                .Append(count)
                 .Append('\n');
+
+            foreach (var referencedMemberId in referencedMemberIds)
+            {
+                _ = builder
+                    .Append(TestSurfaceManifestFormat.ReferencePrefix)
+                    .Append(' ')
+                    .Append(referencedMemberId)
+                    .Append('\n');
+            }
         }
 
         return new InMemoryAdditionalText(path, builder.ToString());
@@ -793,6 +1100,43 @@ public class MutationCoverageAnalyzerTests
         DiagnosticAssertions
             .Summarise(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint))
             .Select(summary => summary.Line);
+
+    private static ImmutableArray<Diagnostic> SingleTestCaseDiagnostics(ImmutableArray<Diagnostic> diagnostics) =>
+        AnalyzerRunner.OfId(diagnostics, DiagnosticIds.SingleTestCaseMutationPoint);
+
+    private static IEnumerable<int> SingleTestCaseLines(ImmutableArray<Diagnostic> diagnostics) =>
+        DiagnosticAssertions.Summarise(SingleTestCaseDiagnostics(diagnostics)).Select(summary => summary.Line);
+
+    /// <summary>
+    /// Reads the single test method every <c>FSH0006</c> message names, so that an assertion states the
+    /// attribution without also pinning the name of the mutation the message starts with.
+    /// </summary>
+    /// <param name="diagnostics">The diagnostics of a run.</param>
+    /// <returns>One test method name per <c>FSH0006</c> diagnostic.</returns>
+    private static IEnumerable<string> SingleTestCaseMethods(ImmutableArray<Diagnostic> diagnostics) =>
+        DiagnosticAssertions
+            .Summarise(SingleTestCaseDiagnostics(diagnostics))
+            .Select(summary => ExtractTestMethod(summary.Message));
+
+    /// <summary>
+    /// Extracts the quoted test method name that follows <see cref="TestMethodMarker" />.
+    /// </summary>
+    /// <param name="message">The message of an <c>FSH0006</c> diagnostic.</param>
+    /// <returns>The name, or the whole message when the marker is missing, which fails the assertion.</returns>
+    private static string ExtractTestMethod(string message)
+    {
+        var marker = message.IndexOf(TestMethodMarker, StringComparison.Ordinal);
+
+        if (marker < 0)
+        {
+            return message;
+        }
+
+        var start = marker + TestMethodMarker.Length;
+        var end = message.IndexOf('\'', start);
+
+        return end < 0 ? message.Substring(start) : message.Substring(start, end - start);
+    }
 
     private static string Describe(ImmutableArray<Diagnostic> diagnostics, string id) =>
         DiagnosticAssertions.Describe(AnalyzerRunner.OfId(diagnostics, id));

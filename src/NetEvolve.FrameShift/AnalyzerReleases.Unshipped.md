@@ -9,3 +9,4 @@ FSH0001 | FrameShift | Warning | Mutation point is not reachable from any test.
 FSH0002 | FrameShift | Info | Mutant cannot change observable behaviour (trivial or equivalent mutant).
 FSH0003 | FrameShift | Warning | Test-surface manifest is missing or malformed.
 FSH0004 | FrameShift | Info | Test method does not reference any production member.
+FSH0006 | FrameShift | Info | Mutation point is reached by a single test case.

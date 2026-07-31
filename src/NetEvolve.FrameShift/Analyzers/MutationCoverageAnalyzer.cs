@@ -29,8 +29,42 @@ using NetEvolve.FrameShift.TestSurface;
 /// syntax tree once: each candidate mutation is verified to still compile, classified as trivial or
 /// meaningful, and finally attributed to its enclosing member. A meaningful mutant inside an
 /// unreachable member is a testing gap (<c>FSH0001</c>), a mutant that cannot change observable
-/// behaviour is informational (<c>FSH0002</c>), and a manifest that cannot be used is reported as
-/// such (<c>FSH0003</c>).
+/// behaviour is informational (<c>FSH0002</c>), a manifest that cannot be used is reported as
+/// such (<c>FSH0003</c>), and a meaningful mutant inside a member that a single test case reaches is a
+/// weak-test-data hint (<c>FSH0006</c>).
+/// </para>
+/// <para>
+/// The three mutation diagnostics are mutually exclusive, in this order of precedence:
+/// </para>
+/// <list type="number">
+/// <item>
+/// <description>
+/// A mutant that cannot change observable behaviour reports <c>FSH0002</c> and nothing else. No test
+/// data can ever distinguish it from the original code, so counting the test cases that reach it would
+/// only add noise to a finding that is not a gap in the first place. This is independent of
+/// <see cref="FrameShiftOptions.ReportTrivialMutants" />: suppressing the informational
+/// <c>FSH0002</c> output must not turn the very same mutant into an <c>FSH0006</c> hint.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// A meaningful mutant inside an unreachable member reports <c>FSH0001</c> and never <c>FSH0006</c>.
+/// <c>FSH0006</c> refines "covered" into "thinly covered", which presupposes coverage; a member no test
+/// reaches has no test case to count.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// A meaningful mutant inside a reachable member reports <c>FSH0006</c> when exactly one test case
+/// reaches that member, see <see cref="TestCaseAttribution" />.
+/// </description>
+/// </item>
+/// </list>
+/// <para>
+/// <c>FSH0006</c> has no MSBuild switch of its own, deliberately: it is informational and the standard
+/// <c>dotnet_diagnostic.FSH0006.severity</c> configuration already silences it. Its cost is paid lazily
+/// instead, because the per-test attribution is built the first time a mutation point actually asks for
+/// it and never for a compilation without a single exactly-one-case test.
 /// </para>
 /// <para>
 /// A project without a manifest stays completely silent, because it has not opted in; the build assets
@@ -58,11 +92,12 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         Descriptors.UnreachableMutationPoint,
         Descriptors.TrivialMutant,
         Descriptors.InvalidTestSurfaceManifest,
+        Descriptors.SingleTestCaseMutationPoint,
     ];
 
     /// <summary>
-    /// Gets the diagnostics this analyzer can report, which are <c>FSH0001</c>, <c>FSH0002</c> and
-    /// <c>FSH0003</c>.
+    /// Gets the diagnostics this analyzer can report, which are <c>FSH0001</c>, <c>FSH0002</c>,
+    /// <c>FSH0003</c> and <c>FSH0006</c>.
     /// </summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
 
@@ -126,9 +161,10 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         }
 
         var compiler = new MutantCompiler(context.Compilation);
+        var attribution = new TestCaseAttribution(context.Compilation, result.Manifest);
 
         context.RegisterSemanticModelAction(modelContext =>
-            AnalyzeSemanticModel(modelContext, reachable, compiler, options)
+            AnalyzeSemanticModel(modelContext, reachable, attribution, compiler, options)
         );
     }
 
@@ -150,11 +186,13 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// </summary>
     /// <param name="context">The semantic model context of the analysed file.</param>
     /// <param name="reachable">The reachable set computed once for the whole compilation.</param>
+    /// <param name="attribution">The per-test attribution shared by all files, which memoises its results.</param>
     /// <param name="compiler">The mutant compiler shared by all files, which memoises its results.</param>
     /// <param name="options">The configuration of the current compilation.</param>
     private static void AnalyzeSemanticModel(
         SemanticModelAnalysisContext context,
         ReachableSymbolSet reachable,
+        TestCaseAttribution attribution,
         MutantCompiler compiler,
         FrameShiftOptions options
     )
@@ -175,7 +213,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var state = GetOrCreateState(states, member, reachable);
+            var state = GetOrCreateState(states, member, reachable, attribution);
             if (!state.TryConsume(options.MaxMutantsPerMember))
             {
                 // The member has exhausted its budget. Skipping before the expensive verification
@@ -232,6 +270,9 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
                 );
             }
 
+            // A mutant that cannot change observable behaviour is not made interesting by weak test
+            // data, so the single-test-case hint is suppressed here as well, whether or not the
+            // informational diagnostic above was reported.
             return;
         }
 
@@ -240,7 +281,43 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
             context.ReportDiagnostic(
                 Diagnostic.Create(Descriptors.UnreachableMutationPoint, mutation.Location, mutation.DisplayName)
             );
+
+            return;
         }
+
+        ReportSingleTestCase(context, mutation, state, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reports <c>FSH0006</c> for a meaningful mutant inside a reachable member that exactly one exact
+    /// test case reaches.
+    /// </summary>
+    /// <param name="context">The semantic model context of the analysed file.</param>
+    /// <param name="mutation">The candidate mutation, already known to be viable and meaningful.</param>
+    /// <param name="state">The state of the member enclosing the mutation point.</param>
+    /// <param name="cancellationToken">A token observed while the attribution is built.</param>
+    private static void ReportSingleTestCase(
+        SemanticModelAnalysisContext context,
+        Mutation mutation,
+        MemberState state,
+        CancellationToken cancellationToken
+    )
+    {
+        var testMethodId = state.GetSingleTestMethodId(cancellationToken);
+
+        if (testMethodId is null)
+        {
+            return;
+        }
+
+        context.ReportDiagnostic(
+            Diagnostic.Create(
+                Descriptors.SingleTestCaseMutationPoint,
+                mutation.Location,
+                mutation.DisplayName,
+                TestCaseAttribution.Describe(testMethodId)
+            )
+        );
     }
 
     /// <summary>
@@ -250,16 +327,18 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// <param name="states">The per-file state map.</param>
     /// <param name="member">The member enclosing the current mutation point.</param>
     /// <param name="reachable">The reachable set computed once for the whole compilation.</param>
+    /// <param name="attribution">The per-test attribution of the whole compilation.</param>
     /// <returns>The state of the member.</returns>
     private static MemberState GetOrCreateState(
         Dictionary<ISymbol, MemberState> states,
         ISymbol member,
-        ReachableSymbolSet reachable
+        ReachableSymbolSet reachable,
+        TestCaseAttribution attribution
     )
     {
         if (!states.TryGetValue(member, out var state))
         {
-            state = new MemberState(reachable.ContainsEnclosing(member));
+            state = new MemberState(member, reachable.ContainsEnclosing(member), attribution);
             states.Add(member, state);
         }
 
@@ -289,13 +368,19 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// <param name="files">The manifest files to read.</param>
     /// <param name="cancellationToken">A token observed between the files.</param>
     /// <returns>The merged manifest, the files it was built from and one diagnostic per unusable file.</returns>
+    /// <remarks>
+    /// The merge unites the per-test entries instead of the flat id sets, so that the attribution behind
+    /// <c>FSH0006</c> still knows which test reached what after several manifests were combined. The
+    /// derived <see cref="TestSurfaceManifest.TestMethodIds" /> and
+    /// <see cref="TestSurfaceManifest.ReferencedMemberIds" /> are exactly the unions the previous flat
+    /// merge produced.
+    /// </remarks>
     private static ManifestReadResult ReadManifests(
         ImmutableArray<AdditionalText> files,
         CancellationToken cancellationToken
     )
     {
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var manifests = ImmutableArray.CreateBuilder<TestSurfaceManifest>(files.Length);
         var parsedFiles = ImmutableArray.CreateBuilder<AdditionalText>(files.Length);
         var problems = ImmutableArray.CreateBuilder<Diagnostic>();
 
@@ -318,12 +403,11 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            testMethodIds.UnionWith(manifest.TestMethodIds);
-            referencedMemberIds.UnionWith(manifest.ReferencedMemberIds);
+            manifests.Add(manifest);
             parsedFiles.Add(file);
         }
 
-        var merged = new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
+        var merged = TestSurfaceManifest.Merge(manifests.ToImmutable());
 
         return new ManifestReadResult(merged, parsedFiles.ToImmutable(), problems.ToImmutable());
     }
@@ -380,13 +464,25 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// </summary>
     private sealed class MemberState
     {
+        private readonly ISymbol _member;
+        private readonly TestCaseAttribution _attribution;
+
         private int _considered;
+        private bool _isAttributed;
+        private string? _singleTestMethodId;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MemberState" /> class.
         /// </summary>
+        /// <param name="member">The member enclosing the mutation points this state belongs to.</param>
         /// <param name="isReachable">Whether the member, or a member enclosing it, is reachable.</param>
-        public MemberState(bool isReachable) => IsReachable = isReachable;
+        /// <param name="attribution">The per-test attribution of the whole compilation.</param>
+        public MemberState(ISymbol member, bool isReachable, TestCaseAttribution attribution)
+        {
+            _member = member;
+            _attribution = attribution;
+            IsReachable = isReachable;
+        }
 
         /// <summary>
         /// Gets a value indicating whether the member, or a member enclosing it, is reachable from a
@@ -412,6 +508,31 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
             _considered++;
 
             return true;
+        }
+
+        /// <summary>
+        /// Returns the documentation comment id of the only test method that reaches the member, if the
+        /// member is reached by exactly one test case.
+        /// </summary>
+        /// <param name="cancellationToken">A token observed while the attribution is built.</param>
+        /// <returns>
+        /// The id of the single test method, or <see langword="null" /> when the sum of the case counts
+        /// reaching the member is not exactly one or when any contributing count is a lower bound.
+        /// </returns>
+        /// <remarks>
+        /// The answer is a property of the member, not of the mutation point, so it is computed once per
+        /// member. This instance is a local of a single semantic model callback, therefore the memoisation
+        /// needs no synchronisation of its own.
+        /// </remarks>
+        public string? GetSingleTestMethodId(CancellationToken cancellationToken)
+        {
+            if (!_isAttributed)
+            {
+                _singleTestMethodId = _attribution.FindSingleTestMethodId(_member, cancellationToken);
+                _isAttributed = true;
+            }
+
+            return _singleTestMethodId;
         }
     }
 
@@ -451,5 +572,259 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         /// Gets one diagnostic per file that could not be used.
         /// </summary>
         public ImmutableArray<Diagnostic> Problems { get; }
+    }
+
+    /// <summary>
+    /// Answers, per production member, whether exactly one test case reaches it, which is the trigger of
+    /// <c>FSH0006</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The rule is an aggregation over all test methods reaching the member: the sum of their case counts
+    /// has to be exactly one and every contributing count has to be exact. That leaves precisely one
+    /// shape, which is what this class exploits instead of materialising the sum. A count that is exact
+    /// and zero contributes nothing at all and can be ignored; a count that is exact and greater than one,
+    /// or a lower bound of any value, makes the aggregate fail as soon as it contributes at all. So the
+    /// tests are partitioned once: the exactly-one-case tests are kept individually, everything that can
+    /// only disqualify a member is folded into a single seed set. A member is reported when no
+    /// disqualifying test reaches it and exactly one of the exactly-one-case tests does.
+    /// </para>
+    /// <para>
+    /// Which members a single test reaches is again a transitive question over the production call graph,
+    /// so one closure per kept test is computed, plus one for the disqualifying seeds. That is the price of
+    /// attributing a member to a test at all, and it is paid lazily: nothing is computed for a compilation
+    /// without an exactly-one-case test, and nothing is computed until the first meaningful mutant inside a
+    /// reachable member asks for it.
+    /// </para>
+    /// <para>
+    /// Instances are shared by the concurrently running per-file callbacks, so the lazy build is guarded by
+    /// a lock. A build that is cancelled publishes nothing and is simply retried by the next caller.
+    /// </para>
+    /// </remarks>
+    private sealed class TestCaseAttribution
+    {
+        /// <summary>
+        /// The prefix a documentation comment id of a method carries.
+        /// </summary>
+        private const string MethodIdPrefix = "M:";
+
+        /// <summary>
+        /// The empty test method id set of the throwaway manifests the closures are seeded with. Only the
+        /// referenced members matter there, the closure never looks at the test ids.
+        /// </summary>
+        private static readonly ImmutableHashSet<string> _noTestMethodIds = ImmutableHashSet.Create<string>(
+            StringComparer.Ordinal
+        );
+
+        private readonly Compilation _compilation;
+        private readonly ImmutableArray<SingleCaseTest> _singleCaseTests;
+        private readonly ImmutableHashSet<string> _disqualifyingMemberIds;
+        private readonly object _gate = new object();
+
+        private ImmutableArray<ReachingTest> _reachingTests;
+        private ReachableSymbolSet? _disqualified;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TestCaseAttribution" /> class by partitioning the
+        /// recorded test methods into the ones that can trigger <c>FSH0006</c> and the ones that can only
+        /// suppress it.
+        /// </summary>
+        /// <param name="compilation">The production compilation the closures are computed over.</param>
+        /// <param name="manifest">The merged manifest holding the per-test entries.</param>
+        public TestCaseAttribution(Compilation compilation, TestSurfaceManifest manifest)
+        {
+            _compilation = compilation;
+
+            var singleCaseTests = ImmutableArray.CreateBuilder<SingleCaseTest>();
+            var disqualifyingMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
+            foreach (var references in manifest.ReferencesByTest.Where(entry => !entry.Value.IsEmpty))
+            {
+                var count = GetCaseCount(manifest, references.Key);
+
+                if (count.IsExact && count.Value == 1)
+                {
+                    singleCaseTests.Add(new SingleCaseTest(references.Key, references.Value));
+                }
+                else if (!count.IsExact || count.Value > 1)
+                {
+                    disqualifyingMemberIds.UnionWith(references.Value);
+                }
+            }
+
+            _singleCaseTests = singleCaseTests.ToImmutable();
+            _disqualifyingMemberIds = disqualifyingMemberIds.ToImmutable();
+        }
+
+        /// <summary>
+        /// Turns the documentation comment id of a test method into the form a message shows.
+        /// </summary>
+        /// <param name="testMethodId">The documentation comment id of the test method.</param>
+        /// <returns>The id without its <c>M:</c> prefix.</returns>
+        public static string Describe(string testMethodId) =>
+            testMethodId.StartsWith(MethodIdPrefix, StringComparison.Ordinal)
+                ? testMethodId.Substring(MethodIdPrefix.Length)
+                : testMethodId;
+
+        /// <summary>
+        /// Determines the single test method reaching <paramref name="member" />.
+        /// </summary>
+        /// <param name="member">The member enclosing a mutation point, known to be reachable.</param>
+        /// <param name="cancellationToken">A token observed while the attribution is built.</param>
+        /// <returns>
+        /// The documentation comment id of the only test method whose only test case reaches
+        /// <paramref name="member" />, or <see langword="null" /> when no such attribution exists.
+        /// </returns>
+        public string? FindSingleTestMethodId(ISymbol member, CancellationToken cancellationToken)
+        {
+            if (_singleCaseTests.IsEmpty)
+            {
+                return null;
+            }
+
+            EnsureBuilt(cancellationToken);
+
+            if (_disqualified!.ContainsEnclosing(member))
+            {
+                return null;
+            }
+
+            string? single = null;
+
+            foreach (var test in _reachingTests.Where(test => test.Closure.ContainsEnclosing(member)))
+            {
+                if (single is not null)
+                {
+                    // Two test cases reach the member, so its inputs are not a single combination.
+                    return null;
+                }
+
+                single = test.TestMethodId;
+            }
+
+            return single;
+        }
+
+        /// <summary>
+        /// Computes the closures of the partitioned tests on first use.
+        /// </summary>
+        /// <param name="cancellationToken">A token observed between the closures.</param>
+        private void EnsureBuilt(CancellationToken cancellationToken)
+        {
+            lock (_gate)
+            {
+                if (_disqualified is not null)
+                {
+                    return;
+                }
+
+                var reachingTests = ImmutableArray.CreateBuilder<ReachingTest>(_singleCaseTests.Length);
+
+                foreach (var test in _singleCaseTests)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var closure = Close(test.ReferencedMemberIds, cancellationToken);
+
+                    if (!closure.IsEmpty)
+                    {
+                        reachingTests.Add(new ReachingTest(test.TestMethodId, closure));
+                    }
+                }
+
+                var disqualified = Close(_disqualifyingMemberIds, cancellationToken);
+
+                _reachingTests = reachingTests.ToImmutable();
+
+                // Published last, because it is the flag every reader checks.
+                _disqualified = disqualified;
+            }
+        }
+
+        /// <summary>
+        /// Closes one seed set over the production call graph.
+        /// </summary>
+        /// <param name="referencedMemberIds">The documentation comment ids seeding the closure.</param>
+        /// <param name="cancellationToken">A token observed while walking.</param>
+        /// <returns>The reachable set of the seed, empty for an empty seed.</returns>
+        private ReachableSymbolSet Close(
+            ImmutableHashSet<string> referencedMemberIds,
+            CancellationToken cancellationToken
+        ) =>
+            referencedMemberIds.IsEmpty
+                ? ReachableSymbolSet.Empty
+                : ReachabilityClosure.Compute(
+                    _compilation,
+                    new TestSurfaceManifest(_noTestMethodIds, referencedMemberIds),
+                    cancellationToken
+                );
+
+        /// <summary>
+        /// Reads the case count of one test method.
+        /// </summary>
+        /// <param name="manifest">The merged manifest holding the per-test entries.</param>
+        /// <param name="testMethodId">The documentation comment id of the test method.</param>
+        /// <returns>
+        /// The recorded count, or a lower bound of one for a test method the manifest lists without a
+        /// count, which is the conservative reading: an unknown number of cases must never trigger the
+        /// diagnostic.
+        /// </returns>
+        private static TestCaseCount GetCaseCount(TestSurfaceManifest manifest, string testMethodId) =>
+            manifest.TestCaseCounts.TryGetValue(testMethodId, out var count) ? count : TestCaseCount.AtLeast(1);
+
+        /// <summary>
+        /// A test method declaring exactly one test case, together with the production members it
+        /// references directly.
+        /// </summary>
+        private sealed class SingleCaseTest
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="SingleCaseTest" /> class.
+            /// </summary>
+            /// <param name="testMethodId">The documentation comment id of the test method.</param>
+            /// <param name="referencedMemberIds">The ids of the members the test references directly.</param>
+            public SingleCaseTest(string testMethodId, ImmutableHashSet<string> referencedMemberIds)
+            {
+                TestMethodId = testMethodId;
+                ReferencedMemberIds = referencedMemberIds;
+            }
+
+            /// <summary>
+            /// Gets the documentation comment id of the test method.
+            /// </summary>
+            public string TestMethodId { get; }
+
+            /// <summary>
+            /// Gets the ids of the production members the test method references directly.
+            /// </summary>
+            public ImmutableHashSet<string> ReferencedMemberIds { get; }
+        }
+
+        /// <summary>
+        /// A test method declaring exactly one test case, together with the members that case reaches.
+        /// </summary>
+        private sealed class ReachingTest
+        {
+            /// <summary>
+            /// Initializes a new instance of the <see cref="ReachingTest" /> class.
+            /// </summary>
+            /// <param name="testMethodId">The documentation comment id of the test method.</param>
+            /// <param name="closure">The members the test method reaches transitively.</param>
+            public ReachingTest(string testMethodId, ReachableSymbolSet closure)
+            {
+                TestMethodId = testMethodId;
+                Closure = closure;
+            }
+
+            /// <summary>
+            /// Gets the documentation comment id of the test method.
+            /// </summary>
+            public string TestMethodId { get; }
+
+            /// <summary>
+            /// Gets the members the test method reaches transitively.
+            /// </summary>
+            public ReachableSymbolSet Closure { get; }
+        }
     }
 }
