@@ -39,6 +39,9 @@ public class TUnitTestMethodRecognizerTests
 
     private const string CasesTypeName = "Fixture.Cases";
     private const string MarkersTypeName = "Fixture.Markers";
+    private const string CountsTypeName = "Fixture.Counts";
+    private const string ClassDataTypeName = "Fixture.CountsWithClassData";
+    private const string UnrelatedTypeName = "Fixture.UnrelatedCases";
 
     private const string SatelliteSource = """
         namespace Satellite;
@@ -196,8 +199,263 @@ public class TUnitTestMethodRecognizerTests
         """;
 
     /// <summary>
+    /// Every shape a test case count is read off, one method per shape, plus the members the data sources
+    /// name. The counts these methods are expected to produce are pinned by
+    /// <see cref="GetTestCaseCount_EveryShape_IsCountedByItsDataAttributes(string, string)" />.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Three data sources of the framework - <c>StaticDataSourceAttribute</c>,
+    /// <c>DelegateDataSourceAttribute</c> and <c>EmptyDataSourceAttribute</c> - cannot appear in source at
+    /// all: the first takes a nested array, the second a delegate, neither of which is a legal attribute
+    /// argument, and the third is not public on every target framework. They are counted by the same rule
+    /// that answers for <c>[ClassDataSource]</c> and <c>[CombinedDataSources]</c>, which are applied here,
+    /// because the rule keys on the interface the framework implements on every data source rather than on a
+    /// list of names.
+    /// </para>
+    /// <para>
+    /// <c>MatrixRangeAttribute</c> is missing from the netstandard2.0 assets of the framework, which are the
+    /// ones a .NET Framework target binds, so it cannot appear in a fixture that has to compile on all eight
+    /// target frameworks. <c>[MatrixMethod]</c> covers the same shape: a matrix whose values are not written
+    /// out in the source.
+    /// </para>
+    /// </remarks>
+    private const string CountFixtureSource = """
+        namespace Fixture;
+
+        using System.Collections.Generic;
+        using TUnit.Core;
+
+        public class Counts
+        {
+            [Test]
+            public void Parameterless()
+            {
+            }
+
+            [Test]
+            [Repeat(3)]
+            public void RepeatedParameterless()
+            {
+            }
+
+            [Test]
+            [Arguments(1)]
+            [Arguments(2)]
+            [Arguments(3)]
+            public void ThreeInlineRows(int value)
+            {
+            }
+
+            [Test]
+            [Arguments(1)]
+            [MethodDataSource(nameof(LoopValues))]
+            public void InlineAndLowerBoundSource(int value)
+            {
+            }
+
+            [Test]
+            [Arguments(1)]
+            [Arguments(2)]
+            [MethodDataSource(nameof(CollectionExpressionValues))]
+            public void InlineAndExactSource(int value)
+            {
+            }
+
+            [Test]
+            public void MatrixOfTwoAndThree([Matrix(1, 2)] int left, [Matrix("a", "b", "c")] string right)
+            {
+            }
+
+            [Test]
+            [MatrixDataSource]
+            public void MatrixWithExplicitDataSource([Matrix(1, 2)] int left, [Matrix(3, 4)] int right)
+            {
+            }
+
+            [Test]
+            public void MatrixWithNonLiteralValues([Matrix(typeof(int), typeof(long))] object value)
+            {
+            }
+
+            [Test]
+            public void MatrixFromAMethod([MatrixMethod<Counts>(nameof(MatrixValues))] int value)
+            {
+            }
+
+            [Test]
+            public void MatrixWithExclusion([Matrix(1, 2, 3, Excluding = new object[] { 2 })] int value)
+            {
+            }
+
+            [Test]
+            public void MatrixAndUncoveredParameter([Matrix(1, 2)] int left, bool right)
+            {
+            }
+
+            [Test]
+            [MatrixDataSource]
+            public void MatrixOverGeneratedValues(bool flag)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(CollectionExpressionValues))]
+            public void FromACollectionExpression(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(ArrayCreationValues))]
+            public void FromAnArrayCreation(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(ReturnedValues))]
+            public void FromASingleReturn(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(PropertyValues))]
+            public void FromAProperty(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(FieldValues))]
+            public void FromAField(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(LoopValues))]
+            public void FromALoop(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(ConditionalValues))]
+            public void FromACondition(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(CalledValues))]
+            public void FromACall(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(typeof(ExternalValues), nameof(ExternalValues.Values))]
+            public void FromAnotherType(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource(nameof(OverloadedValues))]
+            public void FromAnAmbiguousName(int value)
+            {
+            }
+
+            [Test]
+            [MethodDataSource("NoSuchMember")]
+            public void FromAnUnknownMember(int value)
+            {
+            }
+
+            [Test]
+            [InstanceMethodDataSource(nameof(InstanceValues))]
+            public void FromAnInstanceMethod(int value)
+            {
+            }
+
+            [Test]
+            [ClassDataSource]
+            public void FromAClassDataSource()
+            {
+            }
+
+            [Test]
+            [CombinedDataSources]
+            public void FromCombinedDataSources([Arguments(1)] int value)
+            {
+            }
+
+            [Test]
+            public void MissingSource(int value)
+            {
+            }
+
+            public static int[] CollectionExpressionValues() => [1, 2, 3];
+
+            public static int[] ArrayCreationValues() => new[] { 4, 5, 6 };
+
+            public static int[] ReturnedValues()
+            {
+                return [7, 8];
+            }
+
+            public static int[] PropertyValues => [9, 10];
+
+            public static readonly int[] FieldValues = [11, 12];
+
+            public int[] InstanceValues() => [13, 14];
+
+            public static int[] ConditionalValues() => FieldValues.Length > 0 ? [15] : [16, 17];
+
+            public static int[] CalledValues() => CollectionExpressionValues();
+
+            public static int[] OverloadedValues() => [18];
+
+            public static int[] OverloadedValues(int seed) => [seed];
+
+            public static IEnumerable<int> LoopValues()
+            {
+                for (var index = 0; index < 3; index++)
+                {
+                    yield return index;
+                }
+            }
+
+            public static IEnumerable<int> MatrixValues()
+            {
+                yield return 1;
+            }
+        }
+
+        public static class ExternalValues
+        {
+            public static int[] Values() => [20, 21];
+        }
+
+        [Arguments(1)]
+        [Arguments(2)]
+        public class CountsWithClassData
+        {
+            public CountsWithClassData(int value)
+            {
+            }
+
+            [Test]
+            public void Parameterless()
+            {
+            }
+
+            [Test]
+            [Arguments(1)]
+            [Arguments(2)]
+            public void TwoInlineRows(int value)
+            {
+            }
+        }
+        """;
+
+    /// <summary>
     /// Look-alikes declared by the compilation itself: one named like the concrete marker, one named like
-    /// the marker base type, and an attribute deriving from the latter.
+    /// the marker base type, an attribute deriving from the latter, and one named like the inline data
+    /// attribute of the framework.
     /// </summary>
     private const string UnrelatedFixtureSource = """
         namespace Fixture;
@@ -207,6 +465,14 @@ public class TUnitTestMethodRecognizerTests
         [AttributeUsage(AttributeTargets.Method)]
         public sealed class TestAttribute : Attribute
         {
+        }
+
+        [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+        public sealed class ArgumentsAttribute : Attribute
+        {
+            public ArgumentsAttribute(params object[] values)
+            {
+            }
         }
 
         [AttributeUsage(AttributeTargets.Method)]
@@ -234,6 +500,13 @@ public class TUnitTestMethodRecognizerTests
             public void DerivesFromALookAlike()
             {
             }
+
+            [Test]
+            [Arguments(1)]
+            [Arguments(2)]
+            public void LookAlikeArguments(int value)
+            {
+            }
         }
         """;
 
@@ -244,6 +517,7 @@ public class TUnitTestMethodRecognizerTests
         {
             Describe(CreateTUnitFixture()),
             Describe(CreateMarkerFixture()),
+            Describe(CreateCountFixture()),
             Describe(CreateSatelliteFixture(FrameworkAssemblyName)),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource, includeTUnit: true)),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource)),
@@ -438,7 +712,7 @@ public class TUnitTestMethodRecognizerTests
     public async Task IsTestMethod_CompilationWithoutTheFramework_ReturnsFalse()
     {
         var compilation = CompilationFactory.Create(UnrelatedFixtureSource);
-        var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
+        var method = FindMethod(compilation, UnrelatedTypeName, "LooksLikeATest");
 
         _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
         _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
@@ -522,7 +796,7 @@ public class TUnitTestMethodRecognizerTests
     public async Task IsTestMethod_LookAlikeAttributeOfTheCompilation_IsNotClassifiedAsATest(string methodName)
     {
         var compilation = CompilationFactory.Create(UnrelatedFixtureSource, includeTUnit: true);
-        var method = FindMethod(compilation, "Fixture.UnrelatedCases", methodName);
+        var method = FindMethod(compilation, UnrelatedTypeName, methodName);
 
         _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
         _ = await Assert.That(new TUnitTestMethodRecognizer(testAttributeType: null).IsTestMethod(method)).IsFalse();
@@ -537,6 +811,290 @@ public class TUnitTestMethodRecognizerTests
         try
         {
             _ = recognizer.IsTestMethod(null!);
+        }
+        catch (ArgumentNullException)
+        {
+            threw = true;
+        }
+
+        _ = await Assert.That(threw).IsTrue();
+    }
+
+    /// <summary>
+    /// The counting rules, one row per method of the counting fixture and therefore exhaustive: an exact
+    /// integer where the number of input combinations is written out in the source, and a lower bound
+    /// wherever the framework would have to execute something to know it.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    /// <param name="expected">The expected count, spelled the way a manifest spells it.</param>
+    [Test]
+    [Arguments("Parameterless", "1")]
+    [Arguments("RepeatedParameterless", "1")]
+    [Arguments("ThreeInlineRows", "3")]
+    [Arguments("InlineAndLowerBoundSource", "2+")]
+    [Arguments("InlineAndExactSource", "5")]
+    [Arguments("MatrixOfTwoAndThree", "6")]
+    [Arguments("MatrixWithExplicitDataSource", "4")]
+    [Arguments("MatrixWithNonLiteralValues", "2+")]
+    [Arguments("MatrixFromAMethod", "1+")]
+    [Arguments("MatrixWithExclusion", "1+")]
+    [Arguments("MatrixAndUncoveredParameter", "2+")]
+    [Arguments("MatrixOverGeneratedValues", "1+")]
+    [Arguments("FromACollectionExpression", "3")]
+    [Arguments("FromAnArrayCreation", "3")]
+    [Arguments("FromASingleReturn", "2")]
+    [Arguments("FromAProperty", "2")]
+    [Arguments("FromAField", "2")]
+    [Arguments("FromALoop", "1+")]
+    [Arguments("FromACondition", "1+")]
+    [Arguments("FromACall", "1+")]
+    [Arguments("FromAnotherType", "2")]
+    [Arguments("FromAnAmbiguousName", "1+")]
+    [Arguments("FromAnUnknownMember", "1+")]
+    [Arguments("FromAnInstanceMethod", "2")]
+    [Arguments("FromAClassDataSource", "1+")]
+    [Arguments("FromCombinedDataSources", "1+")]
+    [Arguments("MissingSource", "1+")]
+    public async Task GetTestCaseCount_EveryShape_IsCountedByItsDataAttributes(string methodName, string expected)
+    {
+        var count = CountCases(CountsTypeName, methodName);
+
+        _ = await Assert.That(count.ToString()).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// The guard that keeps the table above exhaustive: a shape added to the fixture without a row of its
+    /// own would otherwise be counted by nothing at all. Twenty-seven methods carry the shapes, and the two
+    /// of the type with a class-level data source are counted separately.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_TheCountingFixture_DeclaresTheCountedMethodsOnly()
+    {
+        var found = FindTestMethods(CreateCountFixture());
+
+        _ = await Assert.That(found.Length).IsEqualTo(29);
+    }
+
+    /// <summary>
+    /// The counter-intuitive part of the contract: a test method without parameters is exactly one case,
+    /// because its input values are hardcoded in its body, which makes it as narrow as a single inline row.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_ParameterlessTestMethod_IsExactlyOneCase()
+    {
+        var count = CountCases(CountsTypeName, "Parameterless");
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// The pinned decision on <c>[Repeat]</c>: it does not multiply the count. A repeated test runs the very
+    /// same inputs again, so it widens no input space, and a mutation surviving the single case survives
+    /// every repetition of it. Multiplying would make the narrowest tests of all look wide.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_RepeatedTestMethod_IsStillExactlyOneCase()
+    {
+        var count = CountCases(CountsTypeName, "RepeatedParameterless");
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// Three inline rows are three cases, exactly - the shape the whole heuristic is calibrated against.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_ThreeInlineRows_AreExactlyThreeCases()
+    {
+        var count = CountCases(CountsTypeName, "ThreeInlineRows");
+
+        _ = await Assert.That(count.Value).IsEqualTo(3);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// A matrix over two literal value sets of two and three values is exactly their cross product, whether
+    /// the method states the matrix explicitly or leaves it to the parameters.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    /// <param name="expected">The expected size of the cross product.</param>
+    [Test]
+    [Arguments("MatrixOfTwoAndThree", 6)]
+    [Arguments("MatrixWithExplicitDataSource", 4)]
+    public async Task GetTestCaseCount_MatrixOverLiteralValueSets_IsExactlyTheCrossProduct(
+        string methodName,
+        int expected
+    )
+    {
+        var count = CountCases(CountsTypeName, methodName);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// Every matrix whose true size is not written out in the source is a lower bound: values that are no
+    /// literals, a value set taken from a method, an exclusion taking combinations away again, and a
+    /// parameter left to the values its type generates.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    /// <param name="expected">The expected lower bound.</param>
+    [Test]
+    [Arguments("MatrixWithNonLiteralValues", 2)]
+    [Arguments("MatrixFromAMethod", 1)]
+    [Arguments("MatrixWithExclusion", 1)]
+    [Arguments("MatrixAndUncoveredParameter", 2)]
+    [Arguments("MatrixOverGeneratedValues", 1)]
+    public async Task GetTestCaseCount_MatrixThatIsNotWrittenOut_IsALowerBound(string methodName, int expected)
+    {
+        var count = CountCases(CountsTypeName, methodName);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// Inline rows and a data source on one method add up. The sum stays exact only while every contributing
+    /// part is: one row plus a data source resolved by executing a member is at least two cases, while one
+    /// row plus a literal sequence of three is exactly five.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_InlineDataAndADataSource_AddUp()
+    {
+        var lowerBound = CountCases(CountsTypeName, "InlineAndLowerBoundSource");
+        var exact = CountCases(CountsTypeName, "InlineAndExactSource");
+
+        _ = await Assert.That(lowerBound.Value).IsEqualTo(2);
+        _ = await Assert.That(lowerBound.IsExact).IsFalse();
+        _ = await Assert.That(exact.Value).IsEqualTo(5);
+        _ = await Assert.That(exact.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// A data source naming a member that hands over a literal sequence is exactly as long as that sequence,
+    /// no matter which of the shapes carries it.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    /// <param name="expected">The expected length of the sequence.</param>
+    [Test]
+    [Arguments("FromACollectionExpression", 3)]
+    [Arguments("FromAnArrayCreation", 3)]
+    [Arguments("FromASingleReturn", 2)]
+    [Arguments("FromAProperty", 2)]
+    [Arguments("FromAField", 2)]
+    [Arguments("FromAnotherType", 2)]
+    [Arguments("FromAnInstanceMethod", 2)]
+    public async Task GetTestCaseCount_DataSourceOnALiteralSequence_IsExactlyItsLength(string methodName, int expected)
+    {
+        var count = CountCases(CountsTypeName, methodName);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// Everything the framework would have to execute to enumerate is a lower bound of one case: a loop, a
+    /// condition, a call, an ambiguous member name, a member that does not exist, and every data source that
+    /// names no member at all.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    [Test]
+    [Arguments("FromALoop")]
+    [Arguments("FromACondition")]
+    [Arguments("FromACall")]
+    [Arguments("FromAnAmbiguousName")]
+    [Arguments("FromAnUnknownMember")]
+    [Arguments("FromAClassDataSource")]
+    [Arguments("FromCombinedDataSources")]
+    public async Task GetTestCaseCount_DataSourceThatIsNotStaticallyEnumerable_IsALowerBoundOfOne(string methodName)
+    {
+        var count = CountCases(CountsTypeName, methodName);
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// A method with parameters and no data source at all is nothing the framework can run, so no exact
+    /// statement is made about it - counting it as one case would claim a narrowness that is not there.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_MethodWithParametersAndNoDataSource_IsALowerBoundOfOne()
+    {
+        var count = CountCases(CountsTypeName, "MissingSource");
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// A data source on the declaring type multiplies every case of every test method of it by the number of
+    /// instances it produces, which is not written out in the method itself. Both the parameterless method
+    /// and the one with two inline rows therefore keep their value as a lower bound only.
+    /// </summary>
+    /// <param name="methodName">The method to count.</param>
+    /// <param name="expected">The expected lower bound.</param>
+    [Test]
+    [Arguments("Parameterless", 1)]
+    [Arguments("TwoInlineRows", 2)]
+    public async Task GetTestCaseCount_DataSourceOnTheDeclaringType_MakesTheCountALowerBound(
+        string methodName,
+        int expected
+    )
+    {
+        var count = CountCases(ClassDataTypeName, methodName);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// An inline data attribute of the compilation itself contributes no case, however exactly it matches the
+    /// name of the framework's own: the method is left with parameters it gets nothing for, which is a lower
+    /// bound of one. That holds whether or not the well-known types could be resolved.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_LookAlikeInlineDataAttribute_ContributesNoCase()
+    {
+        var compilation = CompilationFactory.Create(UnrelatedFixtureSource, includeTUnit: true);
+        var method = FindMethod(compilation, UnrelatedTypeName, "LookAlikeArguments");
+
+        var resolved = CreateRecognizer(compilation).GetTestCaseCount(method);
+        var unresolved = new TUnitTestMethodRecognizer(testAttributeType: null).GetTestCaseCount(method);
+
+        _ = await Assert.That(resolved.ToString()).IsEqualTo("1+");
+        _ = await Assert.That(unresolved.ToString()).IsEqualTo("1+");
+    }
+
+    /// <summary>
+    /// Counting is independent of the well-known types the recogniser was built with: the data attributes it
+    /// reads are the framework's own by namespace and declaring assembly, so a recogniser that resolved
+    /// nothing still counts the very same cases.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_WithoutAnyResolvedType_CountsTheSameCases()
+    {
+        var compilation = CreateCountFixture();
+        var recognizer = new TUnitTestMethodRecognizer(testAttributeType: null);
+
+        var inline = recognizer.GetTestCaseCount(FindMethod(compilation, CountsTypeName, "ThreeInlineRows"));
+        var matrix = recognizer.GetTestCaseCount(FindMethod(compilation, CountsTypeName, "MatrixOfTwoAndThree"));
+
+        _ = await Assert.That(inline.ToString()).IsEqualTo("3");
+        _ = await Assert.That(matrix.ToString()).IsEqualTo("6");
+    }
+
+    [Test]
+    public async Task GetTestCaseCount_MethodIsNull_ThrowsArgumentNullException()
+    {
+        var recognizer = new TUnitTestMethodRecognizer(testAttributeType: null);
+        var threw = false;
+
+        try
+        {
+            _ = recognizer.GetTestCaseCount(null!);
         }
         catch (ArgumentNullException)
         {
@@ -579,6 +1137,22 @@ public class TUnitTestMethodRecognizerTests
 
     private static CSharpCompilation CreateMarkerFixture() =>
         CompilationFactory.Create(MarkerFixtureSource, includeTUnit: true, filePath: "Markers.cs");
+
+    private static CSharpCompilation CreateCountFixture() =>
+        CompilationFactory.Create(CountFixtureSource, includeTUnit: true, filePath: "Counts.cs");
+
+    /// <summary>
+    /// Counts the cases of one method of the counting fixture.
+    /// </summary>
+    /// <param name="typeName">The metadata name of the declaring type.</param>
+    /// <param name="methodName">The name of the method to count.</param>
+    /// <returns>The counted number of cases.</returns>
+    private static TestCaseCount CountCases(string typeName, string methodName)
+    {
+        var compilation = CreateCountFixture();
+
+        return CreateRecognizer(compilation).GetTestCaseCount(FindMethod(compilation, typeName, methodName));
+    }
 
     private static CSharpCompilation CreateSatelliteFixture(string satelliteAssemblyName)
     {

@@ -75,6 +75,25 @@ public class TestMethodDiscoveryTests
     private const string OrphanedMethodName = "Orphaned";
 
     /// <summary>
+    /// A file that declares no attribute at all. Such a file is walked, but nothing in it is ever bound:
+    /// the discovery only asks for a semantic model once a decorated method declaration turns up.
+    /// </summary>
+    private const string HelperOnlySource = """
+        namespace Fixture;
+
+        public class Helpers
+        {
+            public int Add(int left, int right) => left + right;
+
+            public void Reset()
+            {
+            }
+        }
+        """;
+
+    private const string HelperOnlyPath = "Helpers.cs";
+
+    /// <summary>
     /// A test method carrying a local function that is decorated exactly like a test. Only method
     /// declarations are walked, and a local function is none, so the recogniser is never even asked
     /// about it.
@@ -314,6 +333,167 @@ public class TestMethodDiscoveryTests
         _ = await Assert.That(exception).IsNotNull();
     }
 
+    /// <summary>
+    /// A file without a single decorated method declaration contributes nothing, and the files around it
+    /// are unaffected. It is the case the deferred semantic model exists for: nothing in such a file is
+    /// ever bound.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethods_FileWithoutAnyDecoratedMethod_ContributesNothing()
+    {
+        var compilation = CompilationFactory.Create([
+            (FirstPath, FirstSource),
+            (HelperOnlyPath, HelperOnlySource),
+            (SecondPath, SecondSource),
+        ]);
+
+        var found = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert.That(Describe(found)).IsEqualTo("FirstCases.Alpha|SecondCases.Beta");
+    }
+
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_CompilationIsNull_ThrowsArgumentNullException()
+    {
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+                null!,
+                new AttributeNameRecognizer(),
+                CancellationToken.None
+            )
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("compilation");
+    }
+
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_RecognizerIsNull_ThrowsArgumentNullException()
+    {
+        var compilation = CreateCompilation();
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = TestMethodDiscovery.FindTestMethodsWithCaseCounts(compilation, null!, CancellationToken.None)
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("recognizer");
+    }
+
+    /// <summary>
+    /// The count travels next to the method it belongs to, in the very same declaration order, and it is
+    /// the answer of the recogniser — both an exact one and a lower bound reach the caller unchanged.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_SeveralFiles_PairEveryTestWithItsCountInDeclarationOrder()
+    {
+        var found = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+            CreateCompilation(),
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+");
+    }
+
+    /// <summary>
+    /// The methods are exactly the ones the count-free discovery finds, so no caller has to choose
+    /// between the two for correctness.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_DiscoveredMethods_AreTheOnesOfFindTestMethods()
+    {
+        var compilation = CreateCompilationWithOrphan();
+
+        var withCounts = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+        var withoutCounts = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(Describe(withCounts.Select(entry => entry.Method))).IsEqualTo(Describe(withoutCounts));
+        _ = await Assert
+            .That(DescribeWithCounts(withCounts))
+            .IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+|<invalid-global-code>.Orphaned=1+");
+    }
+
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_RecognizerAcceptsNothing_ReturnsEmpty()
+    {
+        var found = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+            CreateCompilation(),
+            new RejectingRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(found).IsEmpty();
+    }
+
+    /// <summary>
+    /// A recogniser is asked for a count once per discovered test, and never for a method it has not
+    /// accepted: the count of a non-test method is unspecified, so asking for one would be meaningless.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_EveryDiscoveredTest_IsCountedExactlyOnce()
+    {
+        var recognizer = new RecordingRecognizer();
+
+        var found = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+            CreateCompilation(),
+            recognizer,
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+");
+        _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha|Beta");
+    }
+
+    /// <summary>
+    /// A partial test method is one test with one count, however many declarations it is written in.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_PartialTestMethod_IsCountedOnce()
+    {
+        var recognizer = new RecordingRecognizer();
+
+        var found = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+            CompilationFactory.Create(PartialMethodSource),
+            recognizer,
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("PartialCases.Alpha=3");
+        _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha");
+    }
+
+    [Test]
+    public async Task FindTestMethodsWithCaseCounts_CancelledToken_ThrowsOperationCanceledException()
+    {
+        var compilation = CreateCompilation();
+        using var cancellation = new CancellationTokenSource();
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = TestMethodDiscovery.FindTestMethodsWithCaseCounts(
+                compilation,
+                new AttributeNameRecognizer(),
+                cancellation.Token
+            )
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
+    }
+
     private static CSharpCompilation CreateCompilation() =>
         CompilationFactory.Create([(FirstPath, FirstSource), (SecondPath, SecondSource)]);
 
@@ -339,27 +519,68 @@ public class TestMethodDiscoveryTests
     private static string Describe(IEnumerable<IMethodSymbol> methods) =>
         string.Join("|", methods.Select(method => method.ContainingType.Name + "." + method.Name));
 
+    private static string DescribeWithCounts(IEnumerable<(IMethodSymbol Method, TestCaseCount CaseCount)> entries) =>
+        string.Join(
+            "|",
+            entries.Select(entry =>
+                entry.Method.ContainingType.Name + "." + entry.Method.Name + "=" + entry.CaseCount.ToString()
+            )
+        );
+
     /// <summary>
-    /// Accepts every method carrying an attribute whose type is named <c>CaseAttribute</c>.
+    /// Accepts every method carrying an attribute whose type is named <c>CaseAttribute</c> and answers a
+    /// count of its own: an exact three for a method named <c>Alpha</c>, a lower bound of one for every
+    /// other. Both shapes of a count therefore travel through the discovery, without any framework's
+    /// counting rules taking part.
     /// </summary>
-    private sealed class AttributeNameRecognizer : ITestMethodRecognizer
+    private class AttributeNameRecognizer : ITestMethodRecognizer
     {
+        private const string ExactlyCountedName = "Alpha";
+
         public string FrameworkName => "Fixture";
 
         public bool IsTestMethod(IMethodSymbol method) =>
             method.GetAttributes().Any(attribute => IsCaseAttribute(attribute.AttributeClass));
+
+        public virtual TestCaseCount GetTestCaseCount(IMethodSymbol method) =>
+            string.Equals(method.Name, ExactlyCountedName, StringComparison.Ordinal)
+                ? TestCaseCount.Exact(3)
+                : TestCaseCount.AtLeast(1);
 
         private static bool IsCaseAttribute(INamedTypeSymbol? attributeClass) =>
             attributeClass is not null && string.Equals(attributeClass.Name, "CaseAttribute", StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// Accepts no method at all.
+    /// The same recogniser, recording the name of every method it is asked to count, in the order it is
+    /// asked. That is how a test proves each discovered test is counted exactly once and no other method
+    /// is counted at all.
+    /// </summary>
+    private sealed class RecordingRecognizer : AttributeNameRecognizer
+    {
+        /// <summary>
+        /// Gets the names of the methods the recogniser was asked to count, in order.
+        /// </summary>
+        public List<string> Counted { get; } = [];
+
+        public override TestCaseCount GetTestCaseCount(IMethodSymbol method)
+        {
+            Counted.Add(method.Name);
+
+            return base.GetTestCaseCount(method);
+        }
+    }
+
+    /// <summary>
+    /// Accepts no method at all, and consequently is never asked for a count. It still answers one,
+    /// because the contract forbids throwing.
     /// </summary>
     private sealed class RejectingRecognizer : ITestMethodRecognizer
     {
         public string FrameworkName => "Fixture";
 
         public bool IsTestMethod(IMethodSymbol method) => false;
+
+        public TestCaseCount GetTestCaseCount(IMethodSymbol method) => TestCaseCount.AtLeast(1);
     }
 }

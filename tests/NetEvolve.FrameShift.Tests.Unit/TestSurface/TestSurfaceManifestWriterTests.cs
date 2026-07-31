@@ -17,9 +17,12 @@ public class TestSurfaceManifestWriterTests
     private const string Header = "frameshift-test-surface/1";
 
     [Test]
-    public async Task Write_Manifest_WritesHeaderThenTestsThenReferences()
+    public async Task Write_Manifest_WritesOneBlockPerTestInOrdinalOrder()
     {
-        var manifest = Create(["M:Tests.B.Second", "M:Tests.A.First"], ["M:Production.B.Beta", "M:Production.A.Alpha"]);
+        var manifest = Blocks(
+            ("M:Tests.B.Second", TestCaseCount.Exact(1), ["M:Production.B.Beta"]),
+            ("M:Tests.A.First", TestCaseCount.Exact(3), ["M:Production.B.Beta", "M:Production.A.Alpha"])
+        );
 
         var written = TestSurfaceManifestWriter.Write(manifest);
 
@@ -28,11 +31,32 @@ public class TestSurfaceManifestWriterTests
             .IsEqualTo(
                 Header
                     + "\n"
-                    + "T M:Tests.A.First\n"
-                    + "T M:Tests.B.Second\n"
+                    + "T M:Tests.A.First 3\n"
                     + "R M:Production.A.Alpha\n"
                     + "R M:Production.B.Beta\n"
+                    + "T M:Tests.B.Second 1\n"
+                    + "R M:Production.B.Beta\n"
             );
+    }
+
+    [Test]
+    public async Task Write_ALowerBoundCount_CarriesThePlusSuffix()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.AtLeast(1), ["M:Production.A.Alpha"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert.That(written).IsEqualTo(Header + "\n" + "T M:Tests.A.First 1+\n" + "R M:Production.A.Alpha\n");
+    }
+
+    [Test]
+    public async Task Write_ATestWithoutAnyReference_WritesTheTestLineOnly()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), []));
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert.That(written).IsEqualTo(Header + "\n" + "T M:Tests.A.First 1\n");
     }
 
     [Test]
@@ -46,21 +70,86 @@ public class TestSurfaceManifestWriterTests
     [Test]
     public async Task Write_Ids_AreSortedOrdinallyAndNotByCulture()
     {
-        var manifest = Create(["M:A.b", "M:A.B", "M:A.a", "M:A.A"], []);
+        var manifest = Blocks(
+            ("M:A.b", TestCaseCount.Exact(1), []),
+            ("M:A.B", TestCaseCount.Exact(1), []),
+            ("M:A.a", TestCaseCount.Exact(1), []),
+            ("M:A.A", TestCaseCount.Exact(1), [])
+        );
 
         var written = TestSurfaceManifestWriter.Write(manifest);
 
-        _ = await Assert.That(written).IsEqualTo(Header + "\n" + "T M:A.A\n" + "T M:A.B\n" + "T M:A.a\n" + "T M:A.b\n");
+        _ = await Assert
+            .That(written)
+            .IsEqualTo(Header + "\n" + "T M:A.A 1\n" + "T M:A.B 1\n" + "T M:A.a 1\n" + "T M:A.b 1\n");
+    }
+
+    [Test]
+    public async Task Write_References_AreSortedOrdinallyWithinTheirBlock()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(2), ["P:X.b", "P:X.B", "P:X.a", "P:X.A"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert
+            .That(written)
+            .IsEqualTo(Header + "\n" + "T M:Tests.A.First 2\n" + "R P:X.A\n" + "R P:X.B\n" + "R P:X.a\n" + "R P:X.b\n");
     }
 
     [Test]
     public async Task Write_Manifest_UsesLineFeedOnlyAndEndsWithOne()
     {
-        var written = TestSurfaceManifestWriter.Write(Create(["M:Tests.A.First"], ["M:Production.A.Alpha"]));
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), ["M:Production.A.Alpha"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
 
         _ = await Assert.That(written.Contains('\r', StringComparison.Ordinal)).IsFalse();
         _ = await Assert.That(written[^1]).IsEqualTo('\n');
         _ = await Assert.That(written.Split('\n').Length).IsEqualTo(4);
+    }
+
+    /// <summary>
+    /// A manifest built from the flat unions knows no attribution, so every test is written with the
+    /// lower bound and with every referenced member; nothing is lost, but nothing exact is invented.
+    /// </summary>
+    [Test]
+    public async Task Write_AManifestBuiltFromTheFlatUnions_WritesEveryReferenceUnderEveryTest()
+    {
+        var manifest = new TestSurfaceManifest(
+            ImmutableHashSet.Create(StringComparer.Ordinal, "M:Tests.A.First", "M:Tests.B.Second"),
+            ImmutableHashSet.Create(StringComparer.Ordinal, "M:Production.A.Alpha")
+        );
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert
+            .That(written)
+            .IsEqualTo(
+                Header
+                    + "\n"
+                    + "T M:Tests.A.First 1+\n"
+                    + "R M:Production.A.Alpha\n"
+                    + "T M:Tests.B.Second 1+\n"
+                    + "R M:Production.A.Alpha\n"
+            );
+    }
+
+    /// <summary>
+    /// The format cannot express a reference that belongs to no test, because a reference line before the
+    /// first test line is malformed. Such a manifest only arises from the flat form without a single
+    /// test, and the writer states the header instead of emitting something the reader would reject.
+    /// </summary>
+    [Test]
+    public async Task Write_ReferencesWithoutAnyTest_CannotBeExpressedAndAreDropped()
+    {
+        var manifest = new TestSurfaceManifest(
+            ImmutableHashSet.Create<string>(StringComparer.Ordinal),
+            ImmutableHashSet.Create(StringComparer.Ordinal, "M:Production.A.Alpha")
+        );
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert.That(written).IsEqualTo(Header + "\n");
     }
 
     [Test]
@@ -74,9 +163,13 @@ public class TestSurfaceManifestWriterTests
     [Test]
     public async Task RoundTrip_WrittenManifest_ParsesBackIntoAnEqualManifest()
     {
-        var manifest = Create(
-            ["M:Tests.CalculatorTests.Add", "M:Tests.CalculatorTests.Subtract"],
-            ["M:Production.Calculator.Add(System.Int32,System.Int32)", "P:Production.Calculator.Factor"]
+        var manifest = Blocks(
+            (
+                "M:Tests.CalculatorTests.Add",
+                TestCaseCount.Exact(3),
+                ["M:Production.Calculator.Add(System.Int32,System.Int32)", "P:Production.Calculator.Factor"]
+            ),
+            ("M:Tests.CalculatorTests.Subtract", TestCaseCount.AtLeast(1), ["P:Production.Calculator.Factor"])
         );
 
         var parsed = TestSurfaceManifestReader.TryRead(
@@ -87,8 +180,24 @@ public class TestSurfaceManifestWriterTests
 
         _ = await Assert.That(parsed).IsTrue();
         _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(roundTripped.TestMethodIds)).IsEqualTo(Join(manifest.TestMethodIds));
-        _ = await Assert.That(Join(roundTripped.ReferencedMemberIds)).IsEqualTo(Join(manifest.ReferencedMemberIds));
+        _ = await AssertSameSurface(manifest, roundTripped).ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task RoundTrip_ATestWithoutAnyReference_SurvivesTheRoundTrip()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), []));
+
+        var parsed = TestSurfaceManifestReader.TryRead(
+            SourceText.From(TestSurfaceManifestWriter.Write(manifest)),
+            out var roundTripped,
+            out var error
+        );
+
+        _ = await Assert.That(parsed).IsTrue();
+        _ = await Assert.That(error).IsNull();
+        _ = await AssertSameSurface(manifest, roundTripped).ConfigureAwait(false);
+        _ = await Assert.That(roundTripped.ReferencesByTest["M:Tests.A.First"]).IsEmpty();
     }
 
     [Test]
@@ -101,13 +210,61 @@ public class TestSurfaceManifestWriterTests
         _ = await Assert.That(parsed).IsTrue();
         _ = await Assert.That(error).IsNull();
         _ = await Assert.That(roundTripped.IsEmpty).IsTrue();
+        _ = await AssertSameSurface(TestSurfaceManifest.Empty, roundTripped).ConfigureAwait(false);
     }
 
-    private static TestSurfaceManifest Create(string[] testMethodIds, string[] referencedMemberIds) =>
-        new TestSurfaceManifest(
-            ImmutableHashSet.Create(StringComparer.Ordinal, testMethodIds),
-            ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds)
+    /// <summary>
+    /// Writing an already written manifest again has to produce the very same bytes, otherwise the
+    /// checked-in file would keep churning.
+    /// </summary>
+    [Test]
+    public async Task RoundTrip_WritingTwice_ProducesTheSameText()
+    {
+        var manifest = Blocks(
+            ("M:Tests.A.First", TestCaseCount.Exact(2), ["M:Production.A.Alpha"]),
+            ("M:Tests.B.Second", TestCaseCount.AtLeast(4), [])
         );
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+        _ = TestSurfaceManifestReader.TryRead(SourceText.From(written), out var roundTripped, out _);
+
+        _ = await Assert.That(TestSurfaceManifestWriter.Write(roundTripped)).IsEqualTo(written);
+    }
+
+    private static async Task<bool> AssertSameSurface(TestSurfaceManifest expected, TestSurfaceManifest actual)
+    {
+        _ = await Assert.That(Join(actual.TestMethodIds)).IsEqualTo(Join(expected.TestMethodIds));
+        _ = await Assert.That(Join(actual.ReferencedMemberIds)).IsEqualTo(Join(expected.ReferencedMemberIds));
+        _ = await Assert.That(Describe(actual)).IsEqualTo(Describe(expected));
+
+        return true;
+    }
+
+    private static string Describe(TestSurfaceManifest manifest) =>
+        string.Join(
+            ";",
+            manifest
+                .TestMethodIds.OrderBy(id => id, StringComparer.Ordinal)
+                .Select(id =>
+                    id + "=" + manifest.TestCaseCounts[id].ToString() + "[" + Join(manifest.ReferencesByTest[id]) + "]"
+                )
+        );
+
+    private static TestSurfaceManifest Blocks(
+        params (string TestMethodId, TestCaseCount Count, string[] ReferencedMemberIds)[] blocks
+    )
+    {
+        var counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+        var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var (testMethodId, count, referencedMemberIds) in blocks)
+        {
+            counts[testMethodId] = count;
+            references[testMethodId] = ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds);
+        }
+
+        return new TestSurfaceManifest(counts.ToImmutable(), references.ToImmutable());
+    }
 
     private static string Join(IEnumerable<string> ids) =>
         string.Join("|", ids.OrderBy(id => id, StringComparer.Ordinal));

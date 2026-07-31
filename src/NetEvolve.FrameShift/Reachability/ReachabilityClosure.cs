@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Reachability;
 
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -24,6 +25,16 @@ using NetEvolve.FrameShift.TestSurface;
 /// executable code resolves to is added, and the newly added members are queued in turn. Virtual and
 /// interface dispatch is approximated by adding the implementations and overrides declared in this
 /// compilation for every reachable virtual, abstract or interface member.
+/// </para>
+/// <para>
+/// The walk also carries attribution. A seed does not only say "some test reaches this member", it
+/// says which test methods reach it, and every member the walk expands to inherits the attribution of
+/// the members it was reached from, unioned over all paths that lead to it. That union is what allows
+/// a caller to sum the test case counts of exactly those tests that reach a mutation point, instead of
+/// only knowing that the point is reached at all. Understating the attribution would understate the
+/// number of input combinations a member is exercised with, so the union is deliberately maximal: a
+/// member reached from two seeds carries both, and a member reached along a longer path never loses
+/// what a shorter path already gave it.
 /// </para>
 /// <para>
 /// Known limitations, all of them deliberate, because the analysis must stay a pure, side effect free
@@ -81,9 +92,17 @@ internal static class ReachabilityClosure
     /// <param name="manifest">The manifest produced by a previous pass over the test compilation.</param>
     /// <param name="cancellationToken">A token observed on every iteration of the walk.</param>
     /// <returns>
-    /// The transitively closed set of reachable members, or <see cref="ReachableSymbolSet.Empty" /> if
-    /// the manifest records no production reference at all.
+    /// The transitively closed set of reachable members, attributed to the test methods that reach
+    /// them, or <see cref="ReachableSymbolSet.Empty" /> if the manifest records no production reference
+    /// at all.
     /// </returns>
+    /// <remarks>
+    /// The seed is taken from both <see cref="TestSurfaceManifest.ReferencedMemberIds" /> and the keys
+    /// of the inverted <see cref="TestSurfaceManifest.ReferencesByTest" />. The former is the union of
+    /// the latter, so the two agree for every manifest this analyzer writes; reading both means that a
+    /// manifest carrying references without attribution still produces the very same reachable set,
+    /// just without test ids to report.
+    /// </remarks>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="compilation" /> or <paramref name="manifest" /> is <see langword="null" />.
     /// </exception>
@@ -104,33 +123,149 @@ internal static class ReachabilityClosure
             throw new ArgumentNullException(nameof(manifest));
         }
 
-        if (manifest.ReferencedMemberIds.IsEmpty)
+        var attribution = InvertReferences(manifest.ReferencesByTest, cancellationToken);
+        var referencedMemberIds = manifest.ReferencedMemberIds.Union(attribution.Keys);
+
+        if (referencedMemberIds.IsEmpty)
         {
             return ReachableSymbolSet.Empty;
         }
 
+        return Compute(compilation, referencedMemberIds, attribution, cancellationToken);
+    }
+
+    /// <summary>
+    /// Computes the reachable set of <paramref name="compilation" /> for a test-to-references map,
+    /// without going through a manifest.
+    /// </summary>
+    /// <param name="compilation">The production compilation that owns the syntax trees to walk.</param>
+    /// <param name="referencesByTest">
+    /// The documentation comment ids of the production members each test method references, keyed by
+    /// the documentation comment id of the test method.
+    /// </param>
+    /// <param name="cancellationToken">A token observed on every iteration of the walk.</param>
+    /// <returns>
+    /// The transitively closed set of reachable members, attributed to the test methods that reach
+    /// them, or <see cref="ReachableSymbolSet.Empty" /> if no test references a production member.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="compilation" /> or <paramref name="referencesByTest" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    public static ReachableSymbolSet ComputeFromReferences(
+        Compilation compilation,
+        ImmutableDictionary<string, ImmutableHashSet<string>> referencesByTest,
+        CancellationToken cancellationToken
+    )
+    {
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
+        if (referencesByTest is null)
+        {
+            throw new ArgumentNullException(nameof(referencesByTest));
+        }
+
+        var attribution = InvertReferences(referencesByTest, cancellationToken);
+
+        if (attribution.Count == 0)
+        {
+            return ReachableSymbolSet.Empty;
+        }
+
+        return Compute(compilation, attribution.Keys, attribution, cancellationToken);
+    }
+
+    private static ReachableSymbolSet Compute(
+        Compilation compilation,
+        IEnumerable<string> referencedMemberIds,
+        Dictionary<string, ImmutableHashSet<string>> attribution,
+        CancellationToken cancellationToken
+    )
+    {
         var walker = new ClosureWalker(compilation, cancellationToken);
 
-        walker.Seed(manifest);
+        walker.Seed(referencedMemberIds, attribution);
         walker.Expand();
 
         return walker.CreateResult();
     }
 
     /// <summary>
+    /// Inverts the test-to-references map into the references-to-tests map the seeding needs.
+    /// </summary>
+    /// <param name="referencesByTest">The recorded references of every test method.</param>
+    /// <param name="cancellationToken">A token observed once per test method.</param>
+    /// <returns>
+    /// The ids of the test methods referencing a member, keyed by the documentation comment id of that
+    /// member and compared ordinally.
+    /// </returns>
+    private static Dictionary<string, ImmutableHashSet<string>> InvertReferences(
+        ImmutableDictionary<string, ImmutableHashSet<string>> referencesByTest,
+        CancellationToken cancellationToken
+    )
+    {
+        var builders = new Dictionary<string, ImmutableHashSet<string>.Builder>(StringComparer.Ordinal);
+
+        foreach (var reference in referencesByTest)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            foreach (var referencedMemberId in reference.Value)
+            {
+                if (!builders.TryGetValue(referencedMemberId, out var builder))
+                {
+                    builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+                    builders.Add(referencedMemberId, builder);
+                }
+
+                _ = builder.Add(reference.Key);
+            }
+        }
+
+        var attribution = new Dictionary<string, ImmutableHashSet<string>>(builders.Count, StringComparer.Ordinal);
+
+        foreach (var builder in builders)
+        {
+            attribution.Add(builder.Key, builder.Value.ToImmutable());
+        }
+
+        return attribution;
+    }
+
+    /// <summary>
     /// Holds the mutable state of a single closure computation. The state never outlives the
-    /// <see cref="Compute" /> call that created it, which keeps the analyzers using this class
-    /// stateless and thread-safe.
+    /// <see cref="Compute(Compilation, TestSurfaceManifest, CancellationToken)" /> call that created
+    /// it, which keeps the analyzers using this class stateless and thread-safe.
     /// </summary>
     private sealed class ClosureWalker
     {
+        private static readonly ImmutableHashSet<string> _noTests = ImmutableHashSet<string>.Empty.WithComparer(
+            StringComparer.Ordinal
+        );
+
+        private static readonly ISymbol[] _noTargets = [];
+
         private readonly Compilation _compilation;
         private readonly CancellationToken _cancellationToken;
         private readonly Dictionary<SyntaxTree, SemanticModel> _semanticModels =
             new Dictionary<SyntaxTree, SemanticModel>();
 
-        private readonly HashSet<ISymbol> _reachable = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        private readonly HashSet<ISymbol> _dispatchHandled = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        private readonly Dictionary<ISymbol, ImmutableHashSet<string>> _attribution = new Dictionary<
+            ISymbol,
+            ImmutableHashSet<string>
+        >(SymbolEqualityComparer.Default);
+
+        private readonly Dictionary<ISymbol, ISymbol[]> _outgoing = new Dictionary<ISymbol, ISymbol[]>(
+            SymbolEqualityComparer.Default
+        );
+
+        private readonly Dictionary<ISymbol, ISymbol[]> _dispatchTargets = new Dictionary<ISymbol, ISymbol[]>(
+            SymbolEqualityComparer.Default
+        );
+
         private readonly Queue<ISymbol> _pending = new Queue<ISymbol>();
 
         private List<INamedTypeSymbol>? _declaredTypes;
@@ -148,32 +283,35 @@ internal static class ReachabilityClosure
 
         /// <summary>
         /// Resolves the recorded member ids against this compilation and queues everything that maps to
-        /// a symbol of it. Ids that do not resolve are ignored, because a manifest may describe another
-        /// version of the assembly.
+        /// a symbol of it, attributed to the test methods that recorded the id. Ids that do not resolve
+        /// are ignored, because a manifest may describe another version of the assembly.
         /// </summary>
-        /// <param name="manifest">The manifest holding the recorded ids.</param>
-        public void Seed(TestSurfaceManifest manifest)
+        /// <param name="referencedMemberIds">The recorded ids of the referenced production members.</param>
+        /// <param name="attribution">The test method ids per referenced production member id.</param>
+        public void Seed(
+            IEnumerable<string> referencedMemberIds,
+            Dictionary<string, ImmutableHashSet<string>> attribution
+        )
         {
-            foreach (var referencedMemberId in manifest.ReferencedMemberIds)
+            foreach (var referencedMemberId in referencedMemberIds)
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
+                var tests = attribution.TryGetValue(referencedMemberId, out var attributed) ? attributed : _noTests;
                 var symbols = DocumentationCommentId.GetSymbolsForDeclarationId(referencedMemberId, _compilation);
 
                 foreach (var symbol in symbols)
                 {
-                    // A seeded member is reachable like any other, so the dispatch approximation has to
-                    // run for it as well. A test that calls an interface or virtual member directly is
-                    // the most common shape there is, and without this the implementations behind that
-                    // abstraction would all be reported as gaps.
-                    HandleReference(symbol);
+                    SeedSymbol(symbol, tests);
                 }
             }
         }
 
         /// <summary>
-        /// Drains the work queue until no new member becomes reachable. The visited set guards against
-        /// the cycles that recursion and mutually recursive members create.
+        /// Drains the work queue until no member becomes reachable and no attribution grows any more.
+        /// The recorded attribution guards against the cycles that recursion and mutually recursive
+        /// members create: a member is only queued again when a path actually widened its set of test
+        /// methods, and those sets only ever grow inside the finite set of seeded test ids.
         /// </summary>
         public void Expand()
         {
@@ -189,9 +327,114 @@ internal static class ReachabilityClosure
         /// Materializes the computed set.
         /// </summary>
         /// <returns>The immutable reachable set.</returns>
-        public ReachableSymbolSet CreateResult() => new ReachableSymbolSet(_reachable);
+        public ReachableSymbolSet CreateResult() => ReachableSymbolSet.FromAttribution(_attribution);
 
+        /// <summary>
+        /// Seeds a single resolved symbol.
+        /// </summary>
+        /// <param name="symbol">The symbol a recorded id resolved to.</param>
+        /// <param name="tests">The ids of the test methods that recorded it.</param>
+        /// <remarks>
+        /// A seeded member is reachable like any other, so the dispatch approximation has to run for it
+        /// as well. A test that calls an interface or virtual member directly is the most common shape
+        /// there is, and without this the implementations behind that abstraction would all be reported
+        /// as gaps. The dispatch search runs even when the seed itself is declared in another assembly,
+        /// which is what connects a test against a foreign abstraction to the local implementation of it.
+        /// </remarks>
+        private void SeedSymbol(ISymbol symbol, ImmutableHashSet<string> tests)
+        {
+            Reach(symbol, tests);
+
+            foreach (var dispatchTarget in GetDispatchTargets(symbol))
+            {
+                Reach(dispatchTarget, tests);
+            }
+        }
+
+        /// <summary>
+        /// Propagates the attribution of <paramref name="member" /> to everything it references.
+        /// </summary>
+        /// <param name="member">The member that was queued.</param>
         private void ExpandMember(ISymbol member)
+        {
+            var tests = _attribution[member];
+
+            foreach (var target in GetOutgoingTargets(member))
+            {
+                Reach(target, tests);
+            }
+        }
+
+        /// <summary>
+        /// Returns the members <paramref name="member" /> references, computing them from its syntax on
+        /// the first call and reusing them afterwards.
+        /// </summary>
+        /// <param name="member">The reachable member to inspect.</param>
+        /// <returns>The normalized, locally declared members that inherit the attribution of the member.</returns>
+        /// <remarks>
+        /// Caching matters twice over. A member is queued again whenever a further path widens its
+        /// attribution, and re-walking its syntax and re-resolving every expression of it for that is
+        /// pure waste; the deduplicated array also keeps the replay proportional to the number of
+        /// distinct references instead of the number of times they are written.
+        /// </remarks>
+        private ISymbol[] GetOutgoingTargets(ISymbol member)
+        {
+            if (_outgoing.TryGetValue(member, out var cached))
+            {
+                return cached;
+            }
+
+            var targets = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+
+            CollectRelatedMembers(member, targets);
+            CollectReferences(member, targets);
+
+            cached = targets.Count == 0 ? _noTargets : [.. targets];
+            _outgoing.Add(member, cached);
+
+            return cached;
+        }
+
+        /// <summary>
+        /// Records that <paramref name="symbol" /> is reachable from the tests in
+        /// <paramref name="tests" />, queueing it when that widens what is already known about it.
+        /// </summary>
+        /// <param name="symbol">The reached symbol, in the form the semantic model resolved it.</param>
+        /// <param name="tests">The ids of the test methods reaching it along the current path.</param>
+        private void Reach(ISymbol? symbol, ImmutableHashSet<string> tests)
+        {
+            if (symbol is null)
+            {
+                return;
+            }
+
+            var definition = ReachableSymbolSet.NormalizeDefinition(symbol);
+
+            if (!IsDeclaredInThisCompilation(definition))
+            {
+                return;
+            }
+
+            if (!_attribution.TryGetValue(definition, out var known))
+            {
+                _attribution.Add(definition, tests);
+                _pending.Enqueue(definition);
+
+                return;
+            }
+
+            var widened = known.Union(tests);
+
+            if (widened.Count == known.Count)
+            {
+                return;
+            }
+
+            _attribution[definition] = widened;
+            _pending.Enqueue(definition);
+        }
+
+        private void CollectReferences(ISymbol member, HashSet<ISymbol> targets)
         {
             foreach (var syntaxReference in member.DeclaringSyntaxReferences)
             {
@@ -207,26 +450,30 @@ internal static class ReachabilityClosure
 
                 foreach (var executableNode in GetExecutableNodes(declaration))
                 {
-                    WalkExecutableNode(semanticModel, executableNode);
+                    WalkExecutableNode(semanticModel, executableNode, targets);
                 }
             }
         }
 
-        private void WalkExecutableNode(SemanticModel semanticModel, SyntaxNode executableNode)
+        private void WalkExecutableNode(
+            SemanticModel semanticModel,
+            SyntaxNode executableNode,
+            HashSet<ISymbol> targets
+        )
         {
             foreach (var node in executableNode.DescendantNodesAndSelf(node => node is not AttributeListSyntax))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                HandleNode(semanticModel, node);
+                HandleNode(semanticModel, node, targets);
             }
         }
 
-        private void HandleNode(SemanticModel semanticModel, SyntaxNode node)
+        private void HandleNode(SemanticModel semanticModel, SyntaxNode node, HashSet<ISymbol> targets)
         {
             if (node is LocalFunctionStatementSyntax localFunction)
             {
-                Add(semanticModel.GetDeclaredSymbol(localFunction, _cancellationToken));
+                Record(targets, semanticModel.GetDeclaredSymbol(localFunction, _cancellationToken));
                 return;
             }
 
@@ -239,7 +486,7 @@ internal static class ReachabilityClosure
 
             if (symbolInfo.Symbol is not null)
             {
-                HandleReference(symbolInfo.Symbol);
+                HandleReference(symbolInfo.Symbol, targets);
                 return;
             }
 
@@ -248,17 +495,27 @@ internal static class ReachabilityClosure
             // is wrongly considered reachable costs a missed hint, never a false gap report.
             foreach (var candidate in symbolInfo.CandidateSymbols)
             {
-                HandleReference(candidate);
+                HandleReference(candidate, targets);
             }
         }
 
-        private void HandleReference(ISymbol symbol)
+        private void HandleReference(ISymbol symbol, HashSet<ISymbol> targets)
         {
-            Add(symbol);
-            AddDispatchTargets(symbol);
+            Record(targets, symbol);
+
+            foreach (var dispatchTarget in GetDispatchTargets(symbol))
+            {
+                Record(targets, dispatchTarget);
+            }
         }
 
-        private void Add(ISymbol? symbol)
+        /// <summary>
+        /// Adds <paramref name="symbol" /> to the outgoing references of the member being inspected, if
+        /// it is a member of this compilation at all.
+        /// </summary>
+        /// <param name="targets">The outgoing references collected so far.</param>
+        /// <param name="symbol">The referenced symbol, may be <see langword="null" />.</param>
+        private void Record(HashSet<ISymbol> targets, ISymbol? symbol)
         {
             if (symbol is null)
             {
@@ -267,41 +524,38 @@ internal static class ReachabilityClosure
 
             var definition = ReachableSymbolSet.NormalizeDefinition(symbol);
 
-            if (!IsDeclaredInThisCompilation(definition) || !_reachable.Add(definition))
+            if (IsDeclaredInThisCompilation(definition))
             {
-                return;
+                _ = targets.Add(definition);
             }
-
-            _pending.Enqueue(definition);
-
-            AddRelatedMembers(definition);
         }
 
         /// <summary>
-        /// Adds the members that share a declaration with <paramref name="definition" /> and therefore
-        /// share its reachability: the two halves of a partial method and the accessors of a property or
-        /// event, whose bodies are separate declarations of their own.
+        /// Adds the members that share a declaration with <paramref name="member" /> and therefore
+        /// share its reachability and its attribution: the two halves of a partial method and the
+        /// accessors of a property or event, whose bodies are separate declarations of their own.
         /// </summary>
-        /// <param name="definition">The member that just became reachable.</param>
-        private void AddRelatedMembers(ISymbol definition)
+        /// <param name="member">The member that became reachable.</param>
+        /// <param name="targets">The outgoing references collected so far.</param>
+        private void CollectRelatedMembers(ISymbol member, HashSet<ISymbol> targets)
         {
-            switch (definition)
+            switch (member)
             {
                 case IMethodSymbol method:
-                    Add(method.PartialDefinitionPart);
-                    Add(method.PartialImplementationPart);
-                    Add(method.AssociatedSymbol);
+                    Record(targets, method.PartialDefinitionPart);
+                    Record(targets, method.PartialImplementationPart);
+                    Record(targets, method.AssociatedSymbol);
                     break;
 
                 case IPropertySymbol property:
-                    Add(property.GetMethod);
-                    Add(property.SetMethod);
+                    Record(targets, property.GetMethod);
+                    Record(targets, property.SetMethod);
                     break;
 
                 case IEventSymbol @event:
-                    Add(@event.AddMethod);
-                    Add(@event.RemoveMethod);
-                    Add(@event.RaiseMethod);
+                    Record(targets, @event.AddMethod);
+                    Record(targets, @event.RemoveMethod);
+                    Record(targets, @event.RaiseMethod);
                     break;
 
                 default:
@@ -310,60 +564,90 @@ internal static class ReachabilityClosure
         }
 
         /// <summary>
+        /// Returns the dispatch targets of <paramref name="symbol" />, computing them once per referenced
+        /// symbol and reusing them for every member that references it.
+        /// </summary>
+        /// <param name="symbol">The referenced symbol, in the form the semantic model resolved it.</param>
+        /// <returns>The implementations and overrides a call through the symbol can end up in.</returns>
+        private ISymbol[] GetDispatchTargets(ISymbol symbol)
+        {
+            if (_dispatchTargets.TryGetValue(symbol, out var cached))
+            {
+                return cached;
+            }
+
+            cached = FindDispatchTargets(symbol);
+            _dispatchTargets.Add(symbol, cached);
+
+            return cached;
+        }
+
+        /// <summary>
         /// Approximates virtual and interface dispatch for <paramref name="symbol" />.
         /// </summary>
         /// <param name="symbol">The referenced symbol, in the form the semantic model resolved it.</param>
+        /// <returns>The implementations and overrides declared in this compilation.</returns>
         /// <remarks>
         /// A call through an abstraction can end up in any implementation, and which one it is cannot be
         /// decided at compile time. Every implementation declared in this compilation is therefore
-        /// considered reachable. The search is syntactic and stays inside this compilation: overrides in
-        /// other assemblies, and implementations chosen through configuration or dependency injection,
-        /// are outside of what a single compilation can observe.
+        /// considered reachable, and inherits the attribution of the reference that led here. The search
+        /// is syntactic and stays inside this compilation: overrides in other assemblies, and
+        /// implementations chosen through configuration or dependency injection, are outside of what a
+        /// single compilation can observe.
         /// </remarks>
-        private void AddDispatchTargets(ISymbol symbol)
+        private ISymbol[] FindDispatchTargets(ISymbol symbol)
         {
             var containingType = symbol.ContainingType;
 
-            if (containingType is null || !_dispatchHandled.Add(symbol))
+            if (containingType is null)
             {
-                return;
+                return _noTargets;
             }
 
             if (containingType.TypeKind == TypeKind.Interface)
             {
-                AddInterfaceImplementations(symbol, containingType);
-                return;
+                return FindInterfaceImplementations(symbol, containingType);
             }
 
             if (symbol.IsVirtual || symbol.IsAbstract || symbol.IsOverride)
             {
-                AddOverrides(symbol);
+                return FindOverrides(symbol);
             }
+
+            return _noTargets;
         }
 
-        private void AddInterfaceImplementations(ISymbol interfaceMember, INamedTypeSymbol interfaceType)
+        private ISymbol[] FindInterfaceImplementations(ISymbol interfaceMember, INamedTypeSymbol interfaceType)
         {
+            var implementations = new List<ISymbol>();
+
             foreach (var type in GetDeclaredTypes().Where(candidate => Implements(candidate, interfaceType)))
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                Add(type.FindImplementationForInterfaceMember(interfaceMember));
+                var implementation = type.FindImplementationForInterfaceMember(interfaceMember);
+
+                if (implementation is not null)
+                {
+                    implementations.Add(implementation);
+                }
             }
+
+            return implementations.Count == 0 ? _noTargets : [.. implementations];
         }
 
-        private void AddOverrides(ISymbol member)
+        private ISymbol[] FindOverrides(ISymbol member)
         {
+            var overrides = new List<ISymbol>();
+
             foreach (var type in GetDeclaredTypes())
             {
                 _cancellationToken.ThrowIfCancellationRequested();
 
-                var candidates = type.GetMembers(member.Name).Where(candidate => Overrides(candidate, member));
-
-                foreach (var candidate in candidates)
-                {
-                    Add(candidate);
-                }
+                overrides.AddRange(type.GetMembers(member.Name).Where(candidate => Overrides(candidate, member)));
             }
+
+            return overrides.Count == 0 ? _noTargets : [.. overrides];
         }
 
         private List<INamedTypeSymbol> GetDeclaredTypes()

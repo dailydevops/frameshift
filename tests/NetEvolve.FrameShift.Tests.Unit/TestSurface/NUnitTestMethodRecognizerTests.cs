@@ -30,10 +30,19 @@ using TUnit.Core;
 /// deliberately: whichever of them the recogniser dropped would silently shrink the recorded test surface
 /// and make the production side claim mutations are unreachable when they are not.
 /// </para>
+/// <para>
+/// The case count is covered shape by shape, and in two groups that must never be mixed up. An exact count
+/// is asserted as the number <em>and</em> as being exact, because only an exact one may ever contribute to
+/// a finding. A lower bound is asserted as the number <em>and</em> as not being exact, because the whole
+/// point of a bound is that it suppresses the finding: NUnit generates the cases of a source, a theory or a
+/// pairwise combination while discovering tests, and mistaking any of those for a single case would report
+/// a gap that is not there.
+/// </para>
 /// </remarks>
 public class NUnitTestMethodRecognizerTests
 {
     private const string CasesTypeName = "Fixture.Cases";
+    private const string CountCasesTypeName = "Fixture.CountCases";
     private const string MarkerCasesTypeName = "Fixture.MarkerCases";
     private const string NonMarkerCasesTypeName = "Fixture.NonMarkerCases";
     private const string LookAlikeCasesTypeName = "Fixture.LookAlikeCases";
@@ -271,6 +280,288 @@ public class NUnitTestMethodRecognizerTests
         """;
 
     /// <summary>
+    /// One method per shape a case count can be derived from, and one source member per shape a sequence
+    /// length can be read from. The methods whose count is a lower bound are declared right next to the
+    /// exact ones on purpose: <c>[TestCaseSource]</c> of a computed sequence looks exactly like
+    /// <c>[TestCaseSource]</c> of a listed one at the call site, and only the declaration of the source
+    /// decides.
+    /// </summary>
+    private const string CountFixtureSource = """
+        namespace Fixture;
+
+        using System.Collections.Generic;
+        using System.Linq;
+        using NUnit.Framework;
+
+        public sealed class ScenarioTestAttribute : TestAttribute
+        {
+        }
+
+        public sealed class ScenarioTestCaseSourceAttribute : TestCaseSourceAttribute
+        {
+            public ScenarioTestCaseSourceAttribute(string sourceName)
+                : base(sourceName)
+            {
+            }
+        }
+
+        public static class ExternalSource
+        {
+            public static readonly int[] Rows = new int[] { 1, 2 };
+        }
+
+        public sealed class TypeSource : List<int>
+        {
+            public TypeSource()
+            {
+                Add(1);
+            }
+        }
+
+        public class CountCases
+        {
+            [Test]
+            public void Parameterless()
+            {
+            }
+
+            [ScenarioTest]
+            public void DerivedMarker()
+            {
+            }
+
+            [Test]
+            [Repeat(5)]
+            public void Repeated()
+            {
+            }
+
+            [Test]
+            [Retry(3)]
+            public void Retried()
+            {
+            }
+
+            [TestCase(1)]
+            public void SingleRow(int value)
+            {
+            }
+
+            [TestCase(1)]
+            [TestCase(2)]
+            [TestCase(3)]
+            public void ThreeRows(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(ArrayRows))]
+            public void SourceFromArrayField(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(CollectionRows))]
+            public void SourceFromCollectionProperty(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(ListRows))]
+            public void SourceFromInitializedList(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(ReturnedRows))]
+            public void SourceFromReturningMethod(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(YieldedRows))]
+            public void SourceFromYieldingMethod(int value)
+            {
+            }
+
+            [ScenarioTestCaseSource(nameof(ArrayRows))]
+            public void SourceFromDerivedAttribute(int value)
+            {
+            }
+
+            [TestCaseSource(typeof(ExternalSource), nameof(ExternalSource.Rows))]
+            public void SourceFromAnotherType(int value)
+            {
+            }
+
+            [TestCase(1)]
+            [TestCase(2)]
+            [TestCaseSource(nameof(ArrayRows))]
+            public void RowsAndSource(int value)
+            {
+            }
+
+            [Test]
+            public void OneValuedParameter([Values(1, 2)] int value)
+            {
+            }
+
+            [Test]
+            public void TwoValuedParameters([Values(1, 2)] int first, [Values(3, 4, 5)] int second)
+            {
+            }
+
+            [Combinatorial]
+            public void CombinatorialParameters([Values(1, 2)] int first, [Values(3, 4, 5)] int second)
+            {
+            }
+
+            [Sequential]
+            public void SequentialParameters([Values(1, 2)] int first, [Values(3, 4, 5)] int second)
+            {
+            }
+
+            [Test]
+            public void FourValuedParameter([Values(1, 2, 3, 4)] int value)
+            {
+            }
+
+            [Test]
+            public void RangedParameter([Range(1, 3)] int value)
+            {
+            }
+
+            [Test]
+            public void SteppedRangeParameter([Range(0, 10, 5)] int value)
+            {
+            }
+
+            [Test]
+            public void DescendingRangeParameter([Range(3, 1, -1)] int value)
+            {
+            }
+
+            [Test]
+            public void TwiceRangedParameter([Range(1, 2)] [Range(5, 6)] int value)
+            {
+            }
+
+            [Test]
+            public void CountedRandomParameter([Random(4)] int value)
+            {
+            }
+
+            [Test]
+            public void BoundedRandomParameter([Random(1, 10, 2)] int value)
+            {
+            }
+
+            [Test]
+            public void ValueSourcedParameter([ValueSource(nameof(ArrayRows))] int value)
+            {
+            }
+
+            [Theory]
+            public void TheoryDriven(bool value)
+            {
+            }
+
+            [TestCaseSource(nameof(ComputedRows))]
+            public void SourceFromComputation(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(SpreadRows))]
+            public void SourceFromSpread(int value)
+            {
+            }
+
+            [TestCaseSource(nameof(ConditionallyYieldedRows))]
+            public void SourceFromConditionalYield(int value)
+            {
+            }
+
+            [TestCaseSource(typeof(TypeSource))]
+            public void SourceFromAType(int value)
+            {
+            }
+
+            [TestCaseSource("Absent")]
+            public void SourceFromAnAbsentMember(int value)
+            {
+            }
+
+            [TestCase(1)]
+            [TestCaseSource(nameof(ComputedRows))]
+            public void RowAndComputedSource(int value)
+            {
+            }
+
+            [Pairwise]
+            public void PairwiseParameters([Values(1, 2)] int first, [Values(3, 4, 5)] int second)
+            {
+            }
+
+            [Test]
+            public void ParameterWithoutData(int value)
+            {
+            }
+
+            [Test]
+            public void PartiallyValuedParameters([Values(1, 2)] int first, int second)
+            {
+            }
+
+            [Test]
+            public void EmptyValuesParameter([Values] bool value)
+            {
+            }
+
+            [Test]
+            public void FloatingRangeParameter([Range(0.0, 1.0, 0.25)] double value)
+            {
+            }
+
+            [Test]
+            public void AbsentValueSourceParameter([ValueSource("Absent")] int value)
+            {
+            }
+
+            public static readonly int[] ArrayRows = new int[] { 1, 2, 3 };
+
+            public static readonly List<int> ListRows = new List<int> { 1, 2, 3, 4 };
+
+            public static IEnumerable<int> CollectionRows => [1, 2];
+
+            public static IEnumerable<int> ReturnedRows()
+            {
+                return new int[] { 1, 2, 3, 4, 5 };
+            }
+
+            public static IEnumerable<int> YieldedRows()
+            {
+                yield return 1;
+                yield return 2;
+            }
+
+            public static IEnumerable<int> ComputedRows()
+            {
+                return Enumerable.Range(1, 3);
+            }
+
+            public static IEnumerable<int> SpreadRows()
+            {
+                return [.. ArrayRows];
+            }
+
+            public static IEnumerable<int> ConditionallyYieldedRows()
+            {
+                yield return 1;
+
+                if (ArrayRows.Length > 2)
+                {
+                    yield return 2;
+                }
+            }
+        }
+        """;
+
+    /// <summary>
     /// A <c>TestAttribute</c> of the project itself, which shares nothing with the framework but its
     /// simple name and must therefore never mark a test.
     /// </summary>
@@ -351,6 +642,7 @@ public class NUnitTestMethodRecognizerTests
         {
             Describe(CreateNUnitFixture()),
             Describe(CreateMarkerFixture()),
+            Describe(CreateCountFixture()),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.NUnit)),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource)),
             Describe(CreateSatelliteConsumer(FrameworkAssemblyName)),
@@ -619,11 +911,151 @@ public class NUnitTestMethodRecognizerTests
         _ = await Assert.That(exception.ParamName).IsEqualTo("method");
     }
 
+    /// <summary>
+    /// Every shape whose number of cases is written down in the source, counted exactly. A parameterless
+    /// <c>[Test]</c> is one of them: its inputs are hardcoded in the body, which is exactly as narrow as a
+    /// single <c>[TestCase]</c> row, so exempting it would hide the very gap the count exists to expose.
+    /// <c>[Repeat]</c> and <c>[Retry]</c> run that one case again with the same arguments and therefore do
+    /// not multiply it.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The exact number of cases.</param>
+    [Test]
+    [Arguments("Parameterless", 1)]
+    [Arguments("DerivedMarker", 1)]
+    [Arguments("Repeated", 1)]
+    [Arguments("Retried", 1)]
+    [Arguments("SingleRow", 1)]
+    [Arguments("ThreeRows", 3)]
+    [Arguments("SourceFromArrayField", 3)]
+    [Arguments("SourceFromCollectionProperty", 2)]
+    [Arguments("SourceFromInitializedList", 4)]
+    [Arguments("SourceFromReturningMethod", 5)]
+    [Arguments("SourceFromYieldingMethod", 2)]
+    [Arguments("SourceFromDerivedAttribute", 3)]
+    [Arguments("SourceFromAnotherType", 2)]
+    [Arguments("RowsAndSource", 5)]
+    [Arguments("OneValuedParameter", 2)]
+    [Arguments("TwoValuedParameters", 6)]
+    [Arguments("CombinatorialParameters", 6)]
+    [Arguments("SequentialParameters", 3)]
+    [Arguments("FourValuedParameter", 4)]
+    [Arguments("RangedParameter", 3)]
+    [Arguments("SteppedRangeParameter", 3)]
+    [Arguments("DescendingRangeParameter", 3)]
+    [Arguments("TwiceRangedParameter", 4)]
+    [Arguments("CountedRandomParameter", 4)]
+    [Arguments("BoundedRandomParameter", 2)]
+    [Arguments("ValueSourcedParameter", 3)]
+    public async Task GetTestCaseCount_ShapeThatIsWrittenDown_IsCountedExactly(string methodName, int expected)
+    {
+        var compilation = CreateCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// Every shape whose number of cases the framework only settles while discovering tests, counted as a
+    /// lower bound. The bound itself is asserted as well, because it is what a sum built from it reports,
+    /// and it must never be smaller than the number of cases that certainly exist.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The lower bound of the number of cases.</param>
+    [Test]
+    [Arguments("TheoryDriven", 1)]
+    [Arguments("SourceFromComputation", 1)]
+    [Arguments("SourceFromSpread", 1)]
+    [Arguments("SourceFromConditionalYield", 1)]
+    [Arguments("SourceFromAType", 1)]
+    [Arguments("SourceFromAnAbsentMember", 1)]
+    [Arguments("RowAndComputedSource", 2)]
+    [Arguments("PairwiseParameters", 3)]
+    [Arguments("ParameterWithoutData", 1)]
+    [Arguments("PartiallyValuedParameters", 2)]
+    [Arguments("EmptyValuesParameter", 1)]
+    [Arguments("FloatingRangeParameter", 1)]
+    [Arguments("AbsentValueSourceParameter", 1)]
+    public async Task GetTestCaseCount_ShapeThatIsNotWrittenDown_IsALowerBound(string methodName, int expected)
+    {
+        var compilation = CreateCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// The count does not depend on the resolved builder interfaces at all — every attribute it reads is
+    /// matched by name and declaring assembly — so a recogniser that has nothing but the name-based rule
+    /// must produce the very same numbers. A count that differed there would make the same test surface
+    /// report different findings depending on how the compilation resolved.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The count, written the way <c>ToString</c> writes it.</param>
+    [Test]
+    [Arguments("Parameterless", "1")]
+    [Arguments("ThreeRows", "3")]
+    [Arguments("SourceFromArrayField", "3")]
+    [Arguments("TwoValuedParameters", "6")]
+    [Arguments("TheoryDriven", "1+")]
+    [Arguments("PairwiseParameters", "3+")]
+    public async Task GetTestCaseCount_RecognizerWithoutAnyInterfaceType_CountsTheSame(
+        string methodName,
+        string expected
+    )
+    {
+        var compilation = CreateCountFixture();
+        var recognizer = new NUnitTestMethodRecognizer([]);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.ToString()).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// An attribute that only shares the simple name of a framework attribute contributes nothing, so the
+    /// method counts as the single hardcoded case a body without arguments is.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_TestAttributeFromAnUnrelatedNamespace_CountsOneHardcodedCase()
+    {
+        var compilation = CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.NUnit);
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    [Test]
+    public async Task GetTestCaseCount_MethodIsNull_ThrowsArgumentNullException()
+    {
+        var recognizer = new NUnitTestMethodRecognizer([]);
+
+        var exception = Assert.Throws<ArgumentNullException>(() => recognizer.GetTestCaseCount(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("method");
+    }
+
     private static CSharpCompilation CreateNUnitFixture() =>
         CompilationFactory.Create(NUnitFixtureSource, TestFramework.NUnit, filePath: CasesPath);
 
     private static CSharpCompilation CreateMarkerFixture() =>
         CompilationFactory.Create(MarkerFixtureSource, TestFramework.NUnit, filePath: CasesPath);
+
+    private static CSharpCompilation CreateCountFixture() =>
+        CompilationFactory.Create(CountFixtureSource, TestFramework.NUnit, filePath: CasesPath);
 
     /// <summary>
     /// Compiles the look-alike interfaces into an assembly called

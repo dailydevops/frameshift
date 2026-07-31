@@ -16,12 +16,15 @@ internal static class TestSurfaceManifestFormat
     public const string FileSuffix = ".frameshift-tests";
 
     /// <summary>
-    /// The line prefix marking the documentation comment id of a test method.
+    /// The line prefix opening the block of a test method. The line carries the documentation comment
+    /// id of the test method, followed by its test case count.
     /// </summary>
     public const char TestPrefix = 'T';
 
     /// <summary>
-    /// The line prefix marking the documentation comment id of a referenced production member.
+    /// The line prefix marking the documentation comment id of a production member referenced by the
+    /// test method of the enclosing block. Such a line belongs to the preceding
+    /// <see cref="TestPrefix" /> line and is malformed before the first one.
     /// </summary>
     public const char ReferencePrefix = 'R';
 
@@ -29,4 +32,15 @@ internal static class TestSurfaceManifestFormat
     /// The line prefix marking a comment line, which is ignored while parsing.
     /// </summary>
     public const char CommentPrefix = '#';
+
+    /// <summary>
+    /// The suffix marking a test case count as a lower bound instead of an exact number, as in
+    /// <c>1+</c>.
+    /// </summary>
+    public const char LowerBoundSuffix = '+';
+
+    /// <summary>
+    /// The character separating the fields of an entry line.
+    /// </summary>
+    public const char FieldSeparator = ' ';
 }

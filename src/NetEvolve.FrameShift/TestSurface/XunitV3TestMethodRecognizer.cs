@@ -50,11 +50,21 @@ using Microsoft.CodeAnalysis;
 /// unavailable — the recogniser recognises nothing instead of guessing. Detecting the framework fails open,
 /// judging a method fails closed.
 /// </para>
+/// <para>
+/// Counting the test cases of a recognised method is delegated to <see cref="XunitTestCaseCounter" />,
+/// which both major versions share: version 3 renamed the base type of a data source to
+/// <c>Xunit.v3.DataAttribute</c> and added the interfaces <c>Xunit.v3.IDataAttribute</c> and
+/// <c>Xunit.v3.ITheoryAttribute</c>, but the shapes that decide a count — <c>[InlineData]</c> per case,
+/// <c>[MemberData]</c> and <c>[ClassData]</c> as lower bounds — are the ones of version 2. Sharing the
+/// rules is what keeps the two recognisers from drifting apart while they stay separate types.
+/// </para>
 /// </remarks>
 internal sealed class XunitV3TestMethodRecognizer : ITestMethodRecognizer
 {
     private readonly INamedTypeSymbol? _testAttributeType;
     private readonly INamedTypeSymbol? _testMarkerInterfaceType;
+    private readonly XunitTestCaseCounter _caseCounter;
+    private readonly Func<INamedTypeSymbol?, bool> _isTestAttribute;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="XunitV3TestMethodRecognizer" /> class.
@@ -72,6 +82,10 @@ internal sealed class XunitV3TestMethodRecognizer : ITestMethodRecognizer
     {
         _testAttributeType = testAttributeType;
         _testMarkerInterfaceType = testMarkerInterfaceType;
+        _caseCounter = XunitTestCaseCounter.ForVersionThree(
+            (testAttributeType ?? testMarkerInterfaceType)?.ContainingAssembly
+        );
+        _isTestAttribute = IsTestAttribute;
     }
 
     /// <inheritdoc />
@@ -92,6 +106,33 @@ internal sealed class XunitV3TestMethodRecognizer : ITestMethodRecognizer
         }
 
         return method.GetAttributes().Any(attribute => IsTestAttribute(attribute.AttributeClass));
+    }
+
+    /// <summary>
+    /// Counts the test cases <paramref name="method" /> contributes, following the shared xUnit.net rules of
+    /// <see cref="XunitTestCaseCounter" />: one case per <c>[InlineData]</c>, the literal length of a member
+    /// data source that is written out in the compilation, a lower bound of one for every other data source,
+    /// exactly one for a <c>[Fact]</c>, no case at all for a <c>[Theory]</c> without any data source, and a
+    /// lower bound whenever a marker other than the shipped <c>[Fact]</c> and <c>[Theory]</c> may multiply
+    /// the cases.
+    /// </summary>
+    /// <param name="method">The test method to count the cases of.</param>
+    /// <returns>The number of test cases, exact or as a lower bound.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="method" /> is <see langword="null" />.</exception>
+    /// <remarks>
+    /// The last rule earns its place in version 3 above all: <c>[CulturedFact(["en-US", "fr-FR"])]</c> is
+    /// two test cases and <c>[CulturedTheory]</c> multiplies its cultures with the data rows, so neither may
+    /// ever be counted exactly. A recogniser whose types could not be resolved cannot see the data sources
+    /// either and answers the lower bound of one rather than inventing exactness.
+    /// </remarks>
+    public TestCaseCount GetTestCaseCount(IMethodSymbol method)
+    {
+        if (method is null)
+        {
+            throw new ArgumentNullException(nameof(method));
+        }
+
+        return _caseCounter.Count(method, _isTestAttribute);
     }
 
     private bool IsTestAttribute(INamedTypeSymbol? attributeClass)

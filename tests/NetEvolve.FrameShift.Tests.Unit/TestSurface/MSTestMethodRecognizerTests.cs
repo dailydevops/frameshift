@@ -17,9 +17,18 @@ using TUnit.Core;
 /// fixture attributes that sit on a method without being one, and the class-level attribute.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The marker really is the base type here, which is why <c>[STATestMethod]</c> is accepted without being
 /// named anywhere in production code, while <c>[DataRow]</c> and <c>[DynamicData]</c> are refused on their
 /// own however test-like they look.
+/// </para>
+/// <para>
+/// The case count is covered shape by shape, and in two groups that must never be mixed up. An exact count
+/// is asserted as the number <em>and</em> as being exact, because only an exact one may ever contribute to
+/// a finding. A lower bound is asserted as the number <em>and</em> as not being exact, because the whole
+/// point of a bound is that it suppresses the finding: MSTest resolves a dynamic data source while
+/// discovering tests, and mistaking such a source for a single case would report a gap that is not there.
+/// </para>
 /// </remarks>
 public class MSTestMethodRecognizerTests
 {
@@ -27,10 +36,12 @@ public class MSTestMethodRecognizerTests
     private const string ForeignAssemblyName = "Foreign.Satellite";
 
     private const string CasesTypeName = "Fixture.Cases";
+    private const string CountCasesTypeName = "Fixture.CountCases";
     private const string DecoratedTestName = "DecoratedTest";
     private const string PlainMethodName = "PlainMethod";
 
     private const string CasesPath = "Cases.cs";
+    private const string CountCasesPath = "CountCases.cs";
     private const string ForeignPath = "Foreign.cs";
     private const string SatellitePath = "Satellite.cs";
 
@@ -109,6 +120,198 @@ public class MSTestMethodRecognizerTests
             public static IEnumerable<object[]> Values
             {
                 get { yield return new object[] { 1 }; }
+            }
+        }
+        """;
+
+    /// <summary>
+    /// One method per shape a case count can be derived from, and one source member per shape a sequence
+    /// length can be read from. The methods whose count is a lower bound are declared right next to the
+    /// exact ones on purpose: <c>[DynamicData]</c> of a computed sequence looks exactly like
+    /// <c>[DynamicData]</c> of a listed one at the call site, and only the declaration of the source
+    /// decides.
+    /// </summary>
+    private const string CountCasesSource = """
+        namespace Fixture;
+
+        using System;
+        using System.Collections.Generic;
+        using System.Linq;
+        using System.Reflection;
+        using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+        public sealed class ScenarioRowAttribute : DataRowAttribute
+        {
+            public ScenarioRowAttribute(int value)
+                : base(value)
+            {
+            }
+        }
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class RowsFromNowhereAttribute : Attribute, ITestDataSource
+        {
+            public IEnumerable<object[]> GetData(MethodInfo methodInfo)
+            {
+                yield return new object[] { 1 };
+            }
+
+            public string GetDisplayName(MethodInfo methodInfo, object[] data)
+            {
+                return "row";
+            }
+        }
+
+        public static class ExternalSource
+        {
+            public static readonly object[][] Rows = new object[][]
+            {
+                new object[] { 1 },
+                new object[] { 2 },
+            };
+        }
+
+        [TestClass]
+        public class CountCases
+        {
+            [TestMethod]
+            public void Parameterless()
+            {
+            }
+
+            [TestMethod]
+            [Retry(3)]
+            public void Retried()
+            {
+            }
+
+            [DataTestMethod]
+            [DataRow(1)]
+            public void SingleRow(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DataRow(1)]
+            [DataRow(2)]
+            [DataRow(3)]
+            public void ThreeRows(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [ScenarioRow(1)]
+            [ScenarioRow(2)]
+            public void DerivedRows(int value)
+            {
+            }
+
+            [TestMethod(UnfoldingStrategy = TestDataSourceUnfoldingStrategy.Fold)]
+            [DataRow(1)]
+            [DataRow(2)]
+            public void FoldedRows(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(ArrayRows))]
+            public void SourceFromArrayField(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(CollectionRows))]
+            public void SourceFromCollectionProperty(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(ReturnedRows), DynamicDataSourceType.Method)]
+            public void SourceFromReturningMethod(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(YieldedRows), DynamicDataSourceType.Method)]
+            public void SourceFromYieldingMethod(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(ExternalSource.Rows), typeof(ExternalSource))]
+            public void SourceFromAnotherType(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DataRow(1)]
+            [DataRow(2)]
+            [DynamicData(nameof(ArrayRows))]
+            public void RowsAndSource(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(ComputedRows), DynamicDataSourceType.Method)]
+            public void SourceFromComputation(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData("Absent")]
+            public void SourceFromAnAbsentMember(int value)
+            {
+            }
+
+            [TestMethod]
+            [DataSource("Connected")]
+            public void SourceFromAnExternalTable()
+            {
+            }
+
+            [TestMethod]
+            [RowsFromNowhere]
+            public void SourceFromACustomAttribute(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DataRow(1)]
+            [DynamicData(nameof(ComputedRows), DynamicDataSourceType.Method)]
+            public void RowAndComputedSource(int value)
+            {
+            }
+
+            public static readonly object[][] ArrayRows = new object[][]
+            {
+                new object[] { 1 },
+                new object[] { 2 },
+                new object[] { 3 },
+            };
+
+            public static IEnumerable<object[]> CollectionRows =>
+                [new object[] { 1 }, new object[] { 2 }];
+
+            public static IEnumerable<object[]> ReturnedRows()
+            {
+                return new object[][]
+                {
+                    new object[] { 1 },
+                    new object[] { 2 },
+                    new object[] { 3 },
+                    new object[] { 4 },
+                };
+            }
+
+            public static IEnumerable<object[]> YieldedRows()
+            {
+                yield return new object[] { 1 };
+                yield return new object[] { 2 };
+            }
+
+            public static IEnumerable<object[]> ComputedRows()
+            {
+                return ArrayRows.Where(row => row.Length > 0);
             }
         }
         """;
@@ -340,12 +543,127 @@ public class MSTestMethodRecognizerTests
         _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsFalse();
     }
 
+    /// <summary>
+    /// Every shape whose number of cases is written down in the source, counted exactly. A
+    /// <c>[TestMethod]</c> without any data source is one of them: its inputs are hardcoded in the body,
+    /// which is exactly as narrow as a single <c>[DataRow]</c>, so exempting it would hide the very gap the
+    /// count exists to expose. <c>[Retry]</c> re-runs that one case with the same arguments and therefore
+    /// does not multiply it, and the folding strategy only changes how the rows are reported.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The exact number of cases.</param>
+    [Test]
+    [Arguments("Parameterless", 1)]
+    [Arguments("Retried", 1)]
+    [Arguments("SingleRow", 1)]
+    [Arguments("ThreeRows", 3)]
+    [Arguments("DerivedRows", 2)]
+    [Arguments("FoldedRows", 2)]
+    [Arguments("SourceFromArrayField", 3)]
+    [Arguments("SourceFromCollectionProperty", 2)]
+    [Arguments("SourceFromReturningMethod", 4)]
+    [Arguments("SourceFromYieldingMethod", 2)]
+    [Arguments("SourceFromAnotherType", 2)]
+    [Arguments("RowsAndSource", 5)]
+    public async Task GetTestCaseCount_ShapeThatIsWrittenDown_IsCountedExactly(string methodName, int expected)
+    {
+        var compilation = CreateCountCases();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    /// <summary>
+    /// Every shape whose number of cases MSTest only settles while discovering tests, counted as a lower
+    /// bound. The bound itself is asserted as well, because it is what a sum built from it reports, and it
+    /// must never be smaller than the number of cases that certainly exist.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The lower bound of the number of cases.</param>
+    [Test]
+    [Arguments("SourceFromComputation", 1)]
+    [Arguments("SourceFromAnAbsentMember", 1)]
+    [Arguments("SourceFromAnExternalTable", 1)]
+    [Arguments("SourceFromACustomAttribute", 1)]
+    [Arguments("RowAndComputedSource", 2)]
+    public async Task GetTestCaseCount_ShapeThatIsNotWrittenDown_IsALowerBound(string methodName, int expected)
+    {
+        var compilation = CreateCountCases();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(expected);
+        _ = await Assert.That(count.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// The count does not depend on the resolved test attribute type at all — every attribute it reads is
+    /// matched by name and declaring assembly — so a recogniser that has nothing but the name-based rule
+    /// must produce the very same numbers. A count that differed there would make the same test surface
+    /// report different findings depending on how the compilation resolved.
+    /// </summary>
+    /// <param name="methodName">The name of the method whose cases are counted.</param>
+    /// <param name="expected">The count, written the way <c>ToString</c> writes it.</param>
+    [Test]
+    [Arguments("Parameterless", "1")]
+    [Arguments("ThreeRows", "3")]
+    [Arguments("SourceFromArrayField", "3")]
+    [Arguments("SourceFromComputation", "1+")]
+    [Arguments("RowAndComputedSource", "2+")]
+    public async Task GetTestCaseCount_RecognizerWithoutTheWellKnownType_CountsTheSame(
+        string methodName,
+        string expected
+    )
+    {
+        var compilation = CreateCountCases();
+        var recognizer = new MSTestTestMethodRecognizer(null);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.ToString()).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// An attribute that only shares the simple name of a framework attribute contributes nothing, so the
+    /// method counts as the single hardcoded case a body without arguments is.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_ForeignAttributesOnly_CountsOneHardcodedCase()
+    {
+        var compilation = CreateCases();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CasesTypeName, "ForeignAttributeTest");
+
+        var count = recognizer.GetTestCaseCount(method);
+
+        _ = await Assert.That(count.Value).IsEqualTo(1);
+        _ = await Assert.That(count.IsExact).IsTrue();
+    }
+
+    [Test]
+    public async Task GetTestCaseCount_MethodIsNull_ThrowsArgumentNullException()
+    {
+        var recognizer = new MSTestTestMethodRecognizer(null);
+
+        var exception = Assert.Throws<ArgumentNullException>(() => recognizer.GetTestCaseCount(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("method");
+    }
+
     [Test]
     public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
     {
         var errors = new[]
         {
             Describe(CreateCases()),
+            Describe(CreateCountCases()),
             Describe(CreateSatelliteConsumer(FrameworkAssemblyName)),
             Describe(CreateSatelliteConsumer(ForeignAssemblyName)),
             Describe(CreateSatelliteConsumer(SatelliteDerivedConsumerSource, FrameworkAssemblyName)),
@@ -382,8 +700,17 @@ public class MSTestMethodRecognizerTests
         );
     }
 
+    private static CSharpCompilation CreateCountCases() =>
+        CompilationFactory.Create(CountCasesSource, TestFramework.MSTest, filePath: CountCasesPath);
+
+    private static MSTestTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
+        (MSTestTestMethodRecognizer)MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)!;
+
     private static IMethodSymbol FindMethod(Compilation compilation, string methodName) =>
-        compilation.GetTypeByMetadataName(CasesTypeName)!.GetMembers(methodName).OfType<IMethodSymbol>().First();
+        FindMethod(compilation, CasesTypeName, methodName);
+
+    private static IMethodSymbol FindMethod(Compilation compilation, string typeName, string methodName) =>
+        compilation.GetTypeByMetadataName(typeName)!.GetMembers(methodName).OfType<IMethodSymbol>().First();
 
     private static string Describe(Compilation compilation) =>
         DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation));

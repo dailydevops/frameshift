@@ -197,10 +197,12 @@ internal static class TestSurfaceAnalysis
     /// project using several frameworks is judged by everything it is supposed to contain.
     /// </summary>
     /// <remarks>
-    /// The union is built over sets of documentation comment ids, so two awake frameworks that describe the
-    /// same test — two versions of one framework, for instance — add the same ids and cannot inflate the
-    /// surface. Only the recognisers are deduplicated, and only to avoid walking the running framework
-    /// twice.
+    /// The union is built block by block through <see cref="TestSurfaceManifest.Merge" />, so the per-test
+    /// attribution and the test case counts survive it. Two awake frameworks that describe the same test —
+    /// two versions of one framework, for instance — contribute the same test method id and therefore
+    /// cannot inflate the surface: such a test keeps the count of the first manifest that declared it and
+    /// the union of its references, because it is one test and not two. Only the recognisers are
+    /// deduplicated, and only to avoid walking the running framework twice.
     /// </remarks>
     /// <param name="context">The context of the analyzed compilation.</param>
     /// <param name="probe">The probe of the running analyzer.</param>
@@ -219,20 +221,16 @@ internal static class TestSurfaceAnalysis
             .Select(framework => framework.Recognizer)
             .Append(recognizer);
 
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var collected = ImmutableArray.CreateBuilder<TestSurfaceManifest>();
 
         foreach (var current in recognizers)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            var collected = TestSurfaceCollector.Collect(context.Compilation, current, context.CancellationToken);
-
-            testMethodIds.UnionWith(collected.TestMethodIds);
-            referencedMemberIds.UnionWith(collected.ReferencedMemberIds);
+            collected.Add(TestSurfaceCollector.Collect(context.Compilation, current, context.CancellationToken));
         }
 
-        return new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
+        return TestSurfaceManifest.Merge(collected.ToImmutable());
     }
 
     /// <summary>

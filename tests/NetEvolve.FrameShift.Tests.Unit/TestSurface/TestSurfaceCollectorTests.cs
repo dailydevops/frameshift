@@ -12,7 +12,8 @@ using TUnit.Core;
 /// Exercises the bridge between the two passes with a real two-assembly setup: a production assembly
 /// that is only visible as metadata, and a test assembly compiled against it. Everything the
 /// production side later relies on is asserted here, most importantly that every recorded id is a
-/// documentation comment declaration id that resolves against the production compilation again.
+/// documentation comment declaration id that resolves against the production compilation again, and
+/// that every recorded member is attributed to every test that reaches it.
 /// </summary>
 /// <remarks>
 /// The fixture deliberately avoids <c>var</c>, predefined type keywords and operators inside the code
@@ -47,6 +48,17 @@ public class TestSurfaceCollectorTests
         public static class Helpers
         {
             public static int Double(int value) => value + value;
+
+            public static int Triple(int value) => value + value + value;
+        }
+
+        public static class Shared
+        {
+            public static int Touched() => 1;
+
+            public static int FromDualUseHelper() => 2;
+
+            public static int OnlyFromNonTest() => 3;
         }
         """;
 
@@ -81,7 +93,33 @@ public class TestSurfaceCollectorTests
             [Test]
             public void OnlyTouchesLocalState() => Noop();
 
+            [Test]
+            public void SharesHelperFirst() => _ = TouchShared();
+
+            [Test]
+            public void SharesHelperSecond() => _ = TouchShared();
+
+            [Test]
+            public void CallsDualUseHelper() => _ = DualUseHelper();
+
+            [Test]
+            [Arguments(1)]
+            [Arguments(2)]
+            [Arguments(3)]
+            public void RunsThreeCases(int value) => _ = Production.Helpers.Triple(value);
+
             private static int DoubleThroughHelper() => Production.Helpers.Double(21);
+
+            private static int TouchShared() => Production.Shared.Touched();
+
+            private static int DualUseHelper() => Production.Shared.FromDualUseHelper();
+
+            private static int NotATest()
+            {
+                _ = Production.Shared.OnlyFromNonTest();
+
+                return DualUseHelper();
+            }
 
             private static Production.Calculator Down(Production.Calculator calculator) => Up(calculator.Self());
 
@@ -92,6 +130,45 @@ public class TestSurfaceCollectorTests
             }
         }
         """;
+
+    private const string CallsDualUseHelperId = "M:Tests.CalculatorTests.CallsDualUseHelper";
+
+    private const string CallsProductionMemberDirectlyId = "M:Tests.CalculatorTests.CallsProductionMemberDirectly";
+
+    private const string OnlyTouchesLocalStateId = "M:Tests.CalculatorTests.OnlyTouchesLocalState";
+
+    private const string RunsThreeCasesId = "M:Tests.CalculatorTests.RunsThreeCases(System.Int32)";
+
+    private const string SharesHelperFirstId = "M:Tests.CalculatorTests.SharesHelperFirst";
+
+    private const string SharesHelperSecondId = "M:Tests.CalculatorTests.SharesHelperSecond";
+
+    private const string WalksMutuallyRecursiveHelpersId = "M:Tests.CalculatorTests.WalksMutuallyRecursiveHelpers";
+
+    private const string TouchedId = "M:Production.Shared.Touched~System.Int32";
+
+    private const string FromDualUseHelperId = "M:Production.Shared.FromDualUseHelper~System.Int32";
+
+    private const string SharedHelperSurface = TouchedId + "|T:Production.Shared";
+
+    private const string DualUseHelperSurface = FromDualUseHelperId + "|T:Production.Shared";
+
+    private const string OnlyFromNonTestId = "M:Production.Shared.OnlyFromNonTest~System.Int32";
+
+    private const string AllTestMethodIds =
+        CallsDualUseHelperId
+        + "|"
+        + CallsProductionMemberDirectlyId
+        + "|M:Tests.CalculatorTests.CallsProductionMemberThroughHelper|"
+        + OnlyTouchesLocalStateId
+        + "|M:Tests.CalculatorTests.ReadsPropertyAndField|"
+        + RunsThreeCasesId
+        + "|"
+        + SharesHelperFirstId
+        + "|"
+        + SharesHelperSecondId
+        + "|"
+        + WalksMutuallyRecursiveHelpersId;
 
     [Test]
     public async Task Fixtures_BothAssemblies_CompileWithoutErrors()
@@ -112,15 +189,7 @@ public class TestSurfaceCollectorTests
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
 
-        _ = await Assert
-            .That(Join(manifest.TestMethodIds))
-            .IsEqualTo(
-                "M:Tests.CalculatorTests.CallsProductionMemberDirectly|"
-                    + "M:Tests.CalculatorTests.CallsProductionMemberThroughHelper|"
-                    + "M:Tests.CalculatorTests.OnlyTouchesLocalState|"
-                    + "M:Tests.CalculatorTests.ReadsPropertyAndField|"
-                    + "M:Tests.CalculatorTests.WalksMutuallyRecursiveHelpers"
-            );
+        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(AllTestMethodIds);
     }
 
     [Test]
@@ -192,10 +261,158 @@ public class TestSurfaceCollectorTests
                     + "M:Production.Calculator.Add(System.Int32,System.Int32)~System.Int32|"
                     + "M:Production.Calculator.Self~Production.Calculator|"
                     + "M:Production.Helpers.Double(System.Int32)~System.Int32|"
+                    + "M:Production.Helpers.Triple(System.Int32)~System.Int32|"
+                    + "M:Production.Shared.FromDualUseHelper~System.Int32|"
+                    + "M:Production.Shared.Touched~System.Int32|"
                     + "P:Production.Calculator.Factor|"
                     + "T:Production.Calculator|"
-                    + "T:Production.Helpers"
+                    + "T:Production.Helpers|"
+                    + "T:Production.Shared"
             );
+    }
+
+    /// <summary>
+    /// The union of the per-test attributions is what the flat set of referenced members has to be: it is
+    /// derived from the very same data, so a member attributed to nobody could never appear in it.
+    /// </summary>
+    [Test]
+    public async Task Collect_ReferencedMemberIds_AreTheUnionOfThePerTestAttributions()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        var union = manifest
+            .ReferencesByTest.Values.SelectMany(references => references)
+            .Distinct(StringComparer.Ordinal);
+
+        _ = await Assert.That(Join(union)).IsEqualTo(Join(manifest.ReferencedMemberIds));
+    }
+
+    /// <summary>
+    /// Every discovered test contributes an attribution entry and a test-case count, including the test
+    /// that reaches no production member at all. The keys of both maps are therefore exactly the set of
+    /// test methods.
+    /// </summary>
+    [Test]
+    [Arguments(true)]
+    [Arguments(false)]
+    public async Task Collect_EveryDiscoveredTest_HasAnEntryInBothMaps(bool references)
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        var keys = references ? manifest.ReferencesByTest.Keys : manifest.TestCaseCounts.Keys;
+
+        _ = await Assert.That(Join(keys)).IsEqualTo(AllTestMethodIds);
+    }
+
+    [Test]
+    public async Task Collect_TestCallingProductionDirectly_IsAttributedExactlyItsOwnSurface()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert
+            .That(ReferencesOf(manifest, CallsProductionMemberDirectlyId))
+            .IsEqualTo(
+                "M:Production.Calculator.#ctor(System.Int32)|"
+                    + "M:Production.Calculator.Add(System.Int32,System.Int32)~System.Int32|"
+                    + "T:Production.Calculator"
+            );
+    }
+
+    /// <summary>
+    /// The case a naive attribution gets wrong: two tests call the same helper of the test assembly, and
+    /// the production member behind it belongs to both of them, not to whichever test was walked first.
+    /// Attributing it to one test only would understate the number of input combinations the member is
+    /// exercised with and produce a single-test-case finding that is plainly false.
+    /// </summary>
+    [Test]
+    [Arguments(SharesHelperFirstId)]
+    [Arguments(SharesHelperSecondId)]
+    public async Task Collect_HelperSharedByTwoTests_IsAttributedToBothOfThem(string testMethodId)
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(ReferencesOf(manifest, testMethodId)).IsEqualTo(SharedHelperSurface);
+    }
+
+    /// <summary>
+    /// A helper that a test and a non-test method both call is attributed to the test, while the member
+    /// only the non-test method reaches stays out of the surface entirely: the traversal starts at test
+    /// methods, never at arbitrary methods of the test assembly.
+    /// </summary>
+    [Test]
+    public async Task Collect_HelperCalledByATestAndByANonTestMethod_IsAttributedToTheTestOnly()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(ReferencesOf(manifest, CallsDualUseHelperId)).IsEqualTo(DualUseHelperSurface);
+        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(OnlyFromNonTestId)).IsFalse();
+    }
+
+    [Test]
+    public async Task Collect_MutuallyRecursiveHelpers_AreAttributedToTheEnteringTest()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert
+            .That(ReferencesOf(manifest, WalksMutuallyRecursiveHelpersId))
+            .IsEqualTo(
+                "M:Production.Calculator.#ctor(System.Int32)|"
+                    + "M:Production.Calculator.Self~Production.Calculator|"
+                    + "T:Production.Calculator"
+            );
+    }
+
+    [Test]
+    public async Task Collect_TestWithoutProductionReference_IsAttributedAnEmptySet()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(ReferencesOf(manifest, OnlyTouchesLocalStateId)).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// A member another test reaches must not leak into an unrelated attribution, because the whole point
+    /// of the map is to tell the tests apart.
+    /// </summary>
+    [Test]
+    public async Task Collect_MemberOfAnotherTest_IsNotAttributed()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(manifest.ReferencesByTest[SharesHelperFirstId].Contains(FromDualUseHelperId)).IsFalse();
+        _ = await Assert.That(manifest.ReferencesByTest[CallsDualUseHelperId].Contains(TouchedId)).IsFalse();
+    }
+
+    /// <summary>
+    /// A parameterless test is one case, and three inline data attributes are three: the collector reports
+    /// what the recogniser answers for the method instead of deriving a count of its own.
+    /// </summary>
+    [Test]
+    [Arguments(OnlyTouchesLocalStateId, "1")]
+    [Arguments(RunsThreeCasesId, "3")]
+    public async Task Collect_TestCaseCounts_AreTakenFromTheRecognizer(string testMethodId, string expected)
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(manifest.TestCaseCounts[testMethodId].ToString()).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// The collector passes a lower bound through unchanged as well. A recogniser that answers
+    /// <c>2+</c> must reach the manifest as <c>2+</c>, because collapsing it to an exact count would let
+    /// the single-test-case heuristic fire on a number that is only a floor.
+    /// </summary>
+    [Test]
+    [Arguments(SharesHelperFirstId, "1")]
+    [Arguments(CallsDualUseHelperId, "2+")]
+    public async Task Collect_RecognizerAnswersALowerBound_IsReportedAsALowerBound(string testMethodId, string expected)
+    {
+        var test = CreateTest(CreateProduction());
+        var recognizer = new StubCountingRecognizer(CreateRecognizer(test));
+
+        var manifest = TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None);
+
+        _ = await Assert.That(manifest.TestCaseCounts[testMethodId].ToString()).IsEqualTo(expected);
     }
 
     /// <summary>
@@ -214,7 +431,7 @@ public class TestSurfaceCollectorTests
             DocumentationCommentId.GetSymbolsForDeclarationId(id, production).IsEmpty
         );
 
-        _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsEqualTo(8);
+        _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsEqualTo(12);
         _ = await Assert.That(Join(unresolved)).IsEqualTo(string.Empty);
     }
 
@@ -257,6 +474,8 @@ public class TestSurfaceCollectorTests
         var manifest = CollectSurface(production);
 
         _ = await Assert.That(manifest.IsEmpty).IsTrue();
+        _ = await Assert.That(manifest.ReferencesByTest.Count).IsEqualTo(0);
+        _ = await Assert.That(manifest.TestCaseCounts.Count).IsEqualTo(0);
     }
 
     /// <summary>
@@ -311,6 +530,9 @@ public class TestSurfaceCollectorTests
             filePath: "CalculatorTests.cs"
         );
 
+    private static string ReferencesOf(TestSurfaceManifest manifest, string testMethodId) =>
+        Join(manifest.ReferencesByTest[testMethodId]);
+
     private static string Join(IEnumerable<string> values) =>
         string.Join("|", values.OrderBy(value => value, StringComparer.Ordinal));
 
@@ -326,5 +548,35 @@ public class TestSurfaceCollectorTests
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// A recogniser that recognises exactly the tests of the fixture, but answers a case count of its own:
+    /// an exact <c>1</c> for the two tests sharing a helper and a lower bound of <c>2</c> for everything
+    /// else. It isolates the collector from the counting rules of any concrete framework.
+    /// </summary>
+    private sealed class StubCountingRecognizer : ITestMethodRecognizer
+    {
+        private const string ExactPrefix = "Shares";
+
+        private readonly ITestMethodRecognizer _inner;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="StubCountingRecognizer" /> class.
+        /// </summary>
+        /// <param name="inner">The recogniser deciding which methods are tests.</param>
+        public StubCountingRecognizer(ITestMethodRecognizer inner) => _inner = inner;
+
+        /// <inheritdoc />
+        public string FrameworkName => _inner.FrameworkName;
+
+        /// <inheritdoc />
+        public bool IsTestMethod(IMethodSymbol method) => _inner.IsTestMethod(method);
+
+        /// <inheritdoc />
+        public TestCaseCount GetTestCaseCount(IMethodSymbol method) =>
+            method.Name.StartsWith(ExactPrefix, StringComparison.Ordinal)
+                ? TestCaseCount.Exact(1)
+                : TestCaseCount.AtLeast(2);
     }
 }

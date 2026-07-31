@@ -42,6 +42,7 @@ internal sealed class XunitV3TestMethodRecognizerTests
 {
     private const string CasesTypeName = "Fixture.Cases";
     private const string MixedCasesTypeName = "Fixture.MixedCases";
+    private const string CountCasesTypeName = "Fixture.CountCases";
 
     private const string VersionTwoAssemblyName = "Helper.VersionTwo";
     private const string VersionThreeAssemblyName = "Helper.VersionThree";
@@ -201,6 +202,297 @@ internal sealed class XunitV3TestMethodRecognizerTests
         """;
 
     /// <summary>
+    /// The fixture of the case-counting rules. It is a compilation of its own, so that the shapes it adds
+    /// cannot shift the discovery assertions above, and it carries one method per rule: a parameterless
+    /// <c>[Fact]</c>, one and three <c>[InlineData]</c> rows, a <c>[Theory]</c> without any data source, a
+    /// member data source per literal shape — implicit and explicit array creation, an expression-bodied
+    /// getter, a collection initializer, a <c>TheoryData</c> initializer, a collection expression, an empty
+    /// sequence, a method, a field and an inherited member — and the shapes no static reading can size: an
+    /// iterator, an array created by length alone, a member that does not exist and a <c>[ClassData]</c>
+    /// source.
+    /// </summary>
+    /// <remarks>
+    /// On top of the version 2 shapes it carries the three version 3 knows on its own: <c>[CulturedFact]</c>
+    /// and <c>[CulturedTheory]</c>, whose cultures multiply the cases, and a data source that implements
+    /// <c>Xunit.v3.IDataAttribute</c> without deriving from <c>Xunit.v3.DataAttribute</c> — the shape a rule
+    /// keyed on the base type alone would overlook, and the counterpart of the marker interface of a test.
+    /// </remarks>
+    private const string CaseCountFixtureSource = """
+        namespace Fixture;
+
+        using System;
+        using System.Collections.Generic;
+        using System.Reflection;
+        using System.Threading.Tasks;
+        using Xunit;
+        using Xunit.Sdk;
+        using Xunit.v3;
+
+        public sealed class ScenarioFactAttribute : FactAttribute
+        {
+        }
+
+        public sealed class ScenarioTheoryAttribute : TheoryAttribute
+        {
+        }
+
+        [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
+        public sealed class MarkerInterfaceDataAttribute : Attribute, IDataAttribute
+        {
+            public bool? Explicit => null;
+
+            public string? Label => null;
+
+            public string? Skip => null;
+
+            public Type? SkipType => null;
+
+            public string? SkipUnless => null;
+
+            public string? SkipWhen => null;
+
+            public string? TestDisplayName => null;
+
+            public int? Timeout => null;
+
+            public string[]? Traits => null;
+
+            public ValueTask<IReadOnlyCollection<ITheoryDataRow>> GetData(
+                MethodInfo testMethod,
+                DisposalTracker disposalTracker
+            ) => new ValueTask<IReadOnlyCollection<ITheoryDataRow>>(new List<ITheoryDataRow>());
+
+            public bool SupportsDiscoveryEnumeration() => true;
+        }
+
+        public sealed class RowSource : List<object[]>
+        {
+        }
+
+        public class Rows
+        {
+            public static readonly IEnumerable<object[]> Field = new[]
+            {
+                new object[] { 1 },
+                new object[] { 2 },
+                new object[] { 3 },
+                new object[] { 4 },
+                new object[] { 5 },
+            };
+
+            public static IEnumerable<object[]> ImplicitArrayProperty =>
+                new[] { new object[] { 1 }, new object[] { 2 } };
+
+            public static IEnumerable<object[]> ExplicitArrayProperty => new object[][] { new object[] { 1 } };
+
+            public static IEnumerable<object[]> GetterProperty
+            {
+                get => new[] { new object[] { 1 }, new object[] { 2 }, new object[] { 3 } };
+            }
+
+            public static IEnumerable<object[]> ListProperty =>
+                new List<object[]> { new object[] { 1 }, new object[] { 2 } };
+
+            public static TheoryData<int> TheoryDataProperty => new TheoryData<int> { 1, 2, 3 };
+
+            public static IEnumerable<object[]> CollectionExpressionProperty => [[1], [2]];
+
+            public static IEnumerable<object[]> EmptyProperty => new object[][] { };
+
+            public static IEnumerable<object[]> SizedArrayProperty => new object[4][];
+
+            public static IEnumerable<object[]> Method() =>
+                new[] { new object[] { 1 }, new object[] { 2 }, new object[] { 3 }, new object[] { 4 } };
+
+            public static IEnumerable<object[]> Iterator()
+            {
+                yield return new object[] { 1 };
+                yield return new object[] { 2 };
+            }
+        }
+
+        public sealed class DerivedRows : Rows
+        {
+        }
+
+        public class CountCases
+        {
+            public static IEnumerable<object[]> LocalRows => new[] { new object[] { 1 }, new object[] { 2 } };
+
+            [Fact]
+            public void ParameterlessFact()
+            {
+            }
+
+            [Theory]
+            [InlineData(1)]
+            public void OneInlineData(int value)
+            {
+            }
+
+            [Theory]
+            [InlineData(1)]
+            [InlineData(2)]
+            [InlineData(3)]
+            public void ThreeInlineData(int value)
+            {
+            }
+
+            [Theory]
+            public void TheoryWithoutData()
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(LocalRows))]
+            public void LocalMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.ImplicitArrayProperty), MemberType = typeof(Rows))]
+            public void ImplicitArrayMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.ExplicitArrayProperty), MemberType = typeof(Rows))]
+            public void ExplicitArrayMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.GetterProperty), MemberType = typeof(Rows))]
+            public void GetterPropertyMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.ListProperty), MemberType = typeof(Rows))]
+            public void ListMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.TheoryDataProperty), MemberType = typeof(Rows))]
+            public void TheoryDataMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.CollectionExpressionProperty), MemberType = typeof(Rows))]
+            public void CollectionExpressionMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.EmptyProperty), MemberType = typeof(Rows))]
+            public void EmptyMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.SizedArrayProperty), MemberType = typeof(Rows))]
+            public void SizedArrayMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.Method), MemberType = typeof(Rows))]
+            public void MethodMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.Field), MemberType = typeof(Rows))]
+            public void FieldMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.ImplicitArrayProperty), MemberType = typeof(DerivedRows))]
+            public void InheritedMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.Iterator), MemberType = typeof(Rows))]
+            public void IteratorMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData("DoesNotExist")]
+            public void MissingMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [ClassData(typeof(RowSource))]
+            public void ClassDataTheory(int value)
+            {
+            }
+
+            [Theory]
+            [InlineData(1)]
+            [MemberData(nameof(LocalRows))]
+            public void InlineDataAndLiteralMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [InlineData(1)]
+            [InlineData(2)]
+            [MemberData(nameof(Rows.Iterator), MemberType = typeof(Rows))]
+            public void InlineDataAndIteratorMemberData(int value)
+            {
+            }
+
+            [ScenarioFact]
+            public void CustomMarkerFact()
+            {
+            }
+
+            [ScenarioTheory]
+            [InlineData(1)]
+            [InlineData(2)]
+            public void CustomMarkerTheory(int value)
+            {
+            }
+
+            [CulturedFact(new string[] { "en-US", "fr-FR" })]
+            public void CulturedFact()
+            {
+            }
+
+            [CulturedTheory(new string[] { "en-US" })]
+            [InlineData(1)]
+            [InlineData(2)]
+            public void CulturedTheory(int value)
+            {
+            }
+
+            [Theory]
+            [MarkerInterfaceData]
+            public void MarkerInterfaceDataTheory(int value)
+            {
+            }
+
+            [Theory]
+            [InlineData(1)]
+            [MarkerInterfaceData]
+            public void InlineDataAndMarkerInterfaceData(int value)
+            {
+            }
+
+            [ScenarioTheory]
+            public void CustomMarkerTheoryWithoutData()
+            {
+            }
+        }
+        """;
+
+    /// <summary>
     /// A <c>FactAttribute</c> and an <c>IFactAttribute</c> of the project itself, which share nothing with the
     /// framework but their simple names and must therefore never mark a test. The look-alike interface is the
     /// counterpart of the look-alike attribute: now that the marker is an interface, a project declaring one
@@ -293,6 +585,7 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var errors = new[]
         {
             Describe(CreateXunitFixture()),
+            Describe(CreateCaseCountFixture()),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource, TestFramework.XunitV3)),
             Describe(CompilationFactory.Create(UnrelatedFixtureSource)),
             Describe(CreateVersionTwoHelper()),
@@ -531,8 +824,175 @@ internal sealed class XunitV3TestMethodRecognizerTests
         _ = await Assert.That(exception.ParamName).IsEqualTo("method");
     }
 
+    /// <summary>
+    /// Every counting rule, on the shape that states it. The expectation is the string form of the count, so
+    /// that the value and its exactness are asserted in one place: <c>3</c> is exactly three cases, <c>1+</c>
+    /// is a lower bound of one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The rules are the ones of version 2, and that is the point of asserting them again here: version 3
+    /// renamed the base type of a data source and added an interface next to it, but it did not change a
+    /// single count. A parameterless <c>[Fact]</c> is one case and deliberately not exempt, its inputs being
+    /// hardcoded in the body is exactly as narrow as a single <c>[InlineData]</c> row. A <c>[Theory]</c>
+    /// without any data source is <em>no</em> case at all, because discovery finds no data and version 3
+    /// fails the theory instead of running anything.
+    /// </para>
+    /// <para>
+    /// The three shapes that are version 3's own are the reason the rules cannot simply be copied.
+    /// <c>[CulturedFact(["en-US", "fr-FR"])]</c> is two test cases and <c>[CulturedTheory]</c> multiplies its
+    /// cultures with the data rows, so no marker beyond the shipped <c>[Fact]</c> and <c>[Theory]</c> may
+    /// ever be counted exactly. And a data source implementing <c>Xunit.v3.IDataAttribute</c> directly is a
+    /// data source, so the theory carrying it is a lower bound of one rather than the zero a rule keyed on
+    /// the base type alone would report.
+    /// </para>
+    /// </remarks>
+    [Test]
+    [Arguments("ParameterlessFact", "1")]
+    [Arguments("OneInlineData", "1")]
+    [Arguments("ThreeInlineData", "3")]
+    [Arguments("TheoryWithoutData", "0")]
+    [Arguments("LocalMemberData", "2")]
+    [Arguments("ImplicitArrayMemberData", "2")]
+    [Arguments("ExplicitArrayMemberData", "1")]
+    [Arguments("GetterPropertyMemberData", "3")]
+    [Arguments("ListMemberData", "2")]
+    [Arguments("TheoryDataMemberData", "3")]
+    [Arguments("CollectionExpressionMemberData", "2")]
+    [Arguments("EmptyMemberData", "0")]
+    [Arguments("MethodMemberData", "4")]
+    [Arguments("FieldMemberData", "5")]
+    [Arguments("InheritedMemberData", "2")]
+    [Arguments("SizedArrayMemberData", "1+")]
+    [Arguments("IteratorMemberData", "1+")]
+    [Arguments("MissingMemberData", "1+")]
+    [Arguments("ClassDataTheory", "1+")]
+    [Arguments("InlineDataAndLiteralMemberData", "3")]
+    [Arguments("InlineDataAndIteratorMemberData", "3+")]
+    [Arguments("CustomMarkerFact", "1+")]
+    [Arguments("CustomMarkerTheory", "2+")]
+    [Arguments("CustomMarkerTheoryWithoutData", "0")]
+    [Arguments("CulturedFact", "1+")]
+    [Arguments("CulturedTheory", "2+")]
+    [Arguments("MarkerInterfaceDataTheory", "1+")]
+    [Arguments("InlineDataAndMarkerInterfaceData", "2+")]
+    public async Task GetTestCaseCount_TestShape_IsCountedExactlyOrAsALowerBound(string methodName, string expected)
+    {
+        var compilation = CreateCaseCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+        var method = FindMethod(compilation, CountCasesTypeName, methodName);
+
+        _ = await Assert.That(recognizer.GetTestCaseCount(method).ToString()).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// The value and the exactness are two separate answers, and the aggregation of the heuristic rests on
+    /// the second one: a single lower bound anywhere suppresses a finding. Both are therefore asserted
+    /// without going through the string form.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_ExactCountAndLowerBound_AreDistinguishedByIsExact()
+    {
+        var compilation = CreateCaseCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+
+        var exact = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "ThreeInlineData"));
+        var bound = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "CulturedTheory"));
+
+        _ = await Assert.That(exact.Value).IsEqualTo(3);
+        _ = await Assert.That(exact.IsExact).IsTrue();
+        _ = await Assert.That(bound.Value).IsEqualTo(2);
+        _ = await Assert.That(bound.IsExact).IsFalse();
+    }
+
+    /// <summary>
+    /// The data marker interface counts just as the base type does. A theory whose only data source
+    /// implements <c>Xunit.v3.IDataAttribute</c> directly has at least one case, while the very same theory
+    /// without any data source has none — so overlooking the interface would turn a test that runs into one
+    /// that reportedly runs nothing.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_DataSourceImplementingTheMarkerInterfaceOnly_IsSeenAsADataSource()
+    {
+        var compilation = CreateCaseCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+
+        var withSource = recognizer.GetTestCaseCount(
+            FindMethod(compilation, CountCasesTypeName, "MarkerInterfaceDataTheory")
+        );
+        var withoutSource = recognizer.GetTestCaseCount(
+            FindMethod(compilation, CountCasesTypeName, "TheoryWithoutData")
+        );
+
+        _ = await Assert.That(withSource.ToString()).IsEqualTo("1+");
+        _ = await Assert.That(withoutSource.ToString()).IsEqualTo("0");
+    }
+
+    /// <summary>
+    /// Every method of the counting fixture is a test of version 3, which is what makes the counts above mean
+    /// anything: a count is only ever asked for a method that is on the test surface.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_EveryMethodOfTheCountingFixture_IsClassifiedAsATest()
+    {
+        var compilation = CreateCaseCountFixture();
+        var recognizer = CreateRecognizer(compilation);
+
+        var notRecognized = compilation
+            .GetTypeByMetadataName(CountCasesTypeName)!
+            .GetMembers()
+            .OfType<IMethodSymbol>()
+            .Where(method => method.MethodKind == MethodKind.Ordinary && !recognizer.IsTestMethod(method))
+            .Select(method => method.Name);
+
+        _ = await Assert.That(string.Join("|", notRecognized)).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// A recogniser without any resolved type cannot see the data sources either, so it answers the lower
+    /// bound that suppresses every finding built on it, instead of the exact three cases the inline data rows
+    /// would otherwise be.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_RecognizerWithoutAnAttributeType_AnswersALowerBoundOfOne()
+    {
+        var compilation = CreateCaseCountFixture();
+        var recognizer = new XunitV3TestMethodRecognizer(null, null);
+        var method = FindMethod(compilation, CountCasesTypeName, "ThreeInlineData");
+
+        _ = await Assert.That(recognizer.GetTestCaseCount(method).ToString()).IsEqualTo("1+");
+    }
+
+    /// <summary>
+    /// The counter is built from whichever of the two types resolved, so a recogniser that only found the
+    /// marker interface still counts the cases exactly — both types live in <c>xunit.v3.core</c>.
+    /// </summary>
+    [Test]
+    public async Task GetTestCaseCount_RecognizerWithTheMarkerInterfaceOnly_CountsTheCases()
+    {
+        var compilation = CreateCaseCountFixture();
+        var markerInterface = XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation);
+        var recognizer = new XunitV3TestMethodRecognizer(null, markerInterface);
+        var method = FindMethod(compilation, CountCasesTypeName, "ThreeInlineData");
+
+        _ = await Assert.That(recognizer.GetTestCaseCount(method).ToString()).IsEqualTo("3");
+    }
+
+    [Test]
+    public async Task GetTestCaseCount_MethodIsNull_ThrowsArgumentNullException()
+    {
+        var recognizer = new XunitV3TestMethodRecognizer(null, null);
+
+        var exception = Assert.Throws<ArgumentNullException>(() => _ = recognizer.GetTestCaseCount(null!));
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("method");
+    }
+
     private static CSharpCompilation CreateXunitFixture() =>
         CompilationFactory.Create(XunitFixtureSource, TestFramework.XunitV3, filePath: "Cases.cs");
+
+    private static CSharpCompilation CreateCaseCountFixture() =>
+        CompilationFactory.Create(CaseCountFixtureSource, TestFramework.XunitV3, filePath: "CountCases.cs");
 
     private static CSharpCompilation CreateVersionTwoHelper() =>
         CompilationFactory.Create(

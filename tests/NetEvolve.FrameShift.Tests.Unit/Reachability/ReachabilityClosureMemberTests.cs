@@ -183,6 +183,9 @@ public class ReachabilityClosureMemberTests
         }
         """;
 
+    private const string PropertyTestId = "M:Tests.PropertyTests.CoversTheProperty";
+    private const string NoTestIds = "<none>";
+
     [Test]
     [Arguments(PropertySource)]
     [Arguments(IndexerSource)]
@@ -434,6 +437,107 @@ public class ReachabilityClosureMemberTests
 
         _ = await Assert.That(reachable.ContainsEnclosing(localFunctionSymbol)).IsFalse();
     }
+
+    /// <summary>
+    /// A property and its accessors share a declaration, so they share the tests that reach them. The
+    /// helpers the accessor bodies call inherit that attribution like any other callee.
+    /// </summary>
+    [Test]
+    public async Task ComputeFromReferences_SeededProperty_AttributesItsAccessorsAndTheirHelpers()
+    {
+        var compilation = CompilationFactory.Create(PropertySource);
+        var property = Property(compilation, "Production.Properties", "Block");
+        var references = References(PropertyTestId, property);
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert.That(Describe(reachable, property.GetMethod!)).IsEqualTo(PropertyTestId);
+        _ = await Assert
+            .That(Describe(reachable, Method(compilation, "Production.Properties", "Read")))
+            .IsEqualTo(PropertyTestId);
+        _ = await Assert
+            .That(Describe(reachable, Method(compilation, "Production.Properties", "Write")))
+            .IsEqualTo(PropertyTestId);
+    }
+
+    [Test]
+    public async Task ComputeFromReferences_SeededProperty_LeavesTheHelperOfAnotherPropertyUnattributed()
+    {
+        var compilation = CompilationFactory.Create(PropertySource);
+        var references = References(PropertyTestId, Property(compilation, "Production.Properties", "Block"));
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert
+            .That(Describe(reachable, Method(compilation, "Production.Properties", "Unused")))
+            .IsEqualTo(NoTestIds);
+    }
+
+    /// <summary>
+    /// The mutation point inside the lambda has to be aggregated with the tests reaching the property,
+    /// because the accessor that holds the lambda is only ever reached through that property.
+    /// </summary>
+    [Test]
+    public async Task GetEnclosingTestIds_LambdaInAPropertyAccessor_InheritsTheAttributionOfTheProperty()
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(ClosureSource);
+        var lambda = SyntaxNodeLocator.FindFirst<LambdaExpressionSyntax>(tree);
+        var lambdaSymbol = semanticModel.GetSymbolInfo(lambda).Symbol!;
+        var references = References(PropertyTestId, Property(compilation, "Production.PropertyClosures", "WithLambda"));
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(lambdaSymbol))).IsEqualTo(PropertyTestId);
+    }
+
+    [Test]
+    public async Task GetEnclosingTestIds_LocalFunctionInAnIndexerAccessor_InheritsTheAttributionOfTheIndexer()
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(ClosureSource);
+        var localFunction = LocalFunction(tree, "Indexed");
+        var localFunctionSymbol = semanticModel.GetDeclaredSymbol(localFunction)!;
+        var references = References(PropertyTestId, Indexer(compilation, "Production.PropertyClosures", "Int32"));
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(localFunctionSymbol))).IsEqualTo(PropertyTestId);
+    }
+
+    [Test]
+    public async Task GetEnclosingTestIds_LambdaOfAnUnseededProperty_ReturnsNoTestIds()
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(ClosureSource);
+        var lambda = SyntaxNodeLocator.FindFirst<LambdaExpressionSyntax>(tree);
+        var lambdaSymbol = semanticModel.GetSymbolInfo(lambda).Symbol!;
+        var seed = Property(compilation, "Production.PropertyClosures", "WithLocalFunction");
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(
+            compilation,
+            References(PropertyTestId, seed),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(Describe(reachable.GetEnclosingTestIds(lambdaSymbol))).IsEqualTo(NoTestIds);
+    }
+
+    private static ImmutableDictionary<string, ImmutableHashSet<string>> References(
+        string testId,
+        params ISymbol[] seeds
+    )
+    {
+        string[] referencedMemberIds = [.. seeds.Select(seed => DocumentationCommentId.CreateDeclarationId(seed)!)];
+        var builder = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+
+        builder[testId] = ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds);
+
+        return builder.ToImmutable();
+    }
+
+    private static string Describe(ReachableSymbolSet reachable, ISymbol symbol) =>
+        Describe(reachable.GetTestIds(symbol));
+
+    private static string Describe(ImmutableHashSet<string> testIds) =>
+        testIds.IsEmpty ? NoTestIds : string.Join(", ", testIds.OrderBy(testId => testId, StringComparer.Ordinal));
 
     private static TestSurfaceManifest Manifest(params ISymbol[] seeds)
     {
