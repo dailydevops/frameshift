@@ -283,8 +283,10 @@ dotnet_diagnostic.FSH0002.severity = none
 
 ## Requirements
 
-- A C# project built with a toolchain that ships Roslyn 4.14 or newer - .NET SDK 9.0.300 or Visual
-  Studio 2022 17.14 and above. **The analyzed projects themselves can target any framework**,
+- A C# project built with a toolchain that ships Roslyn 5.6 or newer - .NET SDK 10.0.100 or Visual
+  Studio 2026 and above. This is a hard requirement, not a recommendation: the analyzer is loaded by
+  whichever Roslyn the consuming toolchain provides, and an older host cannot load an assembly built
+  against a newer Roslyn. **The analyzed projects themselves can target any framework**,
   including .NET Framework: the analyzer runs inside the compiler, not inside your application, so
   the framework your code targets is irrelevant to it.
 - A single `netstandard2.0` assembly is what the package ships, because that is the one target every
