@@ -14,10 +14,10 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 21 mutation operators covering arithmetic operators and compound assignments, relational and
+- 25 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical, conditional and bitwise/shift operators, logical negation,
   increment/decrement, unary operators, null-coalescing, boolean, numeric and string literals, and
-  the culture-sensitivity family below.
+  the two families below.
 - A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
   three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted
   type is resolved through the semantic model, so a literal on a plain `bool` is never touched. It is
@@ -29,6 +29,17 @@ next to every other compiler diagnostic.
   machine and fail under another locale, and every one of them is a place a test can pin the intent
   instead of inheriting the ambient culture. Each of these operators resolves the framework type it
   mutates through the compilation, so a same-named type of your own is never mistaken for it.
+- A regular-expression pattern operator family of four operators that mutate the *pattern text* rather
+  than the flags around it - anchors (`^`, `$`, `\A`, `\z`, `\Z` removed, `\b` swapped for `\B`),
+  quantifiers (`*` for `+`, an optional `?` removed, greedy for lazy, the bounds of `{n,m}` shifted),
+  groups (a capturing group turned into `(?:` and back) and alternation (a branch removed, two
+  branches swapped). A pattern is recognised semantically - in a `Regex` constructor or static call,
+  in `[GeneratedRegex]` and in `[RegularExpression]` - and it is rewritten through the spans of an
+  options-aware pattern tokenizer, never by string surgery, so a `+` inside a character class stays a
+  literal `+`. Every rewritten pattern is parsed again before it is reported, so a mutant that is no
+  longer a legal pattern is discarded instead of being killed by an exception in every test. The
+  family multiplies the mutation points of a single member and can therefore be switched off on its
+  own, with `FrameShiftEnableRegexPatternMutations`.
 - Every mutant is verified by in-memory recompilation of the mutated syntax tree, so a mutation that
   would not even build is never reported.
 - Mutants that cannot change observable behaviour are recognised and reported separately
@@ -243,6 +254,7 @@ via `-p:Name=Value`.
 | `FrameShiftVerifyMutantCompilation` | `true` | Compiles every mutant before it is reported. `false` skips the verification and reports mutants that may not build. |
 | `FrameShiftMaxMutantsPerMember` | `64` | Caps the mutants considered for a single member. Values below `1` are clamped to `1`. |
 | `FrameShiftReportTrivialMutants` | `true` | Reports mutants without observable effect as `FSH0002`. `false` keeps them out of the build log. |
+| `FrameShiftEnableRegexPatternMutations` | `true` | Runs the four operators of the regular-expression pattern family - anchors, quantifiers, groups, alternation. `false` switches the family off and leaves every other operator untouched, including the `RegexOptions` one of the culture-sensitivity family. Use it when the pattern mutants of a pattern-heavy project crowd out the mutation points of the surrounding code: the family is skipped before `FrameShiftMaxMutantsPerMember` is consulted, so the budget of a member is then spent on its other mutation points. |
 | `FrameShiftSuppressSetupWarning` | `false` | Silences the `FSH0005` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet. |
 | `FrameShiftIsTestProject` | *(unset)* | Set to `true` to mark a project as a test project, which suppresses `FSH0005` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect. |
 | `FrameShiftEnableDefaultManifestItems` | `true`, or `false` when `$(EnableDefaultItems)` is `false` | Adds every `**/*.frameshift-tests` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories. |
@@ -302,11 +314,17 @@ dotnet_diagnostic.FSH0006.severity = warning
   model, so the generator depends on the whole compilation and re-runs on every build and on every
   keystroke in the IDE. Its cost grows with the size of the test project. Set `FrameShiftEnabled` to
   `false`, or `FrameShiftWriteTestSurfaceManifest` to `false`, if that cost is not wanted.
-- The culture-sensitivity family mutates the *arguments and flags* a call passes, never the contents
-  of a regular expression pattern: the `RegexOptions` operator flips option flags, and no operator
-  rewrites pattern text. A pattern that is only exercised by one input therefore still looks fully
-  covered - `FSH0006` is what makes that thinness visible, by counting the input combinations rather
-  than the coverage.
+- The regular-expression pattern family covers the *structure* of a pattern - anchors, quantifiers,
+  groups and alternation. Character classes, escapes, lookaround and backreferences are not mutated
+  yet, and equivalence between two patterns is not proven: two patterns that happen to match the same
+  language are reported as a gap rather than dismissed, in the same conservative direction as every
+  other classification. A pattern is also only recognised where it is written as a literal at the call
+  site; one handed over through a variable or a `const` is invisible to the family, because there is
+  no single literal a rewrite could replace.
+- A pattern mutant is never *executed*, only parsed. The analyzer therefore knows that a mutated
+  pattern is still a legal pattern, but not whether the test data of the suite happens to distinguish
+  it - a pattern that is exercised by one input still looks fully covered. `FSH0006` is what makes
+  that thinness visible, by counting the input combinations rather than the coverage.
 - `FSH0006` counts test cases, it does not evaluate them. It cannot know whether the single
   combination it found happens to sit exactly where the mutation matters, which is why it is
   informational. And it stays silent whenever a contributing count is only a lower bound - a data

@@ -203,7 +203,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         var root = tree.GetRoot(cancellationToken);
         var states = new Dictionary<ISymbol, MemberState>(SymbolEqualityComparer.Default);
 
-        foreach (var mutation in MutantGenerator.CreateMutations(root, semanticModel, cancellationToken))
+        foreach (var mutation in MutantGenerator.CreateMutations(root, semanticModel, options, cancellationToken))
         {
             cancellationToken.ThrowIfCancellationRequested();
 

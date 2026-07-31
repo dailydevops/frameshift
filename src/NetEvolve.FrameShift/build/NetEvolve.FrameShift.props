@@ -16,6 +16,10 @@
                                                          Default: 64.
       FrameShiftReportTrivialMutants        true|false   Reports mutants without observable effect.
                                                          Default: true.
+      FrameShiftEnableRegexPatternMutations true|false   Runs the regular-expression pattern operators
+                                                         (anchors, quantifiers, groups, alternation).
+                                                         'false' keeps every other operator, including
+                                                         the RegexOptions one. Default: true.
       FrameShiftSuppressSetupWarning        true|false   Silences the FSH0005 setup warning emitted by
                                                          NetEvolve.FrameShift.targets. Default: false.
       FrameShiftEnableDefaultManifestItems  true|false   Adds every '**/*.frameshift-tests' file of the
@@ -38,6 +42,7 @@
     <FrameShiftVerifyMutantCompilation Condition=" '$(FrameShiftVerifyMutantCompilation)' == '' ">true</FrameShiftVerifyMutantCompilation>
     <FrameShiftMaxMutantsPerMember Condition=" '$(FrameShiftMaxMutantsPerMember)' == '' ">64</FrameShiftMaxMutantsPerMember>
     <FrameShiftReportTrivialMutants Condition=" '$(FrameShiftReportTrivialMutants)' == '' ">true</FrameShiftReportTrivialMutants>
+    <FrameShiftEnableRegexPatternMutations Condition=" '$(FrameShiftEnableRegexPatternMutations)' == '' ">true</FrameShiftEnableRegexPatternMutations>
   </PropertyGroup>
 
   <PropertyGroup Label="FrameShift item defaults">
@@ -54,6 +59,7 @@
     <CompilerVisibleProperty Include="FrameShiftVerifyMutantCompilation" />
     <CompilerVisibleProperty Include="FrameShiftMaxMutantsPerMember" />
     <CompilerVisibleProperty Include="FrameShiftReportTrivialMutants" />
+    <CompilerVisibleProperty Include="FrameShiftEnableRegexPatternMutations" />
   </ItemGroup>
 
   <PropertyGroup Label="FrameShift manifest exclusions">

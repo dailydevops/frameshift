@@ -13,10 +13,11 @@ using TUnit.Core;
 public class MutationOperatorRegistryTests
 {
     /// <summary>
-    /// The number of operators the registry must expose: the fifteen expression operators plus the six
-    /// operators of the culture sensitivity family.
+    /// The number of operators the registry must expose: the fifteen expression operators, the six
+    /// operators of the culture sensitivity family and the four operators of the regular expression
+    /// pattern family.
     /// </summary>
-    private const int ExpectedOperatorCount = 21;
+    private const int ExpectedOperatorCount = 25;
 
     private static readonly string[] _expectedOperatorIds =
     [
@@ -38,6 +39,10 @@ public class MutationOperatorRegistryTests
         "null-coalescing",
         "nullable-boolean-literal",
         "numeric-literal",
+        "regex.alternation",
+        "regex.anchor",
+        "regex.group",
+        "regex.quantifier",
         "relational",
         "string-literal",
         "unary",
@@ -127,11 +132,17 @@ public class MutationOperatorRegistryTests
             .IsEqualTo("conditional-expression, negation");
     }
 
+    /// <summary>
+    /// A string literal is claimed by the plain string literal operator and by every operator of the
+    /// regular expression pattern family, because a pattern is spelled out as a string literal and the
+    /// family cannot know from the syntax kind alone whether a literal is one.
+    /// </summary>
     [Test]
     public async Task ForSyntaxKind_SharedSyntaxKind_ReturnsEveryClaimingOperator()
     {
         var memberAccessOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression);
         var invocationOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.InvocationExpression);
+        var stringLiteralOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.StringLiteralExpression);
 
         _ = await Assert
             .That(Join(Sort(memberAccessOperators.Select(item => item.Id))))
@@ -141,6 +152,9 @@ public class MutationOperatorRegistryTests
         _ = await Assert
             .That(Join(Sort(invocationOperators.Select(item => item.Id))))
             .IsEqualTo("culture.case-conversion, culture.format-provider");
+        _ = await Assert
+            .That(Join(Sort(stringLiteralOperators.Select(item => item.Id))))
+            .IsEqualTo("regex.alternation, regex.anchor, regex.group, regex.quantifier, string-literal");
     }
 
     [Test]
@@ -150,8 +164,12 @@ public class MutationOperatorRegistryTests
 
         _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.SimpleMemberAccessExpression)).IsEqualTo(1);
         _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.InvocationExpression)).IsEqualTo(1);
+        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.StringLiteralExpression)).IsEqualTo(1);
         _ = await Assert
             .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression).Length)
+            .IsGreaterThan(1);
+        _ = await Assert
+            .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.StringLiteralExpression).Length)
             .IsGreaterThan(1);
     }
 

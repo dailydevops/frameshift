@@ -40,4 +40,11 @@ internal static class FrameShiftOptionKeys
     /// mutants without observable effect are reported. Defaults to <see langword="true" />.
     /// </summary>
     public const string ReportTrivialMutants = BuildPropertyPrefix + "FrameShiftReportTrivialMutants";
+
+    /// <summary>
+    /// MSBuild property <c>FrameShiftEnableRegexPatternMutations</c>: a <see cref="bool" /> switching the
+    /// regular expression pattern family - anchors, quantifiers, groups and alternation - on or off
+    /// without touching any other operator. Defaults to <see langword="true" />.
+    /// </summary>
+    public const string EnableRegexPatternMutations = BuildPropertyPrefix + "FrameShiftEnableRegexPatternMutations";
 }
