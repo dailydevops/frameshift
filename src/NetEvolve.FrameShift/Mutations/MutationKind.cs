@@ -41,6 +41,13 @@ internal enum MutationKind
     BooleanLiteral,
 
     /// <summary>
+    /// Literals of type <c>bool?</c>, moved between the three states of three valued logic, so that
+    /// <see langword="true" /> and <see langword="false" /> become <see langword="null" /> and
+    /// <see langword="null" /> becomes both of them.
+    /// </summary>
+    NullableBooleanLiteral,
+
+    /// <summary>
     /// Numeric literals, replaced by a neighbouring or boundary value.
     /// </summary>
     NumericLiteral,
