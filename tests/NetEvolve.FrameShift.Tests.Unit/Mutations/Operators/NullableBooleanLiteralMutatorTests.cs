@@ -55,6 +55,34 @@ public class NullableBooleanLiteralMutatorTests
         _ = await Assert.That(supported).Contains(SyntaxKind.NullLiteralExpression);
     }
 
+    /// <summary>
+    /// The two literal operators divide the six transitions of a <c>bool?</c> between them, and neither
+    /// of them is complete on its own. This operator contributes the four transitions that touch
+    /// <see langword="null" />; <see cref="BooleanLiteralMutator" /> contributes <c>true =&gt; false</c> and
+    /// <c>false =&gt; true</c>, which it does regardless of whether the literal sits on a <c>bool</c> or on a
+    /// <c>bool?</c>. Together they leave no transition unreachable, which is why this operator does not
+    /// repeat the swap and produce a duplicate mutant.
+    /// </summary>
+    [Test]
+    [Arguments(TrueSource, "boolean-literal.true-to-false", "nullable-boolean-literal.true-to-null")]
+    [Arguments(FalseSource, "boolean-literal.false-to-true", "nullable-boolean-literal.false-to-null")]
+    public async Task CreateMutations_NullableBooleanLiteral_IsCoveredByBothLiteralOperators(
+        string source,
+        string expectedSwapId,
+        string expectedNullId
+    )
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var literal = FindNullableBooleanLiteral(tree);
+        var swaps = new BooleanLiteralMutator().CreateMutations(literal, semanticModel, CancellationToken.None);
+        var nulls = new NullableBooleanLiteralMutator().CreateMutations(literal, semanticModel, CancellationToken.None);
+
+        _ = await Assert.That(Join(swaps)).IsEqualTo(expectedSwapId);
+        _ = await Assert.That(Join(nulls)).IsEqualTo(expectedNullId);
+    }
+
     [Test]
     public async Task CreateMutations_TrueLiteral_ReplacesItByNull()
     {
@@ -244,6 +272,9 @@ public class NullableBooleanLiteralMutatorTests
     }
 
     private static string Rewrite(SyntaxTree tree, Mutation mutation) => mutation.ApplyTo(tree).ToString();
+
+    private static string Join(IEnumerable<Mutation> mutations) =>
+        string.Join(", ", mutations.Select(mutation => mutation.OperatorId));
 
     private static SyntaxNode FindNullableBooleanLiteral(SyntaxTree tree) =>
         SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
