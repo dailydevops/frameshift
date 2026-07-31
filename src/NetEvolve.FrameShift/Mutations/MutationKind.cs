@@ -133,4 +133,34 @@ internal enum MutationKind
     /// pattern grammar and the matching semantics, so an untested flag hides matches the code relies on.
     /// </summary>
     RegexOptions,
+
+    /// <summary>
+    /// The zero width assertions of a regular expression pattern, with <c>^</c>, <c>$</c>, <c>\A</c>,
+    /// <c>\z</c> and <c>\Z</c> removed and <c>\b</c> swapped for <c>\B</c>. A pattern that is only ever
+    /// fed input the anchors already fit matches just as well without them, which is what makes the
+    /// anchor untested.
+    /// </summary>
+    RegexAnchor,
+
+    /// <summary>
+    /// The repetition suffixes of a regular expression pattern, with <c>*</c> swapped for <c>+</c>, an
+    /// optional <c>?</c> removed, greediness flipped and the bounds of <c>{n,m}</c> shifted. The
+    /// boundaries of a repetition are exactly where a test suite tends to supply only the comfortable
+    /// input length.
+    /// </summary>
+    RegexQuantifier,
+
+    /// <summary>
+    /// The groups of a regular expression pattern, with a capturing group turned into the non-capturing
+    /// <c>(?:</c> and back. Code that reads a group by number or by name breaks when the group stops
+    /// capturing, so a test that never looks at the captures cannot tell the two apart.
+    /// </summary>
+    RegexGroup,
+
+    /// <summary>
+    /// The alternations of a regular expression pattern, with one branch removed and the order of two
+    /// branches swapped. A branch no test exercises is indistinguishable from a branch that is not there,
+    /// and the order of the branches decides which one wins on input both of them match.
+    /// </summary>
+    RegexAlternation,
 }
