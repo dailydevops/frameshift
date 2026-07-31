@@ -5,11 +5,11 @@
     This file does two things:
 
       1. It tells the user when the analysis cannot do anything because no test-surface manifest reached
-         the compiler (FSHB0001).
+         the compiler (FSH0005).
       2. It turns the manifest the TestSurfaceManifestGenerator emits into the checked-in
          '<ProjectName>.frameshift-tests' file next to the test project.
 
-    Set 'FrameshiftSuppressSetupWarning' to 'true' to silence FSHB0001, for example for projects that are
+    Set 'FrameshiftSuppressSetupWarning' to 'true' to silence FSH0005, for example for projects that are
     deliberately not covered, or while the manifest of the first pass does not exist yet:
 
       <PropertyGroup>
@@ -35,7 +35,7 @@
     </ItemGroup>
 
     <Warning
-      Code="FSHB0001"
+      Code="FSH0005"
       Condition=" '@(_FrameshiftTestSurfaceManifest)' == '' "
       Text="Frameshift found no test-surface manifest for '$(MSBuildProjectName)', so every mutation point is reported as unreachable. Build the TUnit test project first and add its generated '*.frameshift-tests' manifest to this project, or set 'FrameshiftSuppressSetupWarning' to 'true' to silence this warning. See https://github.com/dailydevops/frameshift for the documented setup."
     />

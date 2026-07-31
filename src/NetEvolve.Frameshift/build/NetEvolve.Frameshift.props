@@ -16,7 +16,7 @@
                                                          Default: 64.
       FrameshiftReportTrivialMutants        true|false   Reports mutants without observable effect.
                                                          Default: true.
-      FrameshiftSuppressSetupWarning        true|false   Silences the FSHB0001 setup warning emitted by
+      FrameshiftSuppressSetupWarning        true|false   Silences the FSH0005 setup warning emitted by
                                                          NetEvolve.Frameshift.targets. Default: false.
       FrameshiftEnableDefaultManifestItems  true|false   Adds every '**/*.frameshift-tests' file of the
                                                          project to @(AdditionalFiles). Default: true,

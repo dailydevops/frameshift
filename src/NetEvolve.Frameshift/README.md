@@ -195,7 +195,7 @@ flowchart TD
 ```
 
 A production project that has no manifest at all stays completely silent, because it has not opted
-in; the MSBuild assets emit `FSHB0001` for the missing setup instead.
+in; the MSBuild assets emit `FSH0005` for the missing setup instead.
 
 ## Configuration
 
@@ -208,8 +208,8 @@ via `-p:Name=Value`.
 | `FrameshiftVerifyMutantCompilation` | `true` | Compiles every mutant before it is reported. `false` skips the verification and reports mutants that may not build. |
 | `FrameshiftMaxMutantsPerMember` | `64` | Caps the mutants considered for a single member. Values below `1` are clamped to `1`. |
 | `FrameshiftReportTrivialMutants` | `true` | Reports mutants without observable effect as `FSH0002`. `false` keeps them out of the build log. |
-| `FrameshiftSuppressSetupWarning` | `false` | Silences the `FSHB0001` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet. |
-| `FrameshiftIsTestProject` | *(unset)* | Set to `true` to mark a project as a test project, which suppresses `FSHB0001` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect. |
+| `FrameshiftSuppressSetupWarning` | `false` | Silences the `FSH0005` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet. |
+| `FrameshiftIsTestProject` | *(unset)* | Set to `true` to mark a project as a test project, which suppresses `FSH0005` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect. |
 | `FrameshiftEnableDefaultManifestItems` | `true`, or `false` when `$(EnableDefaultItems)` is `false` | Adds every `**/*.frameshift-tests` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories. |
 | `FrameshiftWriteTestSurfaceManifest` | `true` for a project referencing a known test framework package (a `PackageReference` whose id starts, case-insensitively, with `tunit`, `xunit`, `nunit` or `mstest`), `false` otherwise | Writes the generated test-surface manifest next to the project file. Enabling it turns on `$(EmitCompilerGeneratedFiles)`. |
 | `FrameshiftTestSurfaceManifestFile` | `$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests` | The manifest file that is written. |
@@ -237,7 +237,7 @@ dotnet_diagnostic.FSH0002.severity = none
 | [FSH0002](../../docs/rules/FSH0002.md) | Info | The mutant cannot change observable behaviour, so no test could ever distinguish it. |
 | [FSH0003](../../docs/rules/FSH0003.md) | Warning | The test-surface manifest is missing, malformed or stale. |
 | [FSH0004](../../docs/rules/FSH0004.md) | Info | A test method does not reference any production member. |
-| [FSHB0001](../../docs/rules/FSHB0001.md) | MSBuild warning | The project has no test-surface manifest, so the analysis cannot do anything. |
+| [FSH0005](../../docs/rules/FSH0005.md) | MSBuild warning | The project has no test-surface manifest, so the analysis cannot do anything. |
 
 ## Limitations
 

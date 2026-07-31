@@ -145,7 +145,7 @@ produced by the operators in `MutantGenerator`: verifies with `MutantCompiler` t
 compiles, classifies it with `EquivalenceClassifier`, and attributes it to the enclosing member. A
 meaningful mutant in an unreachable member is `FSH0001`; a mutant that cannot change observable
 behaviour is `FSH0002`. A project with no manifest at all stays completely silent — it has not opted in,
-and the MSBuild warning `FSHB0001` addresses the missing setup instead.
+and the MSBuild warning `FSH0005` addresses the missing setup instead.
 
 **Why the transitive closure belongs on the production side.** The manifest records only what a test
 touches *directly*, because that is all the test compilation can determine: it can resolve

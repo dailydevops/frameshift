@@ -8,10 +8,10 @@ Every diagnostic Frameshift can report, with the file each `helpLinkUri` points 
 | [FSH0002](FSH0002.md)   | Info              | Mutant cannot change observable behaviour, so the mutation point is not a testing gap.              |
 | [FSH0003](FSH0003.md)   | Warning           | Test-surface manifest is missing, malformed or stale, so reachability cannot be determined.         |
 | [FSH0004](FSH0004.md)   | Info              | Test method does not reference any production member and cannot contribute to the tested surface.   |
-| [FSHB0001](FSHB0001.md) | Warning (MSBuild) | No test-surface manifest reached the compiler, so the project has not been set up for the analysis. |
+| [FSH0005](FSH0005.md)   | Warning (MSBuild) | No test-surface manifest reached the compiler, so the project has not been set up for the analysis. |
 
 `FSH0001` to `FSH0004` are analyzer diagnostics in the category `Frameshift`, all enabled by default,
-configurable through `.editorconfig`, `[SuppressMessage]` and `#pragma warning`. `FSHB0001` is an
+configurable through `.editorconfig`, `[SuppressMessage]` and `#pragma warning`. `FSH0005` is an
 MSBuild warning from the build assets of the package and is silenced with the
 `FrameshiftSuppressSetupWarning` property instead.
 
