@@ -172,6 +172,83 @@ public class CaseConversionMutatorTests
         }
         """;
 
+    /// <summary>
+    /// A conversion reached through a pointer, which is a member access of the pointer kind and not a simple
+    /// one. The fixture deliberately does not compile - the test compilations forbid unsafe code - because
+    /// the pointer form is the only member access kind the guard has to refuse.
+    /// </summary>
+    private const string PointerAccessSource = """
+        internal struct Box
+        {
+            public string ToUpper() => "U";
+        }
+
+        internal static class Conversions
+        {
+            public static unsafe string Convert(Box* box) => /*!*/box->ToUpper();
+        }
+        """;
+
+    /// <summary>
+    /// A call to <c>ToUpper</c> that no overload accepts, so the invocation binds to nothing at all. The
+    /// fixture deliberately does not compile, because an unbound invocation is what the guard is about.
+    /// </summary>
+    private const string UnresolvedOverloadSource = """
+        internal static class Conversions
+        {
+            public static string Convert(string value) => /*!*/value.ToUpper(1, 2, 3);
+        }
+        """;
+
+    private const string DelegateInvokeSource = """
+        internal static class Conversions
+        {
+            public static string Convert(System.Func<string> factory) => /*!*/factory.Invoke();
+        }
+        """;
+
+    private const string OtherStringMethodSource = """
+        internal static class Conversions
+        {
+            public static string Convert(string value) => /*!*/value.Trim();
+        }
+        """;
+
+    private const string UnexpectedParametersTemplate = """
+        internal sealed class Label
+        {
+            public string ToUpperInvariant(int repeat) => "U";
+
+            public string ToUpper(int first, int second) => "U";
+        }
+
+        internal static class Conversions
+        {
+            public static string Convert(Label label) => /*!*/label.METHOD;
+        }
+        """;
+
+    private const string NonConstantFieldSource = """
+        internal sealed class Conversions
+        {
+            private readonly string _upper = /*!*/"x".ToUpper();
+
+            public string Convert() => _upper;
+        }
+        """;
+
+    private const string NonConstantLocalSource = """
+        internal static class Conversions
+        {
+            public static string Convert(string value)
+            {
+                var upper = /*!*/value.ToUpper();
+
+                return upper;
+            }
+        }
+        """;
+
     private static readonly CaseConversionMutator _mutator = new CaseConversionMutator();
 
     [Test]
@@ -499,6 +576,124 @@ public class CaseConversionMutatorTests
         _ = await Assert.That(mutations.ToArray()).IsEmpty();
     }
 
+    /// <summary>
+    /// A pointer member access is a <see cref="MemberAccessExpressionSyntax" /> as well, so the type test
+    /// alone would let it through; the kind test is what refuses it.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_PointerMemberAccess_ReturnsEmpty()
+    {
+        var (mutations, node, _, _, _) = MutateMarked(PointerAccessSource);
+        var invocation = (InvocationExpressionSyntax)node;
+
+        _ = await Assert.That(invocation.Expression is MemberAccessExpressionSyntax).IsTrue();
+        _ = await Assert.That(invocation.Expression.Kind()).IsEqualTo(SyntaxKind.PointerMemberAccessExpression);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// Without a bound method symbol there is nothing to compare against <see cref="string" />, so the
+    /// operator stays silent instead of renaming a call it does not understand.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_UnresolvableConversion_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, _) = MutateMarked(UnresolvedOverloadSource);
+        var info = model.GetSymbolInfo(node);
+
+        _ = await Assert.That(info.Symbol).IsNull();
+        _ = await Assert.That(info.CandidateReason).IsEqualTo(CandidateReason.OverloadResolutionFailure);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// The invoked symbol of a delegate call is the <c>Invoke</c> of the delegate type, whose method kind is
+    /// not an ordinary one. That kind is the first thing the operator looks at.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_DelegateInvocation_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, errors) = MutateMarked(DelegateInvokeSource);
+        var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.DelegateInvoke);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// An ordinary instance method of <see cref="string" /> that is none of the four conversions has no
+    /// counterpart to offer, which is the other side of the name lookup.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OtherInstanceMethodOfString_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, errors) = MutateMarked(OtherStringMethodSource);
+        var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(method?.Name).IsEqualTo("Trim");
+        _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// The parameter list is checked before the containing type, so a method carrying one of the four names
+    /// with a parameter list <see cref="string" /> never declares is refused by that check. An invariant
+    /// conversion takes no argument at all, and none of the four takes two.
+    /// </summary>
+    /// <param name="call">The call the fixture contains.</param>
+    /// <param name="expectedName">The name of the called method.</param>
+    /// <param name="expectedParameterCount">The number of parameters that method declares.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments("ToUpperInvariant(2)", "ToUpperInvariant", 1)]
+    [Arguments("ToUpper(1, 2)", "ToUpper", 2)]
+    public async Task CreateMutations_ConversionNameWithAnUnexpectedParameterList_ReturnsEmpty(
+        string call,
+        string expectedName,
+        int expectedParameterCount
+    )
+    {
+        ArgumentNullException.ThrowIfNull(call);
+
+        var source = UnexpectedParametersTemplate.Replace(MethodPlaceholder, call, StringComparison.Ordinal);
+        var (mutations, node, _, model, errors) = MutateMarked(source);
+        var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(method?.Name).IsEqualTo(expectedName);
+        _ = await Assert.That(method?.Parameters.Length).IsEqualTo(expectedParameterCount);
+        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// A field and a local declaration without the <see langword="const" /> modifier are ordinary
+    /// initializers, so the walk up the parent chain continues past them instead of treating them as a
+    /// position that requires a constant.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments(NonConstantFieldSource)]
+    [Arguments(NonConstantLocalSource)]
+    public async Task CreateMutations_ConversionInANonConstantInitializer_ProducesBothCounterparts(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        string[] expected = ["ToUpper => ToUpperInvariant", "ToUpper => ToLower"];
+        string[] expectedIds =
+        [
+            "culture.case-conversion.upper-to-upper-invariant",
+            "culture.case-conversion.upper-to-lower",
+        ];
+        var (mutations, _, _, _, errors) = MutateMarked(source);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+        _ = await Assert.That(Join(OperatorIds(mutations))).IsEqualTo(Join(expectedIds));
+    }
+
     private static string CreateSource(string methodName) =>
         ConversionTemplate.Replace(MethodPlaceholder, methodName, StringComparison.Ordinal);
 
@@ -535,6 +730,14 @@ public class CaseConversionMutatorTests
         SemanticModel Model,
         string Errors
     ) MutateCall(string source, string methodName) => Mutate(source, syntaxTree => FindCall(syntaxTree, methodName));
+
+    private static (
+        ImmutableArray<Mutation> Mutations,
+        SyntaxNode Node,
+        SyntaxTree Tree,
+        SemanticModel Model,
+        string Errors
+    ) MutateMarked(string source) => Mutate(source, SyntaxNodeLocator.FindMarked<InvocationExpressionSyntax>);
 
     private static (
         ImmutableArray<Mutation> Mutations,

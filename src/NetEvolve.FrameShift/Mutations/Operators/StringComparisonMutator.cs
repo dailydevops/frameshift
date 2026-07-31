@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -82,7 +82,10 @@ internal sealed class StringComparisonMutator : MutationOperatorBase
         var memberAccess = (MemberAccessExpressionSyntax)node;
         var source = ResolveMember(memberAccess, semanticModel, cancellationToken);
 
-        if (source is null || IsConstantRequired(memberAccess))
+        // An enumeration member is itself a constant, so a mutant in a constant position would compile. It is
+        // skipped all the same: those positions describe metadata, a declaration or a label rather than a
+        // comparison that runs, and mutating them proves nothing about the behaviour of the code under test.
+        if (source is null || ConstantContext.IsRequired(memberAccess))
         {
             yield break;
         }
@@ -227,50 +230,6 @@ internal sealed class StringComparisonMutator : MutationOperatorBase
         }
 
         return source ? "case-insensitive => case-sensitive" : "case-sensitive => case-insensitive";
-    }
-
-    /// <summary>
-    /// Determines whether <paramref name="node" /> sits in a position that only accepts a compile
-    /// time constant, such as an attribute argument, a <see langword="const" /> initializer, a default
-    /// parameter value, a <c>case</c> label, a <c>goto case</c> statement or a constant pattern.
-    /// </summary>
-    /// <param name="node">The node to inspect.</param>
-    /// <returns><see langword="true" /> if the node must stay a constant expression.</returns>
-    /// <remarks>
-    /// An enumeration member is itself a constant, so such a mutant would compile. It is still skipped:
-    /// those positions describe metadata, a declaration or a label rather than a comparison that runs, and
-    /// mutating them proves nothing about the behaviour of the code under test.
-    /// </remarks>
-    private static bool IsConstantRequired(SyntaxNode node)
-    {
-        for (var current = node.Parent; current is not null; current = current.Parent)
-        {
-            switch (current)
-            {
-                case AttributeSyntax:
-                case AttributeArgumentSyntax:
-                case CaseSwitchLabelSyntax:
-                case ConstantPatternSyntax:
-                case RelationalPatternSyntax:
-                case ParameterSyntax:
-                case EnumMemberDeclarationSyntax:
-                    return true;
-
-                case GotoStatementSyntax gotoStatement when gotoStatement.IsKind(SyntaxKind.GotoCaseStatement):
-                case FieldDeclarationSyntax field when field.Modifiers.Any(SyntaxKind.ConstKeyword):
-                case LocalDeclarationStatementSyntax local when local.Modifiers.Any(SyntaxKind.ConstKeyword):
-                    return true;
-
-                case MemberDeclarationSyntax:
-                case CompilationUnitSyntax:
-                    return false;
-
-                default:
-                    continue;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>

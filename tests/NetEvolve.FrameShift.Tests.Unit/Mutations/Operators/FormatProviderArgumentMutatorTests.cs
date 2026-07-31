@@ -228,6 +228,56 @@ public class FormatProviderArgumentMutatorTests
         }
         """;
 
+    /// <summary>
+    /// A default parameter value holding an invocation, with the same deliberate compile error as
+    /// <see cref="ConstantFieldSource" /> and for the same reason.
+    /// </summary>
+    private const string DefaultParameterSource = """
+        using System;
+        using System.Globalization;
+
+        internal static class Formats
+        {
+            public static string Use(string text = /*!*/string.Format(CultureInfo.InvariantCulture, "{0}", 1)) =>
+                text;
+        }
+        """;
+
+    /// <summary>
+    /// A field initializer without the <see langword="const" /> modifier, which is an ordinary initializer
+    /// and therefore no constant context at all.
+    /// </summary>
+    private const string NonConstantFieldSource = """
+        using System;
+        using System.Globalization;
+
+        internal static class Formats
+        {
+            private static readonly string Text = /*!*/string.Format(CultureInfo.InvariantCulture, "{0}", 1);
+
+            public static string Use() => Text;
+        }
+        """;
+
+    /// <summary>
+    /// A local declaration without the <see langword="const" /> modifier, the other half of the
+    /// <see langword="const" /> guard on the walk up the parent chain.
+    /// </summary>
+    private const string NonConstantLocalSource = """
+        using System;
+        using System.Globalization;
+
+        internal static class Formats
+        {
+            public static string Use()
+            {
+                var text = /*!*/string.Format(CultureInfo.InvariantCulture, "{0}", 1);
+
+                return text;
+            }
+        }
+        """;
+
     private const string TriviaSource = """
         using System;
         using System.Globalization;
@@ -330,6 +380,7 @@ public class FormatProviderArgumentMutatorTests
     )]
     [Arguments("int.Parse(text, provider: CultureInfo.InvariantCulture)", "int.Parse(text)")]
     [Arguments("int.Parse(provider: CultureInfo.InvariantCulture, s: text)", "int.Parse(s: text)")]
+    [Arguments("int.Parse(s: text, provider: CultureInfo.InvariantCulture)", "int.Parse(s: text)")]
     [Arguments("value.ToString(provider)", "value.ToString()")]
     [Arguments("string.Format(provider, \"{0}\", value)", "string.Format(\"{0}\", value)")]
     public async Task CreateMutations_ProviderArgument_RemovesIt(string expression, string expected)
@@ -522,6 +573,7 @@ public class FormatProviderArgumentMutatorTests
     [Test]
     [Arguments(ConstantFieldSource)]
     [Arguments(AttributeArgumentSource)]
+    [Arguments(DefaultParameterSource)]
     public async Task CreateMutations_ConstantContext_ReturnsEmpty(string source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -531,6 +583,33 @@ public class FormatProviderArgumentMutatorTests
         _ = await Assert.That(ResolveMethod(tree, model)?.Name).IsEqualTo("Format");
         _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("System.IFormatProvider, string, object");
         _ = await Assert.That(mutations.ToArray()).IsEmpty();
+    }
+
+    /// <summary>
+    /// A field and a local declaration without the <see langword="const" /> modifier are ordinary
+    /// initializers, so the walk up the parent chain continues past them instead of treating them as a
+    /// position that requires a constant, and the provider is removed as it is anywhere else.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments(NonConstantFieldSource)]
+    [Arguments(NonConstantLocalSource)]
+    public async Task CreateMutations_ProviderInANonConstantInitializer_RemovesIt(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        string[] expectedIds = [RemoveId];
+        var expected = source.Replace(
+            "string.Format(CultureInfo.InvariantCulture, \"{0}\", 1)",
+            "string.Format(\"{0}\", 1)",
+            StringComparison.Ordinal
+        );
+        var (mutations, _, tree, _, errors) = Mutate(source);
+
+        _ = await Assert.That(errors).IsEqualTo(string.Empty);
+        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
     }
 
     [Test]

@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -82,7 +82,10 @@ internal sealed class StringComparerMutator : MutationOperatorBase
         var memberAccess = (MemberAccessExpressionSyntax)node;
         var source = ResolveMember(memberAccess, semanticModel, cancellationToken);
 
-        if (source is null || IsConstantRequired(memberAccess))
+        // A comparer is an object reference and never a compile time constant, so no constant position accepts
+        // one and valid code cannot reach the second guard. It is applied all the same, so that the operator
+        // stays silent on a source file that does not compile - which is what an analyzer sees while typing.
+        if (source is null || ConstantContext.IsRequired(memberAccess))
         {
             yield break;
         }
@@ -228,50 +231,6 @@ internal sealed class StringComparerMutator : MutationOperatorBase
         }
 
         return source ? "case-insensitive => case-sensitive" : "case-sensitive => case-insensitive";
-    }
-
-    /// <summary>
-    /// Determines whether <paramref name="node" /> sits in a position that only accepts a compile
-    /// time constant, such as an attribute argument, a <see langword="const" /> initializer, a default
-    /// parameter value, a <c>case</c> label, a <c>goto case</c> statement or a constant pattern.
-    /// </summary>
-    /// <param name="node">The node to inspect.</param>
-    /// <returns><see langword="true" /> if the node must stay a constant expression.</returns>
-    /// <remarks>
-    /// A comparer is an object reference and never a compile time constant, so no such position accepts one
-    /// and valid code cannot reach this guard. It is applied all the same, so that the operator stays silent
-    /// on a source file that does not compile - which is what an analyzer sees while the code is typed.
-    /// </remarks>
-    private static bool IsConstantRequired(SyntaxNode node)
-    {
-        for (var current = node.Parent; current is not null; current = current.Parent)
-        {
-            switch (current)
-            {
-                case AttributeSyntax:
-                case AttributeArgumentSyntax:
-                case CaseSwitchLabelSyntax:
-                case ConstantPatternSyntax:
-                case RelationalPatternSyntax:
-                case ParameterSyntax:
-                case EnumMemberDeclarationSyntax:
-                    return true;
-
-                case GotoStatementSyntax gotoStatement when gotoStatement.IsKind(SyntaxKind.GotoCaseStatement):
-                case FieldDeclarationSyntax field when field.Modifiers.Any(SyntaxKind.ConstKeyword):
-                case LocalDeclarationStatementSyntax local when local.Modifiers.Any(SyntaxKind.ConstKeyword):
-                    return true;
-
-                case MemberDeclarationSyntax:
-                case CompilationUnitSyntax:
-                    return false;
-
-                default:
-                    continue;
-            }
-        }
-
-        return false;
     }
 
     /// <summary>

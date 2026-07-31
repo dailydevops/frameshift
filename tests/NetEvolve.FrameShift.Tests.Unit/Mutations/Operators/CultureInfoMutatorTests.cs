@@ -231,6 +231,85 @@ public class CultureInfoMutatorTests
         }
         """;
 
+    private const string CaseLabelSource = """
+        using System.Globalization;
+
+        public class Sample
+        {
+            public int Classify(CultureInfo culture)
+            {
+                switch (culture)
+                {
+                    case /*!*/CultureInfo.InvariantCulture:
+                        return 1;
+                    default:
+                        return 0;
+                }
+            }
+        }
+        """;
+
+    private const string GotoCaseSource = """
+        using System.Globalization;
+
+        public class Sample
+        {
+            public int Classify(int index)
+            {
+                switch (index)
+                {
+                    case 1:
+                        goto case /*!*/CultureInfo.InvariantCulture;
+                    default:
+                        return 0;
+                }
+            }
+        }
+        """;
+
+    private const string RelationalPatternSource = """
+        using System.Globalization;
+
+        public class Sample
+        {
+            public bool IsAbove(CultureInfo culture) => culture is > /*!*/CultureInfo.InvariantCulture;
+        }
+        """;
+
+    private const string EnumMemberSource = """
+        using System.Globalization;
+
+        public enum Level
+        {
+            Low = /*!*/CultureInfo.InvariantCulture,
+        }
+        """;
+
+    private const string NonConstantFieldSource = """
+        using System.Globalization;
+
+        public class Sample
+        {
+            private readonly CultureInfo _culture = CultureInfo.InvariantCulture;
+
+            public string Format(int value) => value.ToString(_culture);
+        }
+        """;
+
+    private const string NonConstantLocalSource = """
+        using System.Globalization;
+
+        public class Sample
+        {
+            public string Format(int value)
+            {
+                var culture = CultureInfo.InvariantCulture;
+
+                return value.ToString(culture);
+            }
+        }
+        """;
+
     /// <summary>
     /// The fixtures that are meant to be ordinary, compiling C# code. A fixture that does not compile
     /// would make the mutation asserted on it meaningless, and the three fixtures pinning a constant
@@ -259,6 +338,8 @@ public class CultureInfoMutatorTests
             AssignmentTargetSource,
             AssignmentSourceSource,
             UnrelatedTypeSource,
+            NonConstantFieldSource,
+            NonConstantLocalSource,
         }.Select(source => (Func<string>)(() => source));
 
     [Test]
@@ -539,6 +620,58 @@ public class CultureInfoMutatorTests
         var (_, mutations) = Run(ConstFieldSource);
 
         _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// The remaining positions that only accept a compile time constant: a <c>case</c> label, a
+    /// <c>goto case</c> statement, a relational pattern and an enumeration member. A
+    /// culture is an object reference and never a constant, so every one of these fixtures deliberately does
+    /// not compile - they are still the only way to put a culture read in such a position, which is exactly
+    /// what the operator has to skip. The symbol assertion pins that the read really binds to the culture
+    /// member and that only the position kept the mutations away.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments(CaseLabelSource)]
+    [Arguments(GotoCaseSource)]
+    [Arguments(RelationalPatternSource)]
+    [Arguments(EnumMemberSource)]
+    public async Task CreateMutations_PositionRequiringAConstant_ReturnsEmpty(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
+        var access = SyntaxNodeLocator.FindMarked<MemberAccessExpressionSyntax>(tree);
+        var mutator = new CultureInfoMutator();
+        Mutation[] mutations = [.. mutator.CreateMutations(access, semanticModel, CancellationToken.None)];
+        var info = semanticModel.GetSymbolInfo(access);
+        var symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
+
+        _ = await Assert.That(symbol?.Name).IsEqualTo("InvariantCulture");
+        _ = await Assert.That(symbol?.ContainingType.ToDisplayString()).IsEqualTo("System.Globalization.CultureInfo");
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A field and a local declaration without the <see langword="const" /> modifier are ordinary
+    /// initializers, so the walk up the parent chain continues past them instead of treating them as a
+    /// position that requires a constant.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments(NonConstantFieldSource)]
+    [Arguments(NonConstantLocalSource)]
+    public async Task CreateMutations_CultureInANonConstantInitializer_ProducesTheCurrentCultureSwap(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var expected = source.Replace("InvariantCulture", "CurrentCulture", StringComparison.Ordinal);
+        var (tree, mutations) = Run(source);
+
+        _ = await Assert.That(Ids(mutations)).IsEqualTo("culture.culture-info.invariant-to-current");
+        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
     }
 
     [Test]

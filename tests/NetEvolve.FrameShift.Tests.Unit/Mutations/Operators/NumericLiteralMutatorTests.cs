@@ -96,6 +96,19 @@ public class NumericLiteralMutatorTests
         }
         """;
 
+    /// <summary>
+    /// The warning code of a <c>#pragma warning</c> directive is parsed as a numeric literal expression, but
+    /// it lives inside directive trivia instead of inside a member.
+    /// </summary>
+    private const string PragmaWarningSource = """
+        #pragma warning disable 1591
+
+        public class Sample
+        {
+            public int Get() => 42;
+        }
+        """;
+
     private const string ByteArgumentSource = """
         public class Sample
         {
@@ -754,6 +767,30 @@ public class NumericLiteralMutatorTests
         _ = await Assert.That(mutations).IsEmpty();
     }
 
+    /// <summary>
+    /// The warning code of a <c>#pragma warning</c> directive is a numeric literal expression whose parent
+    /// chain ends at the directive: it passes neither a member declaration nor the compilation unit, so the
+    /// walk looking for a position that requires a constant runs out of parents instead of finding a
+    /// decision. The semantic model binds nothing there either, so the literal carries no constant value and
+    /// no mutation can be derived from it.
+    /// </summary>
+    /// <returns>A task representing the test.</returns>
+    [Test]
+    public async Task CreateMutations_LiteralInsideADirective_ReturnsEmpty()
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(PragmaWarningSource);
+        var literal = FindDirectiveLiteral(tree);
+        var mutator = new NumericLiteralMutator();
+        Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
+
+        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+        _ = await Assert.That(literal.ToString()).IsEqualTo("1591");
+        _ = await Assert.That(literal.Parent?.Kind()).IsEqualTo(SyntaxKind.PragmaWarningDirectiveTrivia);
+        _ = await Assert.That(literal.Parent?.Parent).IsNull();
+        _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
     [Test]
     public async Task CreateMutations_UnsupportedSyntaxKind_ReturnsEmpty()
     {
@@ -825,6 +862,18 @@ public class NumericLiteralMutatorTests
             tree,
             static literal => literal.IsKind(SyntaxKind.NumericLiteralExpression)
         );
+
+    /// <summary>
+    /// Finds the numeric literal of a directive, which the ordinary lookup never sees: the default descent
+    /// stops at trivia, and a directive lives inside trivia.
+    /// </summary>
+    /// <param name="tree">The tree to search.</param>
+    /// <returns>The first numeric literal of the tree, trivia included.</returns>
+    private static LiteralExpressionSyntax FindDirectiveLiteral(SyntaxTree tree) =>
+        tree.GetRoot()
+            .DescendantNodes(descendIntoTrivia: true)
+            .OfType<LiteralExpressionSyntax>()
+            .First(static literal => literal.IsKind(SyntaxKind.NumericLiteralExpression));
 
     private static SyntaxNode FindStringLiteral(SyntaxTree tree) =>
         SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
