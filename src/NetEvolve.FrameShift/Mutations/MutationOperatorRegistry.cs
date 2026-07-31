@@ -41,6 +41,7 @@ internal static class MutationOperatorRegistry
         // >>> operator registrations
         yield return new Operators.ArithmeticAssignmentMutator();
         yield return new Operators.ArithmeticOperatorMutator();
+        yield return new Operators.BitwiseAssignmentMutator();
         yield return new Operators.BitwiseOperatorMutator();
         yield return new Operators.BooleanLiteralMutator();
         yield return new Operators.CaseConversionMutator();

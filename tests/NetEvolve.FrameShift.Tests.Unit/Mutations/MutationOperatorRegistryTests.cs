@@ -13,17 +13,18 @@ using TUnit.Core;
 public class MutationOperatorRegistryTests
 {
     /// <summary>
-    /// The number of operators the registry must expose: the fifteen expression operators, the six
+    /// The number of operators the registry must expose: the sixteen expression operators, the six
     /// operators of the culture sensitivity family and the eight operators of the regular expression
     /// pattern family.
     /// </summary>
-    private const int ExpectedOperatorCount = 29;
+    private const int ExpectedOperatorCount = 30;
 
     private static readonly string[] _expectedOperatorIds =
     [
         "arithmetic",
         "arithmetic-assignment",
         "bitwise",
+        "bitwise-assignment",
         "boolean-literal",
         "conditional-expression",
         "culture.case-conversion",
