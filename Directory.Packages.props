@@ -26,7 +26,14 @@
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />
     <PackageVersion Include="NetEvolve.Extensions.TUnit" Version="3.5.348" />
+    <!--
+      Supplies the compiler-required attributes that older frameworks do not ship, most notably
+      `ModuleInitializerAttribute`, which TUnit's source generator emits into every test assembly, and
+      a public `NotNullWhenAttribute`, which .NET Framework keeps internal.
+    -->
+    <PackageVersion Include="Polyfill" Version="11.0.1" />
     <PackageVersion Include="TUnit" Version="1.63.0" />
+    <PackageVersion Include="Verify.TUnit" Version="31.27.0" />
   </ItemGroup>
   <ItemGroup Label="Test framework metadata">
     <!--
