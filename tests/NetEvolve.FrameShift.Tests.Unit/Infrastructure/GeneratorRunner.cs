@@ -178,12 +178,17 @@ internal static class GeneratorRunner
 
             if (matches.Length != 1)
             {
+                // Concatenation with an explicitly invariant count keeps the message identical on every
+                // target framework: .NET Framework has neither the interpolated-string handler overload of
+                // string.Create nor a culture-invariant default for an interpolated int.
                 throw new InvalidOperationException(
-                    string.Create(
-                        CultureInfo.InvariantCulture,
-                        $"Expected exactly one generated source '{hintName}', but found {matches.Length} of them; "
-                            + $"generated were: {HintNames}."
-                    )
+                    "Expected exactly one generated source '"
+                        + hintName
+                        + "', but found "
+                        + matches.Length.ToString(CultureInfo.InvariantCulture)
+                        + " of them; generated were: "
+                        + HintNames
+                        + "."
                 );
             }
 

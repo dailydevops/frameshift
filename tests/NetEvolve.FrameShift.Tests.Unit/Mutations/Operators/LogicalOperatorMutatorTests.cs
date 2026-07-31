@@ -276,7 +276,7 @@ public class LogicalOperatorMutatorTests
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateSource(BooleanTemplate, "&&"));
         var node = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = _mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()

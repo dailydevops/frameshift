@@ -402,7 +402,7 @@ public class UnaryOperatorMutatorTests
         var node = SyntaxNodeLocator.FindMarked<ExpressionSyntax>(tree);
         var mutator = new UnaryOperatorMutator();
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()

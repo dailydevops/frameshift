@@ -108,7 +108,7 @@ public class EquivalenceClassifierBranchTests
         var original = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var mutation = CreateMutation(original, Swap(original, SyntaxKind.SubtractExpression));
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = EquivalenceClassifier.Classify(mutation, model, cancellation.Token)

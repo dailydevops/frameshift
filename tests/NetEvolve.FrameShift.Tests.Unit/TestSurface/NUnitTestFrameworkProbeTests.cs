@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+﻿namespace NetEvolve.FrameShift.Tests.Unit;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -21,7 +21,7 @@ public class NUnitTestFrameworkProbeTests
     private const string ForeignAssemblyName = "Foreign.Satellite";
 
     private const string TUnitScenario = "TUnit";
-    private const string XunitV3Scenario = "xUnit v3";
+    private const string XunitScenario = "xUnit v2";
 
     /// <summary>
     /// A satellite that carries the simple name of an NUnit test attribute in a namespace of its own, so
@@ -128,7 +128,7 @@ public class NUnitTestFrameworkProbeTests
     /// <param name="framework">The foreign framework the compilation references.</param>
     [Test]
     [Arguments(TUnitScenario)]
-    [Arguments(XunitV3Scenario)]
+    [Arguments(XunitScenario)]
     public async Task TryCreateRecognizer_ReferencingADifferentFramework_ReturnsNull(string framework)
     {
         var compilation = CompilationFactory.Create(PlainSource, ToFramework(framework), filePath: "Cases.cs");
@@ -256,7 +256,7 @@ public class NUnitTestFrameworkProbeTests
         scenario switch
         {
             TUnitScenario => TestFramework.TUnit,
-            XunitV3Scenario => TestFramework.XunitV3,
+            XunitScenario => TestFramework.XunitV2,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown scenario."),
         };
 

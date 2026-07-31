@@ -25,6 +25,8 @@ internal static class DiagnosticAssertions
     /// </summary>
     public const string NoFile = "<no file>";
 
+    private static readonly char[] _directorySeparators = ['/', '\\'];
+
     /// <summary>
     /// Describes every diagnostic on its own line, in the form
     /// <c>FSH0001 Source.cs(3,17): message</c>.
@@ -129,6 +131,17 @@ internal static class DiagnosticAssertions
 
     private static string GetMessage(Diagnostic diagnostic) => diagnostic.GetMessage(CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Takes the last segment of a path, treating both separators as one.
+    /// </summary>
+    /// <param name="path">The path of a diagnostic, which may be empty.</param>
+    /// <returns>The file name, or <see cref="NoFile" /> for an empty path.</returns>
+    /// <remarks>
+    /// <see cref="Path.GetFileName(string)" /> is deliberately not used: on .NET Framework it rejects a
+    /// path containing a character the platform considers invalid, and its notion of a separator follows
+    /// the host operating system, so the very same diagnostic would be described differently depending on
+    /// the target framework and the host. A description a test asserts on has to be the same everywhere.
+    /// </remarks>
     private static string GetFileName(string path)
     {
         if (path.Length == 0)
@@ -136,7 +149,8 @@ internal static class DiagnosticAssertions
             return NoFile;
         }
 
-        var name = Path.GetFileName(path);
+        var separator = path.LastIndexOfAny(_directorySeparators);
+        var name = separator < 0 ? path : path.Substring(separator + 1);
 
         return name.Length == 0 ? path : name;
     }

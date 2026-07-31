@@ -2,6 +2,7 @@ namespace NetEvolve.FrameShift.Tests.Unit;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
@@ -67,6 +68,65 @@ public class TestMethodDiscoveryTests
         [Case]
         public void Orphaned()
         {
+        }
+        """;
+
+    private const string OrphanPath = "Orphan.cs";
+    private const string OrphanedMethodName = "Orphaned";
+
+    /// <summary>
+    /// A test method carrying a local function that is decorated exactly like a test. Only method
+    /// declarations are walked, and a local function is none, so the recogniser is never even asked
+    /// about it.
+    /// </summary>
+    private const string LocalFunctionSource = """
+        namespace Fixture;
+
+        using System;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class CaseAttribute : Attribute
+        {
+        }
+
+        public class LocalFunctionCases
+        {
+            [Case]
+            public void Outer()
+            {
+                [Case]
+                void Inner()
+                {
+                }
+
+                Inner();
+            }
+        }
+        """;
+
+    /// <summary>
+    /// A test method split into a defining and an implementing declaration. Both parts carry the merged
+    /// attributes of the method, so a discovery that offered every declaration on its own would hand the
+    /// same test to the analysis twice.
+    /// </summary>
+    private const string PartialMethodSource = """
+        namespace Fixture;
+
+        using System;
+
+        [AttributeUsage(AttributeTargets.Method)]
+        public sealed class CaseAttribute : Attribute
+        {
+        }
+
+        public partial class PartialCases
+        {
+            [Case]
+            public partial void Alpha();
+
+            public partial void Alpha()
+            {
+            }
         }
         """;
 
@@ -154,12 +214,98 @@ public class TestMethodDiscoveryTests
         _ = await Assert.That(Describe(found)).Contains("SecondCases.Beta");
     }
 
+    /// <summary>
+    /// The same fixture, asserted from the other side: the declaration outside any type is not skipped
+    /// either. The compiler places such a member in a container it synthesises for it, so the declaration
+    /// does have a method symbol and the discovery hands it to the recogniser like any other.
+    /// </summary>
+    /// <remarks>
+    /// This is what keeps the guard against a declaration without a symbol from being reachable through
+    /// invalid placement: even the most misplaced method declaration binds.
+    /// </remarks>
+    [Test]
+    public async Task FindTestMethods_DeclarationOutsideAnyType_IsBoundAndDiscoveredLikeAnyOther()
+    {
+        var compilation = CreateCompilationWithOrphan();
+
+        var found = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(found.Length).IsEqualTo(3);
+        _ = await Assert.That(found[2].Name).IsEqualTo(OrphanedMethodName);
+        _ = await Assert.That(found[2].ContainingType).IsNotNull();
+    }
+
+    /// <summary>
+    /// Every discovered method is declared by a method declaration of the analysed source, which is the
+    /// invariant the reporting side relies on: it resolves the location of a finding from exactly that
+    /// declaration. A symbol from metadata, or one without a declaration, can therefore never reach it.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethods_EveryDiscoveredMethod_IsDeclaredByAMethodDeclarationInSource()
+    {
+        var found = TestMethodDiscovery.FindTestMethods(
+            CreateCompilationWithOrphan(),
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(found.Length).IsEqualTo(3);
+        _ = await Assert.That(found.All(HasMethodDeclarationInSource)).IsTrue();
+    }
+
+    /// <summary>
+    /// A local function is not a method declaration, so it is not offered to the recogniser at all, no
+    /// matter how it is decorated. Its containing test method still is.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethods_DecoratedLocalFunction_IsNotDiscovered()
+    {
+        var compilation = CompilationFactory.Create(LocalFunctionSource);
+
+        var found = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert.That(Describe(found)).IsEqualTo("LocalFunctionCases.Outer");
+    }
+
+    /// <summary>
+    /// A partial test method is one test, however many declarations it is written in, so it is discovered
+    /// exactly once and by its defining declaration.
+    /// </summary>
+    [Test]
+    public async Task FindTestMethods_PartialTestMethod_IsDiscoveredOnceForBothDeclarations()
+    {
+        var compilation = CompilationFactory.Create(PartialMethodSource);
+
+        var found = TestMethodDiscovery.FindTestMethods(
+            compilation,
+            new AttributeNameRecognizer(),
+            CancellationToken.None
+        );
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert.That(Describe(found)).IsEqualTo("PartialCases.Alpha");
+        _ = await Assert.That(HasMethodDeclarationInSource(found[0])).IsTrue();
+    }
+
     [Test]
     public async Task FindTestMethods_CancelledToken_ThrowsOperationCanceledException()
     {
         var compilation = CreateCompilation();
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = TestMethodDiscovery.FindTestMethods(compilation, new AttributeNameRecognizer(), cancellation.Token)
@@ -170,6 +316,25 @@ public class TestMethodDiscoveryTests
 
     private static CSharpCompilation CreateCompilation() =>
         CompilationFactory.Create([(FirstPath, FirstSource), (SecondPath, SecondSource)]);
+
+    private static CSharpCompilation CreateCompilationWithOrphan() =>
+        CompilationFactory.Create([
+            (FirstPath, FirstSource),
+            (SecondPath, SecondSource),
+            (OrphanPath, OrphanedMethodSource),
+        ]);
+
+    /// <summary>
+    /// Determines whether <paramref name="method" /> is declared by a method declaration of the analysed
+    /// source, which is what the reporting side resolves the location of a finding from.
+    /// </summary>
+    /// <param name="method">The discovered method.</param>
+    /// <returns><see langword="true" /> when the declaration is there; otherwise <see langword="false" />.</returns>
+    private static bool HasMethodDeclarationInSource(IMethodSymbol method) =>
+        method
+            .DeclaringSyntaxReferences.Select(reference => reference.GetSyntax(CancellationToken.None))
+            .OfType<MethodDeclarationSyntax>()
+            .Any() && method.Locations.Any(location => location.IsInSource);
 
     private static string Describe(IEnumerable<IMethodSymbol> methods) =>
         string.Join("|", methods.Select(method => method.ContainingType.Name + "." + method.Name));

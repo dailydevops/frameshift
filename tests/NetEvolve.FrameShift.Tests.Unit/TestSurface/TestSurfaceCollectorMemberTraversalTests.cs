@@ -404,7 +404,7 @@ public class TestSurfaceCollectorMemberTraversalTests
     [Test]
     public async Task Collect_ExtensionMethodCalledInReducedForm_RecordsTheUnreducedDefinition()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert.That(manifest.ReferencedMemberIds.Contains(UnreducedExtensionId)).IsTrue();
         _ = await Assert.That(manifest.ReferencedMemberIds.Contains(ReducedExtensionId)).IsFalse();
@@ -425,7 +425,7 @@ public class TestSurfaceCollectorMemberTraversalTests
     {
         var test = CreateInaccessibleTest();
 
-        var manifest = TestSurfaceCollector.Collect(test, CancellationToken.None);
+        var manifest = CollectSurface(test);
 
         _ = await Assert.That(DiagnosticAssertions.Ids(CompilationFactory.GetCompileErrors(test))).Contains("CS0122");
         _ = await Assert.That(manifest.ReferencedMemberIds.Contains(InaccessibleMemberId)).IsTrue();
@@ -438,8 +438,11 @@ public class TestSurfaceCollectorMemberTraversalTests
     [Test]
     public async Task Collect_TestTouchingOnlyAutoProperties_HasNoProductionReference()
     {
+        var test = CreateTest(CreateProduction());
+
         var withoutReference = TestSurfaceCollector.FindTestsWithoutProductionReference(
-            CreateTest(CreateProduction()),
+            test,
+            CreateRecognizer(test),
             CancellationToken.None
         );
 
@@ -456,7 +459,7 @@ public class TestSurfaceCollectorMemberTraversalTests
     [Test]
     public async Task Collect_PropertyNoTestReaches_DoesNotContributeItsReferences()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(manifest.ReferencedMemberIds.Contains("M:Production.Signals.FromUnreachableProperty~System.Int32"))
@@ -467,7 +470,7 @@ public class TestSurfaceCollectorMemberTraversalTests
     public async Task Collect_RecordedIds_ResolveBackToProductionSymbols()
     {
         var production = CreateProduction();
-        var manifest = TestSurfaceCollector.Collect(CreateTest(production), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(production));
 
         var unresolved = manifest
             .ReferencedMemberIds.Where(id => id.Contains("Production.Signals", StringComparison.Ordinal))
@@ -478,10 +481,22 @@ public class TestSurfaceCollectorMemberTraversalTests
 
     private static async Task AssertRecorded(string expectedId)
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert.That(manifest.ReferencedMemberIds.Contains(expectedId)).IsTrue();
     }
+
+    /// <summary>
+    /// Collects the test surface of <paramref name="test" /> with a TUnit recogniser, which is how every
+    /// production caller reaches the collector.
+    /// </summary>
+    /// <param name="test">The compilation to inspect.</param>
+    /// <returns>The collected manifest.</returns>
+    private static TestSurfaceManifest CollectSurface(Compilation test) =>
+        TestSurfaceCollector.Collect(test, CreateRecognizer(test), CancellationToken.None);
+
+    private static TUnitTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
+        new TUnitTestMethodRecognizer(TUnitTestFrameworkProbe.GetTestAttributeType(compilation));
 
     private static CSharpCompilation CreateProduction() =>
         CompilationFactory.Create(ProductionSource, ProductionAssemblyName, filePath: "Signals.cs");

@@ -25,7 +25,9 @@ public class XunitTestFrameworkProbeTests
     private const string ForeignAssemblyName = "Foreign.Satellite";
 
     private const string XunitV2Scenario = "xUnit v2";
+#if FRAMESHIFT_XUNIT_V3
     private const string XunitV3Scenario = "xUnit v3";
+#endif
 
     private const string TUnitScenario = "TUnit";
     private const string NUnitScenario = "NUnit";
@@ -100,7 +102,9 @@ public class XunitTestFrameworkProbeTests
     /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task TryCreateRecognizer_WithFrameworkReference_ReturnsARecognizer(string version)
     {
         var compilation = CreateXunitFixture(version);
@@ -190,7 +194,7 @@ public class XunitTestFrameworkProbeTests
     [Test]
     public async Task IsTestMethod_MethodIsNull_ThrowsArgumentNullException()
     {
-        var compilation = CreateXunitFixture(XunitV3Scenario);
+        var compilation = CreateXunitFixture(XunitV2Scenario);
         var recognizer = XunitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)!;
 
         var threw = ThrowsArgumentNull(() => _ = recognizer.IsTestMethod(null!));
@@ -221,7 +225,9 @@ public class XunitTestFrameworkProbeTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task GetTestAttributeType_WithFrameworkReference_ResolvesTheAttribute(string version)
     {
         var resolved = XunitTestFrameworkProbe.GetTestAttributeType(CreateXunitFixture(version));
@@ -242,6 +248,13 @@ public class XunitTestFrameworkProbeTests
     /// type cannot be resolved by its metadata name any more. That must not be mistaken for the absence of
     /// the framework: the probe stays awake on the assembly rule and hands out the name-based recogniser.
     /// </summary>
+    /// <remarks>
+    /// The ambiguity needs both major versions in one compilation, so this expectation only exists where
+    /// <c>xunit.v3.core</c> ships assets. On net6.0 and net7.0 the name is unambiguous and the aligned
+    /// probe contract is covered by the MSTest counterpart instead, which builds its ambiguity from a
+    /// hand-written satellite rather than from a package.
+    /// </remarks>
+#if FRAMESHIFT_XUNIT_V3
     [Test]
     public async Task TryCreateRecognizer_WithAnAmbiguousAttributeName_StillReturnsARecognizer()
     {
@@ -250,6 +263,7 @@ public class XunitTestFrameworkProbeTests
         _ = await Assert.That(XunitTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
         _ = await Assert.That(XunitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNotNull();
     }
+#endif
 
     [Test]
     public async Task Fixtures_EveryCompilation_CompilesWithoutErrors()
@@ -257,7 +271,9 @@ public class XunitTestFrameworkProbeTests
         var errors = new[]
         {
             Describe(CreateXunitFixture(XunitV2Scenario)),
+#if FRAMESHIFT_XUNIT_V3
             Describe(CreateXunitFixture(XunitV3Scenario)),
+#endif
             Describe(CompilationFactory.Create(PlainSource)),
             Describe(CreateSatelliteConsumer(CasesSource, FrameworkLikeAssemblyName)),
             Describe(CreateSatelliteConsumer(CasesSource, ForeignAssemblyName)),
@@ -278,7 +294,9 @@ public class XunitTestFrameworkProbeTests
         scenario switch
         {
             XunitV2Scenario => TestFramework.XunitV2,
+#if FRAMESHIFT_XUNIT_V3
             XunitV3Scenario => TestFramework.XunitV3,
+#endif
             TUnitScenario => TestFramework.TUnit,
             NUnitScenario => TestFramework.NUnit,
             _ => throw new ArgumentOutOfRangeException(nameof(scenario), scenario, "Unknown scenario."),

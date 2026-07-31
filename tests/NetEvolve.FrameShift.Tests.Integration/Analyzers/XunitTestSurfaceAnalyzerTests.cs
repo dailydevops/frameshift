@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Integration;
+﻿namespace NetEvolve.FrameShift.Tests.Integration;
 
 using System.Collections.Immutable;
 using System.Globalization;
@@ -43,7 +43,9 @@ public class XunitTestSurfaceAnalyzerTests
     private const string LocalOnlyTestName = "LocalStateOnly_TouchesNoProduction";
 
     private const string XunitV2Scenario = "xUnit v2";
+#if FRAMESHIFT_XUNIT_V3
     private const string XunitV3Scenario = "xUnit v3";
+#endif
 
     private const string NoTestsScenario = "framework referenced, no test method";
     private const string ForeignAttributeScenario = "test attribute of an unrelated framework";
@@ -164,7 +166,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Fixtures_BothAssemblies_CompileWithoutErrors(string version)
     {
         var production = CreateProduction();
@@ -188,7 +192,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_TestExercisingProduction_IsNotReportedAsWithoutProductionReference(string version)
     {
         var diagnostics = await RunAsync(CreateTest(version), DiagnosticIds.TestWithoutProductionReference)
@@ -203,7 +209,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_TestWithoutProductionReference_IsReportedOnceAtItsIdentifier(string version)
     {
         var test = CreateTest(version);
@@ -220,7 +228,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_WithoutAnyManifest_ReportsNoManifestProblem(string version)
     {
         var diagnostics = await RunAsync(CreateTest(version), DiagnosticIds.InvalidTestSurfaceManifest)
@@ -231,7 +241,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_MalformedManifest_ReportsTheParseProblem(string version)
     {
         var diagnostics = await RunAsync(
@@ -246,7 +258,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_ManifestMatchingTheCollectedSurface_ReportsNoManifestProblem(string version)
     {
         var test = CreateTest(version);
@@ -259,7 +273,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_ManifestWithAnIdTooMany_ReportsOneRemovedId(string version)
     {
         var test = CreateTest(version);
@@ -275,7 +291,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_ManifestWithAnIdMissing_ReportsOneAddedId(string version)
     {
         var test = CreateTest(version);
@@ -291,7 +309,9 @@ public class XunitTestSurfaceAnalyzerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_Disabled_ReportsNothing(string version)
     {
         var options = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -348,7 +368,9 @@ public class XunitTestSurfaceAnalyzerTests
     /// <param name="version">The version of the framework the test compilation references.</param>
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Analyzer_EveryManifestShape_NeverCrashes(string version)
     {
         var test = CreateTest(version);
@@ -381,7 +403,7 @@ public class XunitTestSurfaceAnalyzerTests
     private static CSharpCompilation CreateCompilationWithoutRecognisableTests(string scenario) =>
         scenario switch
         {
-            NoTestsScenario => CompilationFactory.Create(WithoutTestsSource, TestFramework.XunitV3, TestAssemblyName),
+            NoTestsScenario => CompilationFactory.Create(WithoutTestsSource, TestFramework.XunitV2, TestAssemblyName),
             ForeignAttributeScenario => CompilationFactory.Create(
                 ForeignAttributeSource,
                 TestFramework.None,
@@ -413,7 +435,9 @@ public class XunitTestSurfaceAnalyzerTests
         version switch
         {
             XunitV2Scenario => TestFramework.XunitV2,
+#if FRAMESHIFT_XUNIT_V3
             XunitV3Scenario => TestFramework.XunitV3,
+#endif
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unknown version."),
         };
 

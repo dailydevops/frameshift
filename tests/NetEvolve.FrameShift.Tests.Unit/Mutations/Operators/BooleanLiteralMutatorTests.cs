@@ -230,7 +230,7 @@ public class BooleanLiteralMutatorTests
         var mutator = new BooleanLiteralMutator();
         var node = FindBooleanLiteral(tree);
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()

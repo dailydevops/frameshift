@@ -117,6 +117,11 @@ public class MixedFrameworkTestSurfaceTests
     /// The same shape with a third framework added, so that the single-reporter rule is asserted beyond
     /// the two-framework case it is easiest to get right in.
     /// </summary>
+    /// <remarks>
+    /// The third framework is xUnit.net, referenced in version 2. One probe covers both major versions of
+    /// it, so which one the fixture is built against makes no difference to the election under test - and
+    /// version 2 ships assets for every target framework of this suite, while version 3 does not.
+    /// </remarks>
     private const string ThreeFrameworkSource = """
         namespace Tests;
 
@@ -144,6 +149,79 @@ public class MixedFrameworkTestSurfaceTests
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
                 _ = calculator.Subtract(5, 3);
+            }
+        }
+        """;
+
+    /// <summary>
+    /// A project of two frameworks that does not use the first one of the registry at all, so that the
+    /// lead falls to a framework that is neither the first nor the last registered one.
+    /// </summary>
+    private const string XunitAndNUnitSource = """
+        namespace Tests;
+
+        public class MixedTests
+        {
+            [Xunit.Fact]
+            public void XunitNegate_ExercisesProduction()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Negate(4);
+            }
+
+            [NUnit.Framework.Test]
+            public void NUnitSubtract_ExercisesProduction()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Subtract(5, 3);
+            }
+        }
+        """;
+
+    /// <summary>
+    /// The two frameworks at the end of the registry, so that the lead is asserted where a comparison
+    /// against the first entry rather than against the first awake one would still look right.
+    /// </summary>
+    private const string NUnitAndMSTestSource = """
+        namespace Tests;
+
+        public class MixedTests
+        {
+            [NUnit.Framework.Test]
+            public void NUnitSubtract_ExercisesProduction()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Subtract(5, 3);
+            }
+
+            [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+            public void MSTestAdd_ExercisesProduction()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Add(2, 3);
+            }
+        }
+        """;
+
+    /// <summary>
+    /// Tests of the last registered framework only. Combined with a reference set holding every
+    /// framework, this is the case in which three probes match and none of them but the last is awake.
+    /// </summary>
+    private const string MSTestOnlySource = """
+        namespace Tests;
+
+        public class MixedTests
+        {
+            [Microsoft.VisualStudio.TestTools.UnitTesting.TestMethod]
+            public void MSTestAdd_ExercisesProduction()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Add(2, 3);
             }
         }
         """;
@@ -177,6 +255,9 @@ public class MixedFrameworkTestSurfaceTests
             Describe(CreateTwoFrameworkTest()),
             Describe(CreateThreeFrameworkTest()),
             Describe(CreateReferencedButUnusedFrameworkTest()),
+            Describe(CreateXunitAndNUnitTest()),
+            Describe(CreateNUnitAndMSTestTest()),
+            Describe(CreateEveryFrameworkReferencedTest()),
         };
 
         _ = await Assert
@@ -263,6 +344,89 @@ public class MixedFrameworkTestSurfaceTests
             .ConfigureAwait(false);
 
         _ = await Assert.That(diagnostics.Length).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// The lead is not "TUnit unless it is missing": it is the first awake framework in registry order,
+    /// whichever that turns out to be. Here the first registered framework is not referenced at all, and
+    /// the second one takes the manifest over with the exact complaint the file deserves.
+    /// </summary>
+    /// <param name="framework">The framework whose analyzer is run on its own.</param>
+    /// <param name="leads">Whether that analyzer is the one that reports the manifest.</param>
+    [Test]
+    [Arguments("TUnit", false)]
+    [Arguments("xUnit", true)]
+    [Arguments("NUnit", false)]
+    [Arguments("MSTest", false)]
+    public async Task SingleAnalyzer_MalformedManifestOnAnXunitAndNUnitProject_OnlyXunitReports(
+        string framework,
+        bool leads
+    )
+    {
+        var diagnostics = await RunSingleAnalyzerAsync(framework, CreateXunitAndNUnitTest()).ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DescribeMalformedManifest(leads));
+    }
+
+    /// <summary>
+    /// The same for the two frameworks at the very end of the registry, so that the tie-break is asserted
+    /// where the leading one is not the first entry of the registry either.
+    /// </summary>
+    /// <param name="framework">The framework whose analyzer is run on its own.</param>
+    /// <param name="leads">Whether that analyzer is the one that reports the manifest.</param>
+    [Test]
+    [Arguments("TUnit", false)]
+    [Arguments("xUnit", false)]
+    [Arguments("NUnit", true)]
+    [Arguments("MSTest", false)]
+    public async Task SingleAnalyzer_MalformedManifestOnANUnitAndMSTestProject_OnlyNUnitReports(
+        string framework,
+        bool leads
+    )
+    {
+        var diagnostics = await RunSingleAnalyzerAsync(framework, CreateNUnitAndMSTestTest()).ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DescribeMalformedManifest(leads));
+    }
+
+    /// <summary>
+    /// Every registered framework is referenced, so every probe matches, yet only the last registered one
+    /// has a test of its own. Being awake is what elects, so that framework leads even though three
+    /// probes ahead of it recognise the compilation.
+    /// </summary>
+    /// <param name="framework">The framework whose analyzer is run on its own.</param>
+    /// <param name="leads">Whether that analyzer is the one that reports the manifest.</param>
+    [Test]
+    [Arguments("TUnit", false)]
+    [Arguments("xUnit", false)]
+    [Arguments("NUnit", false)]
+    [Arguments("MSTest", true)]
+    public async Task SingleAnalyzer_EveryFrameworkReferencedButOnlyMSTestAwake_OnlyMSTestReports(
+        string framework,
+        bool leads
+    )
+    {
+        var diagnostics = await RunSingleAnalyzerAsync(framework, CreateEveryFrameworkReferencedTest())
+            .ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DescribeMalformedManifest(leads));
+    }
+
+    /// <summary>
+    /// The union the manifest is judged against is the union of the <em>awake</em> frameworks, not of the
+    /// matching ones. A manifest recording the tests of the only awake framework is therefore complete,
+    /// even though three further probes recognise the compilation.
+    /// </summary>
+    [Test]
+    public async Task EveryAnalyzer_ManifestOfTheOnlyAwakeFramework_ReportsNoManifestProblem()
+    {
+        var test = CreateEveryFrameworkReferencedTest();
+        var manifest = CreateManifest(test, MSTestTestFrameworkProbe.Instance);
+
+        var diagnostics = await RunEveryAnalyzerOfIdAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, manifest)
+            .ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
 
     /// <summary>
@@ -391,7 +555,16 @@ public class MixedFrameworkTestSurfaceTests
         CreateTest(TwoFrameworkSource, TestFramework.TUnit, TestFramework.NUnit);
 
     private static CSharpCompilation CreateThreeFrameworkTest() =>
-        CreateTest(ThreeFrameworkSource, TestFramework.TUnit, TestFramework.XunitV3, TestFramework.NUnit);
+        CreateTest(ThreeFrameworkSource, TestFramework.TUnit, TestFramework.XunitV2, TestFramework.NUnit);
+
+    private static CSharpCompilation CreateXunitAndNUnitTest() =>
+        CreateTest(XunitAndNUnitSource, TestFramework.XunitV2, TestFramework.NUnit);
+
+    private static CSharpCompilation CreateNUnitAndMSTestTest() =>
+        CreateTest(NUnitAndMSTestSource, TestFramework.NUnit, TestFramework.MSTest);
+
+    private static CSharpCompilation CreateEveryFrameworkReferencedTest() =>
+        CreateTest(MSTestOnlySource, TestFramework.All);
 
     private static CSharpCompilation CreateReferencedButUnusedFrameworkTest() =>
         CreateTest(ReferencedButUnusedFrameworkSource, TestFramework.TUnit, TestFramework.NUnit);
@@ -517,6 +690,38 @@ public class MixedFrameworkTestSurfaceTests
 
         return AnalyzerRunner.OfId(diagnostics, diagnosticId);
     }
+
+    /// <summary>
+    /// Runs the analyzer of one framework over <paramref name="compilation" /> with a manifest that
+    /// cannot be parsed, and keeps the manifest diagnostics.
+    /// </summary>
+    /// <param name="framework">The framework whose analyzer is run.</param>
+    /// <param name="compilation">The compilation to analyse.</param>
+    /// <returns>The reported <c>FSH0003</c> diagnostics.</returns>
+    private static Task<ImmutableArray<Diagnostic>> RunSingleAnalyzerAsync(string framework, Compilation compilation) =>
+        AnalyzerRunner.RunAsync(
+            CreateAnalyzer(framework),
+            compilation,
+            DiagnosticIds.InvalidTestSurfaceManifest,
+            AdditionalFiles(MalformedManifest)
+        );
+
+    /// <summary>
+    /// Describes what the analyzer of a framework has to report about <see cref="MalformedManifest" />:
+    /// the header complaint when it leads the manifest comparison, and nothing at all when it does not.
+    /// </summary>
+    /// <param name="leads">Whether the analyzer is the one that reports the manifest.</param>
+    /// <returns>The expected description.</returns>
+    private static string DescribeMalformedManifest(bool leads) =>
+        leads
+            ? DiagnosticIds.InvalidTestSurfaceManifest
+                + " "
+                + InMemoryAdditionalText.DefaultPath
+                + "(1,1): Test-surface manifest '"
+                + InMemoryAdditionalText.DefaultPath
+                + "' could not be read: Line 1: expected the test-surface manifest header "
+                + "'frameshift-test-surface/1', but found 'not-a-test-surface-manifest'."
+            : DiagnosticAssertions.NoDiagnostics;
 
     private static ImmutableArray<AdditionalText> AdditionalFiles(string? manifest) =>
         manifest is null ? [] : [new InMemoryAdditionalText(manifest)];

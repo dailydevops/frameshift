@@ -4,18 +4,28 @@ using System.Collections.Immutable;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using MSTestFramework = Microsoft.VisualStudio.TestTools.UnitTesting;
+#if NETFRAMEWORK
+using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis.CSharp;
+#endif
 
 /// <summary>
 /// The metadata references every test compilation is built against.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The references are taken from the assemblies the current process already trusts, which the host
-/// publishes as <c>TRUSTED_PLATFORM_ASSEMBLIES</c>. That list contains the runtime of the executing
+/// On .NET the references are taken from the assemblies the current process already trusts, which the
+/// host publishes as <c>TRUSTED_PLATFORM_ASSEMBLIES</c>. That list contains the runtime of the executing
 /// framework <em>and</em> every package assembly of the test project, so it is narrowed down to the
 /// directory the runtime itself lives in. Without that filter every test compilation would silently
 /// reference TUnit and the analyzer assembly, and the test-side analyzer classifies a compilation as a
 /// test assembly by exactly that reference; tests asserting that it stays silent could then never fail.
+/// </para>
+/// <para>
+/// On .NET Framework that key does not exist, because it is a CoreCLR concept. The runtime assemblies are
+/// therefore looked up by name in the runtime directory, from a list derived from what the fixtures of
+/// this suite actually compile, and a compiler-support type .NET Framework never shipped is compiled into
+/// an in-memory assembly and added to every set.
 /// </para>
 /// <para>
 /// A test framework is therefore added back explicitly, and always from the real package assemblies:
@@ -30,8 +40,79 @@ using MSTestFramework = Microsoft.VisualStudio.TestTools.UnitTesting;
 /// </remarks>
 internal static class ReferenceAssemblies
 {
-    private const string TrustedPlatformAssembliesKey = "TRUSTED_PLATFORM_ASSEMBLIES";
     private const string AssemblyExtension = ".dll";
+
+#if !NETFRAMEWORK
+    private const string TrustedPlatformAssembliesKey = "TRUSTED_PLATFORM_ASSEMBLIES";
+#endif
+
+#if NETFRAMEWORK
+    /// <summary>
+    /// The name of the assembly holding the compiler-support types of <see cref="CompilerSupport" />.
+    /// </summary>
+    private const string CompilerSupportAssemblyName = "FrameShift.CompilerSupport";
+
+    /// <summary>
+    /// The compiler-support type .NET Framework never shipped, declared with the same name, namespace and
+    /// accessibility the runtime uses on .NET. <c>IsExternalInit</c> is what an <c>init</c> accessor - and
+    /// therefore every positional record - is compiled against; without it a fixture declaring a record
+    /// fails with CS0518, and the tests asserting that their own fixture compiles would fail for a reason
+    /// that has nothing to do with the analyzers. The declaration carries no behaviour at all: the compiler
+    /// only needs the type to exist.
+    /// </summary>
+    private const string CompilerSupportSource = """
+        namespace System.Runtime.CompilerServices
+        {
+            public static class IsExternalInit
+            {
+            }
+        }
+        """;
+
+    /// <summary>
+    /// The .NET Framework runtime assemblies without which no fixture binds at all:
+    /// <list type="bullet">
+    /// <item><c>mscorlib</c> - <c>object</c> and the primitives, <c>Attribute</c> with
+    /// <c>AttributeUsage</c> and <c>AttributeTargets</c>, <c>Action</c>, <c>Func</c>, <c>EventHandler</c>,
+    /// <c>EventArgs</c>, <c>Obsolete</c>, <c>Console</c>, <c>Math</c>, <c>Convert</c>, <c>DateTime</c>,
+    /// <c>TimeSpan</c>, <c>IntPtr</c>, the exceptions the fixtures throw, <c>IEnumerable&lt;T&gt;</c> and
+    /// the other generic collections, <c>System.Threading.Tasks.Task</c> and
+    /// <c>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</c>.</item>
+    /// <item><c>System</c> - <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c>, which the generated-code
+    /// fixtures carry, and the assembly every net462 and net472 test-framework package references.</item>
+    /// <item><c>System.Core</c> - <c>System.Linq</c>, used by the fixtures that call <c>Select</c> and
+    /// <c>Sum</c>, and <c>ExtensionAttribute</c>, without which no extension method can be declared.</item>
+    /// </list>
+    /// </summary>
+    private static readonly ImmutableArray<string> _requiredFrameworkAssemblies = ["mscorlib", "System", "System.Core"];
+
+    /// <summary>
+    /// The .NET Framework runtime assemblies that are added when the runtime directory has them:
+    /// <list type="bullet">
+    /// <item><c>System.Runtime</c> and <c>netstandard</c> - the type-forwarding facades a netstandard2.0
+    /// assembly is compiled against. TUnit reaches .NET Framework through netstandard2.0, and without the
+    /// facades none of its types can be bound by a fixture.</item>
+    /// <item><c>Microsoft.CSharp</c> - the runtime binder. A fixture using <c>dynamic</c> is reported as
+    /// CS0656 <em>missing compiler required member</em> without it.</item>
+    /// <item><c>System.Numerics</c> - so that the namespace of the generic-math fixtures resolves; note
+    /// that <c>INumber&lt;T&gt;</c> itself does not exist on .NET Framework at all.</item>
+    /// <item><c>System.ValueTuple</c> - the facade forwarding to the tuple types in <c>mscorlib</c>, which
+    /// netstandard2.0 assemblies reference.</item>
+    /// </list>
+    /// </summary>
+    private static readonly ImmutableArray<string> _optionalFrameworkAssemblies =
+    [
+        "System.Runtime",
+        "netstandard",
+        "Microsoft.CSharp",
+        "System.Numerics",
+        "System.ValueTuple",
+    ];
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> _compilerSupport = new Lazy<
+        ImmutableArray<MetadataReference>
+    >(CreateCompilerSupport, LazyThreadSafetyMode.ExecutionAndPublication);
+#endif
 
     private static readonly Lazy<ImmutableArray<string>> _frameworkPaths = new Lazy<ImmutableArray<string>>(
         GetFrameworkPaths,
@@ -46,9 +127,11 @@ internal static class ReferenceAssemblies
         ImmutableArray<MetadataReference>
     >(CreateWithTUnit, LazyThreadSafetyMode.ExecutionAndPublication);
 
+#if FRAMESHIFT_XUNIT_V3
     private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV3 = new Lazy<
         ImmutableArray<MetadataReference>
     >(CreateWithXunitV3, LazyThreadSafetyMode.ExecutionAndPublication);
+#endif
 
     private static readonly Lazy<ImmutableArray<MetadataReference>> _withXunitV2 = new Lazy<
         ImmutableArray<MetadataReference>
@@ -81,7 +164,20 @@ internal static class ReferenceAssemblies
     /// Gets <see cref="Default" /> plus the xUnit.net v3 assemblies, so that a fixture can carry real
     /// <c>[Fact]</c> and <c>[Theory]</c> methods of that version.
     /// </summary>
-    public static ImmutableArray<MetadataReference> WithXunitV3 => _withXunitV3.Value;
+    /// <exception cref="PlatformNotSupportedException">
+    /// The target framework has no xUnit.net v3 assets, which is the case for net6.0 and net7.0. A caller
+    /// reaching this member there has an unguarded call site; a set silently falling back to
+    /// <see cref="Default" /> would instead turn every test built on it into a false pass.
+    /// </exception>
+    public static ImmutableArray<MetadataReference> WithXunitV3 =>
+#if FRAMESHIFT_XUNIT_V3
+        _withXunitV3.Value;
+#else
+        throw new PlatformNotSupportedException(
+            "xUnit.net v3 ships no assets for this target framework, so no reference set can be built for "
+                + "it. Guard the call site with '#if FRAMESHIFT_XUNIT_V3'."
+        );
+#endif
 
     /// <summary>
     /// Gets <see cref="Default" /> plus the xUnit.net v2 assemblies, so that a fixture can carry real
@@ -109,7 +205,8 @@ internal static class ReferenceAssemblies
     /// The two xUnit.net versions declare the very same type names in the very same namespaces. A
     /// fixture built against this set therefore cannot spell out a name such as <c>Xunit.FactAttribute</c>,
     /// and <see cref="Compilation.GetTypeByMetadataName(string)" /> returns <see langword="null" /> for it;
-    /// only <c>GetTypesByMetadataName</c> sees both declarations.
+    /// only <c>GetTypesByMetadataName</c> sees both declarations. On a target framework without xUnit.net v3
+    /// assets only v2 is part of the set, and that name is then unambiguous again.
     /// </remarks>
     public static ImmutableArray<MetadataReference> WithAllFrameworks => _withAllFrameworks.Value;
 
@@ -127,6 +224,10 @@ internal static class ReferenceAssemblies
     /// <param name="framework">The test framework the compilation is built for.</param>
     /// <returns>The selected references.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="framework" /> is not a known value.</exception>
+    /// <exception cref="PlatformNotSupportedException">
+    /// <paramref name="framework" /> is <see cref="TestFramework.XunitV3" /> on a target framework without
+    /// xUnit.net v3 assets; see <see cref="WithXunitV3" />.
+    /// </exception>
     public static ImmutableArray<MetadataReference> For(TestFramework framework) =>
         framework switch
         {
@@ -172,7 +273,9 @@ internal static class ReferenceAssemblies
 
     private static ImmutableArray<MetadataReference> CreateWithTUnit() => CreateWith(TUnitAnchors);
 
+#if FRAMESHIFT_XUNIT_V3
     private static ImmutableArray<MetadataReference> CreateWithXunitV3() => CreateWith(XunitV3Anchors);
+#endif
 
     private static ImmutableArray<MetadataReference> CreateWithXunitV2() => CreateWith(XunitV2Anchors);
 
@@ -181,19 +284,25 @@ internal static class ReferenceAssemblies
     private static ImmutableArray<MetadataReference> CreateWithMSTest() => CreateWith(MSTestAnchors);
 
     private static ImmutableArray<MetadataReference> CreateWithAllFrameworks() =>
-        CreateWith([.. TUnitAnchors, .. XunitV3Anchors, .. XunitV2Anchors, .. NUnitAnchors, .. MSTestAnchors]);
+        CreateWith([.. TUnitAnchors,
+#if FRAMESHIFT_XUNIT_V3
+            .. XunitV3Anchors,
+#endif
+            .. XunitV2Anchors, .. NUnitAnchors, .. MSTestAnchors]);
 
     /// <summary>
     /// The seed of the TUnit reference set.
     /// </summary>
     private static Type[] TUnitAnchors => [typeof(TUnit.Core.TestAttribute)];
 
+#if FRAMESHIFT_XUNIT_V3
     /// <summary>
     /// The seed of the xUnit.net v3 reference set. <c>Xunit.v3.XunitTestFramework</c> lives in
     /// <c>xunit.v3.core</c> and has no counterpart in v2, so it stays unambiguous when both versions are
     /// referenced by this test project at once.
     /// </summary>
     private static Type[] XunitV3Anchors => [typeof(Xunit.v3.XunitTestFramework)];
+#endif
 
     /// <summary>
     /// The seed of the xUnit.net v2 reference set. <c>Xunit.Sdk.IXunitTestCase</c> lives in
@@ -221,11 +330,23 @@ internal static class ReferenceAssemblies
         CreateReferences([.. _frameworkPaths.Value, .. GetPackagePaths(anchors)]);
 
     /// <summary>
+    /// Maps every path to a reference and appends the references that are not backed by a file.
+    /// </summary>
+    /// <param name="paths">The assembly paths to map, in the order they should be referenced.</param>
+    /// <returns>The created references.</returns>
+    private static ImmutableArray<MetadataReference> CreateReferences(IEnumerable<string> paths) =>
+#if NETFRAMEWORK
+        [.. CreateFileReferences(paths), .. CompilerSupport];
+#else
+        CreateFileReferences(paths);
+#endif
+
+    /// <summary>
     /// Maps every path to a reference, skipping paths that were already mapped.
     /// </summary>
     /// <param name="paths">The assembly paths to map, in the order they should be referenced.</param>
     /// <returns>The created references.</returns>
-    private static ImmutableArray<MetadataReference> CreateReferences(IEnumerable<string> paths)
+    private static ImmutableArray<MetadataReference> CreateFileReferences(IEnumerable<string> paths)
     {
         var builder = ImmutableArray.CreateBuilder<MetadataReference>();
 
@@ -237,6 +358,144 @@ internal static class ReferenceAssemblies
         return builder.ToImmutable();
     }
 
+#if NETFRAMEWORK
+    /// <summary>
+    /// Gets the reference to the compiled <see cref="CompilerSupportSource" />, computed once per process.
+    /// </summary>
+    private static ImmutableArray<MetadataReference> CompilerSupport => _compilerSupport.Value;
+
+    /// <summary>
+    /// Compiles <see cref="CompilerSupportSource" /> into an in-memory assembly, so that the fixtures using
+    /// a record compile on .NET Framework without being written differently there.
+    /// </summary>
+    /// <returns>The single reference to that assembly.</returns>
+    /// <exception cref="InvalidOperationException">The compiler-support assembly does not compile.</exception>
+    private static ImmutableArray<MetadataReference> CreateCompilerSupport()
+    {
+        var compilation = CSharpCompilation.Create(
+            CompilerSupportAssemblyName,
+            [CSharpSyntaxTree.ParseText(CompilerSupportSource)],
+            CreateFileReferences(_frameworkPaths.Value),
+            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+        );
+
+        using var stream = new MemoryStream();
+        var result = compilation.Emit(stream);
+
+        if (!result.Success)
+        {
+            var errors = result.Diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+            throw new InvalidOperationException(
+                $"The compiler-support assembly '{CompilerSupportAssemblyName}' does not compile: "
+                    + string.Join("; ", errors)
+            );
+        }
+
+        return [MetadataReference.CreateFromImage(stream.ToArray())];
+    }
+
+    /// <summary>
+    /// Selects the .NET Framework runtime assemblies by name, because .NET Framework has no
+    /// <c>TRUSTED_PLATFORM_ASSEMBLIES</c> and its runtime directory also holds native images that are no
+    /// metadata at all.
+    /// </summary>
+    /// <returns>The runtime assembly paths.</returns>
+    /// <exception cref="InvalidOperationException">A required runtime assembly is not on disk.</exception>
+    private static ImmutableArray<string> GetFrameworkPaths()
+    {
+        var directories = GetFrameworkDirectories();
+        var optional = _optionalFrameworkAssemblies
+            .Select(name => FindAssembly(directories, name))
+            .Where(path => path.Length > 0);
+
+        return [.. GetRequiredFrameworkPaths(directories), .. optional];
+    }
+
+    /// <summary>
+    /// Resolves <see cref="_requiredFrameworkAssemblies" /> and proves that every one of them was found,
+    /// because a reference set missing them would fail every test with a compile error instead of naming
+    /// the real cause.
+    /// </summary>
+    /// <param name="directories">The directories to look in.</param>
+    /// <returns>The resolved paths, in the declared order.</returns>
+    /// <exception cref="InvalidOperationException">A required runtime assembly is not on disk.</exception>
+    private static ImmutableArray<string> GetRequiredFrameworkPaths(ImmutableArray<string> directories)
+    {
+        var resolved = _requiredFrameworkAssemblies
+            .Select(name => (Name: name, Path: FindAssembly(directories, name)))
+            .ToImmutableArray();
+        var missing = resolved.Where(entry => entry.Path.Length == 0).Select(entry => entry.Name).ToImmutableArray();
+
+        if (!missing.IsEmpty)
+        {
+            throw new InvalidOperationException(
+                $"The .NET Framework runtime directories '{string.Join("', '", directories)}' do not contain "
+                    + $"'{string.Join(AssemblyExtension + "', '", missing)}{AssemblyExtension}', "
+                    + "so no reference assemblies can be resolved."
+            );
+        }
+
+        return [.. resolved.Select(entry => entry.Path)];
+    }
+
+    /// <summary>
+    /// The directories the runtime assemblies are looked up in: the one the CLR reports and the one
+    /// <c>mscorlib</c> was loaded from. They are the same directory in a normal process, and both are
+    /// consulted so that a shadow-copying host still resolves.
+    /// </summary>
+    /// <returns>The directories, without a trailing separator and without duplicates.</returns>
+    private static ImmutableArray<string> GetFrameworkDirectories()
+    {
+        var location = typeof(object).Assembly.Location;
+        var directories = new List<string>(2) { RuntimeEnvironment.GetRuntimeDirectory() };
+
+        if (location.Length > 0)
+        {
+            directories.Add(Path.GetDirectoryName(location) ?? string.Empty);
+        }
+
+        return
+        [
+            .. directories
+                .Where(directory => directory.Length > 0)
+                .Select(directory => directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+                .Distinct(StringComparer.OrdinalIgnoreCase),
+        ];
+    }
+
+    /// <summary>
+    /// Finds an assembly file by its simple name.
+    /// </summary>
+    /// <param name="directories">The directories to look in, in order.</param>
+    /// <param name="name">The simple name of the assembly.</param>
+    /// <returns>The path of the first match, or an empty string when there is none.</returns>
+    private static string FindAssembly(ImmutableArray<string> directories, string name)
+    {
+        var fileName = name + AssemblyExtension;
+
+        return directories.Select(directory => Path.Combine(directory, fileName)).FirstOrDefault(File.Exists)
+            ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Decides whether a walked assembly is part of the framework itself. On .NET Framework the framework
+    /// assemblies are loaded from the assembly cache, whose paths differ from the runtime directory ones
+    /// <see cref="GetFrameworkPaths" /> resolved. Referencing both copies would make every type of
+    /// <c>System</c> ambiguous, so the cached copy is dropped.
+    /// </summary>
+    /// <param name="assembly">The walked assembly.</param>
+    /// <returns><see langword="true" /> when the assembly is already covered by the framework paths.</returns>
+    private static bool IsFrameworkAssembly(Assembly assembly) =>
+        assembly.GlobalAssemblyCache
+        || _frameworkPaths.Value.Any(path =>
+            string.Equals(
+                Path.GetFileName(path),
+                Path.GetFileName(assembly.Location),
+                StringComparison.OrdinalIgnoreCase
+            )
+        );
+#else
     /// <summary>
     /// Selects the trusted platform assemblies that live next to the runtime itself.
     /// </summary>
@@ -280,6 +539,7 @@ internal static class ReferenceAssemblies
     private static bool IsInDirectory(string path, string? directory) =>
         directory is { Length: > 0 }
         && string.Equals(Path.GetDirectoryName(path), directory, StringComparison.OrdinalIgnoreCase);
+#endif
 
     /// <summary>
     /// Walks the assembly reference graph of every anchor's declaring assembly, so that the anchor types
@@ -307,6 +567,13 @@ internal static class ReferenceAssemblies
             {
                 continue;
             }
+
+#if NETFRAMEWORK
+            if (IsFrameworkAssembly(assembly))
+            {
+                continue;
+            }
+#endif
 
             if (assembly.Location.Length > 0)
             {

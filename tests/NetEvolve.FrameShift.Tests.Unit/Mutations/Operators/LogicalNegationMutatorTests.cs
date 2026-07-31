@@ -431,7 +431,7 @@ public class LogicalNegationMutatorTests
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(IfSource);
         var node = SyntaxNodeLocator.FindMarked(tree);
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = _mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()

@@ -23,6 +23,14 @@ internal enum TestFramework
     /// <summary>
     /// xUnit.net v3, recognised by <c>Xunit.FactAttribute</c> of the <c>xunit.v3.core</c> assembly.
     /// </summary>
+    /// <remarks>
+    /// The member is declared on every target framework, so that no call site needs a guard of its own, and
+    /// it keeps the same ordinal everywhere. <c>xunit.v3.core</c> ships no assets for net6.0 and net7.0
+    /// however, therefore <c>FRAMESHIFT_XUNIT_V3</c> is undefined there and
+    /// <see cref="ReferenceAssemblies.For(TestFramework)" /> cannot build a reference set for this value at
+    /// all; it throws instead of handing out a set without a single xUnit.net v3 assembly. A test that
+    /// asserts xUnit.net v3 recognition therefore has to be guarded by <c>FRAMESHIFT_XUNIT_V3</c> itself.
+    /// </remarks>
     XunitV3,
 
     /// <summary>
@@ -45,7 +53,9 @@ internal enum TestFramework
     /// </summary>
     /// <remarks>
     /// Both xUnit.net versions declare the very same type names, so a fixture built against this value
-    /// must not spell out an ambiguous name such as <c>Xunit.FactAttribute</c>; it would not compile.
+    /// must not spell out an ambiguous name such as <c>Xunit.FactAttribute</c>; it would not compile. On
+    /// net6.0 and net7.0, where <c>FRAMESHIFT_XUNIT_V3</c> is undefined, the value covers every supported
+    /// framework except xUnit.net v3, and the names of xUnit.net v2 are therefore unambiguous there.
     /// </remarks>
     All,
 }
