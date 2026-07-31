@@ -917,21 +917,20 @@ public class MixedFrameworkTestSurfaceTests
     /// <returns>The rendered manifest.</returns>
     private static string CreateManifest(Compilation test, params ITestFrameworkProbe[] probes)
     {
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var collected = ImmutableArray.CreateBuilder<TestSurfaceManifest>(probes.Length);
 
         foreach (var probe in probes)
         {
             var recognizer = CreateRecognizer(test, probe);
-            var collected = TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None);
 
-            testMethodIds.UnionWith(collected.TestMethodIds);
-            referencedMemberIds.UnionWith(collected.ReferencedMemberIds);
+            collected.Add(TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None));
         }
 
-        var manifest = new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
-
-        return TestSurfaceManifestWriter.Write(manifest);
+        // Merged block by block, exactly as the generator and the test-surface analyzer do it, so the
+        // fixture manifest carries the per-test attribution and the case counts the build really emits.
+        // Uniting the flat id sets instead would attribute every reference to every test and degrade
+        // every count to a lower bound, which is a manifest shape no build produces.
+        return TestSurfaceManifestWriter.Write(TestSurfaceManifest.Merge(collected.ToImmutable()));
     }
 
     /// <summary>

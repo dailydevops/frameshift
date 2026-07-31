@@ -57,6 +57,16 @@ public class MutationAnalysisRoundTripTests
     private const string LineFeed = "\n";
     private const char LineFeedCharacter = '\n';
 
+    /// <summary>
+    /// The part of the <c>FSH0006</c> message the quoted test method name follows.
+    /// </summary>
+    private const string TestMethodMarker = "the one of test method '";
+
+    /// <summary>
+    /// The quote closing the test method name in an <c>FSH0006</c> message.
+    /// </summary>
+    private const char QuoteCharacter = '\'';
+
     private const string ManifestHeading = "--- manifest ---";
     private const string DiagnosticsHeading = "--- diagnostics ---";
     private const string BeforeHeading = "=== before: only Add is tested ===";
@@ -186,6 +196,87 @@ public class MutationAnalysisRoundTripTests
 
         public class NothingIsTestedHere
         {
+        }
+        """;
+
+    /// <summary>
+    /// Two tests, each exercising one input combination, which together reach <c>Doubler.Twice</c> —
+    /// one transitively through <c>Calculator.Add</c> and one directly. Aggregated over both, the helper
+    /// carries two input combinations, while <c>Calculator.Add</c> keeps exactly one and
+    /// <c>Calculator.Subtract</c> stays out of the reachable set altogether.
+    /// </summary>
+    private const string SharedHelperSource = """
+        namespace Tests;
+
+        using TUnit.Core;
+
+        public class CalculatorTests
+        {
+            [Test]
+            public void Add_ReturnsTheSum()
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Add(2, 3);
+            }
+
+            [Test]
+            public void Twice_DoublesTheValue()
+            {
+                _ = Fixture.Doubler.Twice(4);
+            }
+        }
+        """;
+
+    /// <summary>
+    /// The very same coverage as <see cref="AddCoveredSource" />, but declared with three
+    /// <c>[Arguments]</c> rows, so the recogniser answers an exact three instead of an exact one.
+    /// </summary>
+    private const string ThreeCaseSource = """
+        namespace Tests;
+
+        using TUnit.Core;
+
+        public class CalculatorTests
+        {
+            [Test]
+            [Arguments(1, 2)]
+            [Arguments(3, 4)]
+            [Arguments(5, 6)]
+            public void Add_ReturnsTheSum(int left, int right)
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Add(left, right);
+            }
+        }
+        """;
+
+    /// <summary>
+    /// The same single test, but taking its cases from a method the framework only resolves by executing
+    /// it during discovery, which an analyzer must not do. The count is therefore a lower bound.
+    /// </summary>
+    private const string DataSourceSource = """
+        namespace Tests;
+
+        using System.Collections.Generic;
+        using TUnit.Core;
+
+        public class CalculatorTests
+        {
+            public static IEnumerable<(int, int)> Rows()
+            {
+                yield return (1, 2);
+            }
+
+            [Test]
+            [MethodDataSource(nameof(Rows))]
+            public void Add_ReturnsTheSum(int left, int right)
+            {
+                Fixture.Calculator calculator = new Fixture.Calculator();
+
+                _ = calculator.Add(left, right);
+            }
         }
         """;
 
@@ -360,8 +451,99 @@ public class MutationAnalysisRoundTripTests
         _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
     }
 
+    /// <summary>
+    /// The whole point of <c>FSH0006</c>, driven through the real collector rather than a hand-written
+    /// manifest: a member reached by exactly one exact test case is reported, and the message names that
+    /// very test.
+    /// </summary>
+    /// <remarks>
+    /// The transitive part matters as much as the direct one. No test names <c>Doubler.Twice</c>; it is
+    /// reached only through the covered <c>Add</c>, so the single case has to travel along the closure and
+    /// arrive there with its attribution intact. Both reported lines are pinned, and <c>Subtract</c> is
+    /// pinned as an <c>FSH0001</c> gap instead, because the hint refines "covered" and must never fire
+    /// where nothing is covered at all.
+    /// </remarks>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task RoundTrip_MemberReachedByOneExactTestCase_ReportsTheSingleTestCaseHint()
+    {
+        var cycle = await RunCycleAsync(AddCoveredSource).ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DescribeSingleCases(cycle.Diagnostics))
+            .IsEqualTo(SingleCase(AddLine) + "|" + SingleCase(TwiceLine));
+        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        _ = await Assert
+            .That(SingleCaseTestNames(cycle.Diagnostics))
+            .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+    }
+
+    /// <summary>
+    /// The aggregation, and the failure mode that would make <c>FSH0006</c> lie: a member reached by two
+    /// tests through two different callers carries two input combinations and must not be reported, while
+    /// a member still reached by one of them keeps its hint.
+    /// </summary>
+    /// <remarks>
+    /// This is the understated-attribution guard. If the closure attributed <c>Doubler.Twice</c> to only
+    /// one of the two tests reaching it, the sum would be one and the helper would be reported falsely —
+    /// which is worse than reporting nothing, because it names a gap that does not exist. Asserting the
+    /// exact reported set rather than the absence of one line is what makes that visible.
+    /// </remarks>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task RoundTrip_MemberReachedByTwoTests_ReportsTheHintOnlyWhereOneTestReaches()
+    {
+        var cycle = await RunCycleAsync(SharedHelperSource).ConfigureAwait(false);
+
+        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(SingleCase(AddLine));
+        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+        _ = await Assert
+            .That(SingleCaseTestNames(cycle.Diagnostics))
+            .IsEqualTo("Tests.CalculatorTests.Add_ReturnsTheSum");
+    }
+
+    /// <summary>
+    /// Three inline rows are three input combinations, so the same coverage that produced the hint with a
+    /// parameterless test produces none — the sum is exact, but it is not one.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task RoundTrip_MemberReachedByThreeExactTestCases_ReportsNoSingleTestCaseHint()
+    {
+        var cycle = await RunCycleAsync(ThreeCaseSource).ConfigureAwait(false);
+
+        _ = await Assert.That(cycle.Manifest.Contains(" 3\n", StringComparison.Ordinal)).IsTrue();
+        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
+        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+    }
+
+    /// <summary>
+    /// A single test whose cases come from a data source the analyzer must not execute contributes a lower
+    /// bound, and a lower bound anywhere in the contributing set suppresses the hint — the true total
+    /// could be far higher.
+    /// </summary>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    [Test]
+    public async Task RoundTrip_MemberReachedByALowerBoundTestCase_ReportsNoSingleTestCaseHint()
+    {
+        var cycle = await RunCycleAsync(DataSourceSource).ConfigureAwait(false);
+
+        _ = await Assert.That(cycle.Manifest.Contains(" 1+\n", StringComparison.Ordinal)).IsTrue();
+        _ = await Assert.That(DescribeSingleCases(cycle.Diagnostics)).IsEqualTo(string.Empty);
+        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(Gap(SubtractLine));
+    }
+
     private static IEnumerable<string> GetTestSources() =>
-        [AddCoveredSource, SubtractCoveredSource, BothCoveredSource, ConstructionOnlySource, WithoutAnyTestSource];
+        [
+            AddCoveredSource,
+            SubtractCoveredSource,
+            BothCoveredSource,
+            ConstructionOnlySource,
+            WithoutAnyTestSource,
+            SharedHelperSource,
+            ThreeCaseSource,
+            DataSourceSource,
+        ];
 
     /// <summary>
     /// Runs the complete cycle: collect the surface of the test assembly, serialise it, and analyse the
@@ -527,6 +709,61 @@ public class MutationAnalysisRoundTripTests
         AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint);
 
     private static string Gap(int line) => DiagnosticIds.UnreachableMutationPoint + ":" + ToText(line);
+
+    /// <summary>
+    /// Reduces the reported single-test-case hints to the distinct identifier and line pairs they sit on,
+    /// exactly as <see cref="DescribeGaps" /> does for the gaps.
+    /// </summary>
+    /// <param name="diagnostics">The diagnostics of one cycle.</param>
+    /// <returns>The pinned description of the hints, empty when there is none.</returns>
+    private static string DescribeSingleCases(ImmutableArray<Diagnostic> diagnostics) =>
+        string.Join(
+            "|",
+            DiagnosticAssertions
+                .Summarise(OnlySingleCases(diagnostics))
+                .Select(entry => entry.Id + ":" + ToText(entry.Line))
+                .Distinct(StringComparer.Ordinal)
+        );
+
+    /// <summary>
+    /// Collects the test method names the single-test-case hints name, which is what proves the attribution
+    /// arrived rather than merely that some hint was reported.
+    /// </summary>
+    /// <param name="diagnostics">The diagnostics of one cycle.</param>
+    /// <returns>The distinct names, ordered ordinally and joined, empty when there is no hint.</returns>
+    private static string SingleCaseTestNames(ImmutableArray<Diagnostic> diagnostics) =>
+        string.Join(
+            "|",
+            OnlySingleCases(diagnostics)
+                .Select(diagnostic => ExtractTestName(Message(diagnostic)))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(name => name, StringComparer.Ordinal)
+        );
+
+    /// <summary>
+    /// Reads the test method name out of an <c>FSH0006</c> message, which quotes it behind
+    /// <see cref="TestMethodMarker" />.
+    /// </summary>
+    /// <param name="message">The formatted message of the diagnostic.</param>
+    /// <returns>The quoted test method name, or the whole message when the marker is absent.</returns>
+    private static string ExtractTestName(string message)
+    {
+        var start = message.IndexOf(TestMethodMarker, StringComparison.Ordinal);
+
+        if (start < 0)
+        {
+            return message;
+        }
+
+        // Splitting keeps the closing quote out of the name without an IndexOf overload that the classic
+        // target frameworks do not offer.
+        return message.Substring(start + TestMethodMarker.Length).Split(QuoteCharacter)[0];
+    }
+
+    private static ImmutableArray<Diagnostic> OnlySingleCases(ImmutableArray<Diagnostic> diagnostics) =>
+        AnalyzerRunner.OfId(diagnostics, DiagnosticIds.SingleTestCaseMutationPoint);
+
+    private static string SingleCase(int line) => DiagnosticIds.SingleTestCaseMutationPoint + ":" + ToText(line);
 
     private static string Describe(Compilation compilation) =>
         DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation));

@@ -29,4 +29,14 @@ internal static class DiagnosticIds
     /// <c>FSH0004</c>: a test method does not reference any production member.
     /// </summary>
     public const string TestWithoutProductionReference = "FSH0004";
+
+    /// <summary>
+    /// <c>FSH0006</c>: a mutation point is reached by exactly one test case.
+    /// </summary>
+    /// <remarks>
+    /// <c>FSH0005</c> is deliberately absent here. It is the setup warning the MSBuild assets of the
+    /// package emit, not an analyzer diagnostic, so it is neither described by a
+    /// <see cref="Microsoft.CodeAnalysis.DiagnosticDescriptor" /> nor tracked as an analyzer release.
+    /// </remarks>
+    public const string SingleTestCaseMutationPoint = "FSH0006";
 }

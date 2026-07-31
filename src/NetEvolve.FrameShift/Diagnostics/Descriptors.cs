@@ -41,6 +41,18 @@ internal static class Descriptors
         defaultSeverity: DiagnosticSeverity.Info
     );
 
+    private static readonly DiagnosticDescriptor _singleTestCaseMutationPoint = Create(
+        id: DiagnosticIds.SingleTestCaseMutationPoint,
+        title: "Mutation point is reached by a single test case",
+        messageFormat: "Mutation '{0}' is reached by a single test case, the one of test method '{1}'; "
+            + "a mutant that only differs for other inputs would survive",
+        description: "The mutation point is covered, but every test reaching it contributes exactly one "
+            + "input combination and there is only one such combination in total. A mutant that behaves like "
+            + "the original code for that one combination and differently for any other would therefore "
+            + "survive unnoticed. Adding a test case with different inputs closes the gap.",
+        defaultSeverity: DiagnosticSeverity.Info
+    );
+
     /// <summary>
     /// Gets the descriptor for <see cref="DiagnosticIds.UnreachableMutationPoint" /> (<c>FSH0001</c>).
     /// </summary>
@@ -60,6 +72,11 @@ internal static class Descriptors
     /// Gets the descriptor for <see cref="DiagnosticIds.TestWithoutProductionReference" /> (<c>FSH0004</c>).
     /// </summary>
     public static DiagnosticDescriptor TestWithoutProductionReference => _testWithoutProductionReference;
+
+    /// <summary>
+    /// Gets the descriptor for <see cref="DiagnosticIds.SingleTestCaseMutationPoint" /> (<c>FSH0006</c>).
+    /// </summary>
+    public static DiagnosticDescriptor SingleTestCaseMutationPoint => _singleTestCaseMutationPoint;
 
     private static DiagnosticDescriptor Create(
         string id,
