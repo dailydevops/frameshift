@@ -1,11 +1,16 @@
 namespace NetEvolve.FrameShift.Equivalence;
 
 using System;
+using System.Collections.Immutable;
+using System.Globalization;
+using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
 using NetEvolve.FrameShift.Mutations;
+using NetEvolve.FrameShift.Mutations.RegularExpressions;
 
 /// <summary>
 /// Decides whether a candidate <see cref="Mutation" /> is trivial, meaning that no test could ever
@@ -45,6 +50,15 @@ internal static class EquivalenceClassifier
     private const string ExcludedMemberReason = "the containing member is excluded from coverage";
     private const string ObsoleteMemberReason = "the containing member is marked obsolete";
 
+    private const string RegexExactOneQuantifierReason =
+        "the quantifier repeats its atom exactly once, which leaving the quantifier out already does";
+    private const string RegexOptionalQuantifierShorthandReason =
+        "the counted quantifier is the same as the optional operator";
+    private const string RegexOneOrMoreQuantifierShorthandReason =
+        "the counted quantifier is the same as the one-or-more operator";
+    private const string RegexZeroOrMoreQuantifierShorthandReason =
+        "the counted quantifier is the same as the zero-or-more operator";
+
     /// <summary>
     /// Classifies <paramref name="mutation" /> as trivial or as a mutant whose survival would be
     /// meaningful.
@@ -83,6 +97,7 @@ internal static class EquivalenceClassifier
 
         return ClassifyNoOpRewrite(mutation)
             ?? ClassifyConstantFolding(mutation, semanticModel, cancellationToken)
+            ?? ClassifyRegexQuantifierShorthand(mutation, semanticModel, cancellationToken)
             ?? ClassifyUnreachableCode(mutation, semanticModel, cancellationToken)
             ?? ClassifyDiscardedResult(mutation, semanticModel, cancellationToken)
             ?? ClassifyConstantOnlyContext(mutation)
@@ -531,6 +546,439 @@ internal static class EquivalenceClassifier
 
         return value is not null;
     }
+
+    /// <summary>
+    /// Determines whether the mutation only rewrites a regular expression quantifier into one of the
+    /// four shorthand spellings .NET documents as exactly equivalent to a counted form: an exact count
+    /// of one is the same as no quantifier at all, and <c>{0,1}</c>, <c>{1,}</c> and <c>{0,}</c> are
+    /// the counted spellings of <c>?</c>, <c>+</c> and <c>*</c> respectively, greedy or lazy alike.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is deliberately the only place the classifier reasons about what a regular expression
+    /// pattern matches, and it stays narrow on purpose. The four rewrites above are not an
+    /// approximation, they are the exact semantics .NET documents for a quantifier, independent of every
+    /// other <see cref="RegexOptions" /> flag and of everything else in the pattern, because a
+    /// quantifier's own repetition count and laziness have no interaction with capture numbering or
+    /// backreferences. Proving that two different patterns describe the same language in general - the
+    /// kind of question <c>a+</c> and <c>aa*</c> ask - is out of scope and stays out of scope. This check
+    /// exists for a pattern that already spells one of the four forms out - hand-written or produced by a
+    /// rewrite outside this family - and proves the rewrite between it and its shorthand or bare
+    /// counterpart is a no-op; it deliberately does not, and must not, call a bound shift such as
+    /// <c>RegexQuantifierMutator</c>'s own <c>{0,1}</c> to <c>{1,1}</c> rewrite trivial, because narrowing
+    /// "zero or one" to "exactly one" is an observable change - the empty string matches the former and
+    /// not the latter - and such a mutant is a genuine testing gap, not a no-op.
+    /// </para>
+    /// <para>
+    /// Both patterns are re-tokenized under the very same options, which have to be statically known in
+    /// the first place: a pattern whose options cannot be resolved is left to the conservative default,
+    /// because the options change the grammar a token belongs to. Every non-quantifier token is copied
+    /// through unchanged, and each of the four rules is tried on its own canonical form, because each
+    /// proves a different fact and has to report its own reason. A rule that leaves the canonicalized
+    /// pattern identical to the one it started from proved nothing and is never reported for it.
+    /// </para>
+    /// </remarks>
+    /// <param name="mutation">The mutation to inspect.</param>
+    /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="cancellationToken">A token to observe.</param>
+    /// <returns>A trivial verdict, or <see langword="null" /> if the check does not apply.</returns>
+    private static EquivalenceVerdict? ClassifyRegexQuantifierShorthand(
+        Mutation mutation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            !TryTokenizeRegexRewrite(
+                mutation,
+                semanticModel,
+                cancellationToken,
+                out var originalPattern,
+                out var originalTokens,
+                out var mutatedPattern,
+                out var mutatedTokens
+            )
+        )
+        {
+            return null;
+        }
+
+        return ClassifyQuantifierCanonicalization(
+                originalPattern,
+                originalTokens,
+                mutatedPattern,
+                mutatedTokens,
+                CanonicalizeExactOne,
+                RegexExactOneQuantifierReason
+            )
+            ?? ClassifyQuantifierCanonicalization(
+                originalPattern,
+                originalTokens,
+                mutatedPattern,
+                mutatedTokens,
+                CanonicalizeOptional,
+                RegexOptionalQuantifierShorthandReason
+            )
+            ?? ClassifyQuantifierCanonicalization(
+                originalPattern,
+                originalTokens,
+                mutatedPattern,
+                mutatedTokens,
+                CanonicalizeOneOrMore,
+                RegexOneOrMoreQuantifierShorthandReason
+            )
+            ?? ClassifyQuantifierCanonicalization(
+                originalPattern,
+                originalTokens,
+                mutatedPattern,
+                mutatedTokens,
+                CanonicalizeZeroOrMore,
+                RegexZeroOrMoreQuantifierShorthandReason
+            );
+    }
+
+    /// <summary>
+    /// Resolves <paramref name="mutation" /> as a regex pattern rewrite and tokenizes both sides of it
+    /// under the site's own options, which is the shared precondition every quantifier canonicalization
+    /// rule needs before it can compare the two patterns.
+    /// </summary>
+    /// <param name="mutation">The mutation to inspect.</param>
+    /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="cancellationToken">A token to observe while resolving the site.</param>
+    /// <param name="originalPattern">The original pattern text.</param>
+    /// <param name="originalTokens">The tokens of the original pattern.</param>
+    /// <param name="mutatedPattern">The mutated pattern text.</param>
+    /// <param name="mutatedTokens">The tokens of the mutated pattern.</param>
+    /// <returns>
+    /// <see langword="true" /> if <paramref name="mutation" /> is a regex pattern rewrite whose options are
+    /// statically known and whose patterns both tokenize; otherwise <see langword="false" />.
+    /// </returns>
+    private static bool TryTokenizeRegexRewrite(
+        Mutation mutation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken,
+        out string originalPattern,
+        out ImmutableArray<RegexToken> originalTokens,
+        out string mutatedPattern,
+        out ImmutableArray<RegexToken> mutatedTokens
+    )
+    {
+        originalPattern = string.Empty;
+        originalTokens = ImmutableArray<RegexToken>.Empty;
+        mutatedPattern = string.Empty;
+        mutatedTokens = ImmutableArray<RegexToken>.Empty;
+
+        if (
+            mutation.Original is not LiteralExpressionSyntax { Token.Value: string } original
+            || mutation.Replacement is not LiteralExpressionSyntax { Token.Value: string } replacement
+            || !CanQuery(original, semanticModel)
+        )
+        {
+            return false;
+        }
+
+        var site = RegexPatternLocator.TryLocate(original, semanticModel, cancellationToken);
+
+        if (site?.Options is not { } siteOptions)
+        {
+            return false;
+        }
+
+        var options = siteOptions & ~RegexOptions.Compiled;
+
+        originalPattern = site.Pattern;
+        mutatedPattern = replacement.Token.ValueText;
+
+        return RegexPatternTokenizer.TryTokenize(originalPattern, options, out originalTokens, out _, out _)
+            && RegexPatternTokenizer.TryTokenize(mutatedPattern, options, out mutatedTokens, out _, out _);
+    }
+
+    /// <summary>
+    /// Applies one quantifier canonicalization rule to both patterns and proves triviality when the
+    /// canonical forms agree and the rule actually changed something.
+    /// </summary>
+    /// <param name="originalPattern">The original pattern text.</param>
+    /// <param name="originalTokens">The tokens of the original pattern.</param>
+    /// <param name="mutatedPattern">The mutated pattern text.</param>
+    /// <param name="mutatedTokens">The tokens of the mutated pattern.</param>
+    /// <param name="canonicalize">The rule turning a quantifier token into its canonical text.</param>
+    /// <param name="reason">The reason reported when the rule proves the two patterns equal.</param>
+    /// <returns>A trivial verdict, or <see langword="null" /> if the rule does not prove equality.</returns>
+    private static EquivalenceVerdict? ClassifyQuantifierCanonicalization(
+        string originalPattern,
+        ImmutableArray<RegexToken> originalTokens,
+        string mutatedPattern,
+        ImmutableArray<RegexToken> mutatedTokens,
+        Func<RegexToken, string> canonicalize,
+        string reason
+    )
+    {
+        var canonicalOriginal = CanonicalizeQuantifiers(originalTokens, canonicalize);
+        var canonicalMutated = CanonicalizeQuantifiers(mutatedTokens, canonicalize);
+
+        if (!string.Equals(canonicalOriginal, canonicalMutated, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        // A rule that leaves both patterns exactly as written proved nothing about this particular
+        // difference; some other rule, or no rule at all, is the correct explanation for it.
+        if (
+            string.Equals(canonicalOriginal, originalPattern, StringComparison.Ordinal)
+            && string.Equals(canonicalMutated, mutatedPattern, StringComparison.Ordinal)
+        )
+        {
+            return null;
+        }
+
+        return EquivalenceVerdict.Trivial(reason);
+    }
+
+    /// <summary>
+    /// Rebuilds a pattern by copying every token verbatim except a quantifier, which is rewritten by
+    /// <paramref name="canonicalize" />.
+    /// </summary>
+    /// <param name="tokens">The tokens of the pattern.</param>
+    /// <param name="canonicalize">The rule turning a quantifier token into its canonical text.</param>
+    /// <returns>The canonicalized pattern text.</returns>
+    private static string CanonicalizeQuantifiers(
+        ImmutableArray<RegexToken> tokens,
+        Func<RegexToken, string> canonicalize
+    )
+    {
+        var builder = new StringBuilder();
+
+        foreach (var token in tokens)
+        {
+            _ = builder.Append(token.Kind == RegexTokenKind.Quantifier ? canonicalize(token) : token.Text);
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Canonicalizes an exact-one quantifier, <c>{1}</c> or <c>{1,1}</c>, to the empty string, because
+    /// leaving the quantifier out repeats the atom exactly once as well and an exact count leaves the
+    /// engine no laziness to differ on.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <returns>The canonical text, unchanged when the token is not an exact-one quantifier.</returns>
+    private static string CanonicalizeExactOne(RegexToken token)
+    {
+        var core = SplitQuantifierCore(token.Text, out _);
+
+        return IsExactCount(core, out var count) && count == 1 ? string.Empty : token.Text;
+    }
+
+    /// <summary>
+    /// Canonicalizes the counted <c>{0,1}</c> quantifier to <c>?</c>, keeping its laziness marker.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <returns>The canonical text, unchanged when the token is not this counted form.</returns>
+    private static string CanonicalizeOptional(RegexToken token) => CanonicalizeBoundedCounted(token, 0, 1, "?");
+
+    /// <summary>
+    /// Canonicalizes the open-ended <c>{1,}</c> quantifier to <c>+</c>, keeping its laziness marker.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <returns>The canonical text, unchanged when the token is not this counted form.</returns>
+    private static string CanonicalizeOneOrMore(RegexToken token) => CanonicalizeOpenEndedCounted(token, 1, "+");
+
+    /// <summary>
+    /// Canonicalizes the open-ended <c>{0,}</c> quantifier to <c>*</c>, keeping its laziness marker.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <returns>The canonical text, unchanged when the token is not this counted form.</returns>
+    private static string CanonicalizeZeroOrMore(RegexToken token) => CanonicalizeOpenEndedCounted(token, 0, "*");
+
+    /// <summary>
+    /// Canonicalizes a counted quantifier stating both an exact minimum and an exact maximum, e.g.
+    /// <c>{0,1}</c>.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <param name="minimum">The exact minimum the rule matches.</param>
+    /// <param name="maximum">The exact maximum the rule matches.</param>
+    /// <param name="shorthand">The shorthand symbol replacing the counted core.</param>
+    /// <returns>The canonical text, unchanged when the token does not match the rule's shape.</returns>
+    private static string CanonicalizeBoundedCounted(RegexToken token, int minimum, int maximum, string shorthand)
+    {
+        var core = SplitQuantifierCore(token.Text, out var marker);
+
+        if (!IsBoundedCount(core, out var actualMinimum, out var actualMaximum))
+        {
+            return token.Text;
+        }
+
+        return actualMinimum == minimum && actualMaximum == maximum ? shorthand + marker : token.Text;
+    }
+
+    /// <summary>
+    /// Canonicalizes an open-ended counted quantifier, e.g. <c>{1,}</c>, whose upper bound is left
+    /// unstated.
+    /// </summary>
+    /// <param name="token">The quantifier token.</param>
+    /// <param name="minimum">The exact minimum the rule matches.</param>
+    /// <param name="shorthand">The shorthand symbol replacing the counted core.</param>
+    /// <returns>The canonical text, unchanged when the token does not match the rule's shape.</returns>
+    private static string CanonicalizeOpenEndedCounted(RegexToken token, int minimum, string shorthand)
+    {
+        var core = SplitQuantifierCore(token.Text, out var marker);
+
+        if (!IsOpenEndedCount(core, out var actualMinimum))
+        {
+            return token.Text;
+        }
+
+        return actualMinimum == minimum ? shorthand + marker : token.Text;
+    }
+
+    /// <summary>
+    /// Splits a quantifier token into its core and its lazy marker, the same way
+    /// <c>RegexQuantifierMutator.SplitCore</c> does: a one character core is <c>*</c>, <c>+</c> or
+    /// <c>?</c>, so anything behind the first character is the marker; a counted core ends with
+    /// <c>}</c>, so a trailing <c>?</c> behind it is the marker.
+    /// </summary>
+    /// <param name="text">The text of the quantifier token.</param>
+    /// <param name="marker">The lazy marker the token carries, either <c>?</c> or the empty string.</param>
+    /// <returns>The core of the quantifier, without the marker.</returns>
+    private static string SplitQuantifierCore(string text, out string marker)
+    {
+        if (text[0] is '*' or '+' or '?')
+        {
+            marker = text.Length > 1 ? "?" : string.Empty;
+
+            return text.Substring(0, 1);
+        }
+
+        if (text[text.Length - 1] is '?')
+        {
+            marker = "?";
+
+            return text.Substring(0, text.Length - 1);
+        }
+
+        marker = string.Empty;
+
+        return text;
+    }
+
+    /// <summary>
+    /// Determines whether a counted core states a single, exact repetition count, either <c>{n}</c> or
+    /// <c>{n,n}</c>, and parses that count.
+    /// </summary>
+    /// <param name="core">The core of a quantifier, without its lazy marker.</param>
+    /// <param name="count">The exact count, or zero when the core does not state one.</param>
+    /// <returns><see langword="true" /> if the core states a single, exact repetition count.</returns>
+    private static bool IsExactCount(string core, out int count)
+    {
+        count = 0;
+
+        if (core[0] is not '{' || core[core.Length - 1] is not '}')
+        {
+            return false;
+        }
+
+        var bounds = core.Substring(1, core.Length - 2);
+        var separator = bounds.IndexOf(',');
+
+        if (separator < 0)
+        {
+            return TryParseQuantifierBound(bounds, out count);
+        }
+
+        var minimumText = bounds.Substring(0, separator);
+        var maximumText = bounds.Substring(separator + 1);
+
+        if (
+            !TryParseQuantifierBound(minimumText, out var minimum)
+            || !TryParseQuantifierBound(maximumText, out var maximum)
+            || minimum != maximum
+        )
+        {
+            return false;
+        }
+
+        count = minimum;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Determines whether a counted core states both an exact minimum and an exact maximum, e.g.
+    /// <c>{0,1}</c>, and parses both bounds.
+    /// </summary>
+    /// <param name="core">The core of a quantifier, without its lazy marker.</param>
+    /// <param name="minimum">The lower bound, or zero when the core does not state this shape.</param>
+    /// <param name="maximum">The upper bound, or zero when the core does not state this shape.</param>
+    /// <returns><see langword="true" /> if the core states both an exact minimum and maximum.</returns>
+    private static bool IsBoundedCount(string core, out int minimum, out int maximum)
+    {
+        minimum = 0;
+        maximum = 0;
+
+        if (core[0] is not '{' || core[core.Length - 1] is not '}')
+        {
+            return false;
+        }
+
+        var bounds = core.Substring(1, core.Length - 2);
+        var separator = bounds.IndexOf(',');
+
+        if (separator < 0)
+        {
+            return false;
+        }
+
+        var maximumText = bounds.Substring(separator + 1);
+
+        if (maximumText.Length == 0)
+        {
+            return false;
+        }
+
+        var minimumText = bounds.Substring(0, separator);
+
+        return TryParseQuantifierBound(minimumText, out minimum) && TryParseQuantifierBound(maximumText, out maximum);
+    }
+
+    /// <summary>
+    /// Determines whether a counted core states an open-ended lower bound, e.g. <c>{1,}</c>, and parses
+    /// that bound.
+    /// </summary>
+    /// <param name="core">The core of a quantifier, without its lazy marker.</param>
+    /// <param name="minimum">The lower bound, or zero when the core does not state this shape.</param>
+    /// <returns><see langword="true" /> if the core states an open-ended lower bound.</returns>
+    private static bool IsOpenEndedCount(string core, out int minimum)
+    {
+        minimum = 0;
+
+        if (core[0] is not '{' || core[core.Length - 1] is not '}')
+        {
+            return false;
+        }
+
+        var bounds = core.Substring(1, core.Length - 2);
+        var separator = bounds.IndexOf(',');
+
+        if (separator < 0 || separator != bounds.Length - 1)
+        {
+            return false;
+        }
+
+        var minimumText = bounds.Substring(0, separator);
+
+        return TryParseQuantifierBound(minimumText, out minimum);
+    }
+
+    /// <summary>
+    /// Parses one bound of a counted quantifier the same way <c>RegexQuantifierMutator</c> does: no
+    /// sign, no group separator and no culture specific digit is ever accepted.
+    /// </summary>
+    /// <param name="text">The digits of the bound, as the token spells them.</param>
+    /// <param name="value">The parsed bound, or zero when the text does not parse.</param>
+    /// <returns><see langword="false" /> when the bound does not fit into an <see cref="int" />.</returns>
+    private static bool TryParseQuantifierBound(string text, out int value) =>
+        int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
 
     /// <summary>
     /// Determines whether the mutation sits in code the compiler already knows can never run.

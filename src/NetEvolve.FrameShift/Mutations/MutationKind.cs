@@ -163,4 +163,34 @@ internal enum MutationKind
     /// and the order of the branches decides which one wins on input both of them match.
     /// </summary>
     RegexAlternation,
+
+    /// <summary>
+    /// The character classes of a regular expression pattern: the shorthand classes <c>\d</c>, <c>\w</c>
+    /// and <c>\s</c> swapped among themselves and with their negations, a class negated or un-negated,
+    /// a range widened by one at either end, a member removed from a set, and <c>.</c> swapped with the
+    /// equivalent explicit class <c>[\s\S]</c>. A test suite that only supplies input already inside the
+    /// intended class cannot tell it apart from a neighbouring or a wider one.
+    /// </summary>
+    RegexCharacterClass,
+
+    /// <summary>
+    /// The character escapes of a regular expression pattern, with the literal <c>\.</c> turned into the
+    /// unescaped <c>.</c>. A literal dot becoming "matches any character" is a real and common defect that
+    /// a test suite exercising only dot-shaped input never notices.
+    /// </summary>
+    RegexEscape,
+
+    /// <summary>
+    /// The lookaround assertions of a regular expression pattern, with a positive lookahead or lookbehind
+    /// swapped for its negative counterpart and back. The two assert opposite things about the same
+    /// position, so a test suite that never supplies input failing the assertion cannot tell them apart.
+    /// </summary>
+    RegexLookaround,
+
+    /// <summary>
+    /// The numbered backreferences of a regular expression pattern, with the referenced capture group
+    /// shifted to a neighbouring one. A test suite that never distinguishes the captures cannot tell a
+    /// backreference from a mistakenly renumbered one.
+    /// </summary>
+    RegexBackreference,
 }

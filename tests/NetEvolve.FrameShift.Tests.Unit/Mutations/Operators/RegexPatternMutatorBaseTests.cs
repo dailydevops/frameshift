@@ -13,8 +13,8 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers everything the four operators of the regular expression pattern family inherit from their base
-/// class, once instead of four times: which literals are a pattern site at all, the guard that refuses a
+/// Covers everything the operators of the regular expression pattern family inherit from their base
+/// class, once instead of once per operator: which literals are a pattern site at all, the guard that refuses a
 /// site whose options are not statically determinable, the two viability filters every offered rewrite
 /// passes through, the shape of the produced mutation - operator identifier, display name, kind, location
 /// and the replacement literal - and the two splice helpers a derived operator rewrites a construct with.

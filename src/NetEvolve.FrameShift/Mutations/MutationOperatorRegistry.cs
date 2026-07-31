@@ -56,7 +56,11 @@ internal static class MutationOperatorRegistry
         yield return new Operators.NumericLiteralMutator();
         yield return new Operators.RegexAlternationMutator();
         yield return new Operators.RegexAnchorMutator();
+        yield return new Operators.RegexBackreferenceMutator();
+        yield return new Operators.RegexCharacterClassMutator();
+        yield return new Operators.RegexEscapeMutator();
         yield return new Operators.RegexGroupMutator();
+        yield return new Operators.RegexLookaroundMutator();
         yield return new Operators.RegexOptionsMutator();
         yield return new Operators.RegexQuantifierMutator();
         yield return new Operators.RelationalOperatorMutator();
