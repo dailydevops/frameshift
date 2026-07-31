@@ -1,0 +1,7 @@
+﻿assemblyDirectory: {targetFramework}
+corlib: {corlib}
+framework: {framework}
+language: CSharpLatest
+runtime: {runtimeDirectory}
+targetFramework: {targetFramework}
+temporary: {temporaryDirectory}

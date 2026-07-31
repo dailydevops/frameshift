@@ -79,20 +79,43 @@ one registry line.**
 
 Everything else is framework-neutral. `TestMethodDiscovery`, `TestSurfaceCollector`,
 `TestSurfaceManifest`, its reader and writer, and `TestSurfaceAnalysis` itself take an
-`ITestMethodRecognizer` and never learn which framework produced it. One leftover from the time TUnit was
-the only framework remains: `TestSurfaceCollector` still carries two convenience overloads that take no
-recogniser and fall back to `TUnitTestDiscovery`. Nothing on the analyzer or generator path calls them —
-every production caller passes a recogniser — and a fifth framework does not have to touch them.
+`ITestMethodRecognizer` and never learn which framework produced it. `TestSurfaceCollector` exposes
+exactly two entry points, `Collect(Compilation, ITestMethodRecognizer, CancellationToken)` and
+`FindTestsWithoutProductionReference(Compilation, ITestMethodRecognizer, CancellationToken)`, and both
+demand a recogniser. There is no overload that collects a surface without being told what a test is, so
+no code path can silently assume a framework — the choice is always made by a probe and always visible in
+the call. A fifth framework therefore adds nothing to the collector.
 
-### Detection requires both a name and an assembly guard
+### Every probe accepts either signal
 
-A recogniser accepts an attribute when the attribute type — or any type in its base chain — is the
-resolved framework attribute type, **or** when it carries the framework's simple attribute name *and* is
-declared in an assembly belonging to the framework (`TUnit*`, `xunit*`, `nunit*`, `MSTest.TestFramework*`
-or `Microsoft.VisualStudio.TestPlatform.TestFramework*`). The name alone is never sufficient. The
-name-based rule exists for the cases the symbol-based rule cannot cover: a sealed framework attribute
-whose specialisations derive from a sibling type, and an ambiguous metadata name in a compilation
-referencing two major versions at once.
+All four probes apply the same rule, and that uniformity is deliberate. A probe returns a recogniser when
+the framework's well-known attribute type resolves in the compilation **or** when the compilation
+references an assembly belonging to the framework (`TUnit*`, `xunit*`, `nunit*`, `MSTest.TestFramework*`
+or `Microsoft.VisualStudio.TestPlatform.TestFramework*`); it returns `null` only when neither holds.
+
+The reason no probe may demand both signals is `GetTypeByMetadataName`. It resolves a metadata name only
+when exactly one referenced assembly declares it, and returns `null` on an ambiguity. A compilation
+referencing two major versions of the same framework at once is exactly that ambiguity —
+`Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute` is declared by
+`MSTest.TestFramework` since MSTest 4 and by `Microsoft.VisualStudio.TestPlatform.TestFramework` in
+MSTest 3 and earlier, and `Xunit.FactAttribute` by both `xunit.core` and `xunit.v3.core`. A probe that
+insisted on a resolved type would hand back `null` there and shut its analysis down completely on a
+project that unmistakably uses the framework. The assembly reference is the signal that survives the
+ambiguity, so it has to be sufficient on its own.
+
+The recogniser is where the remaining strictness sits, and it is the right place for it, because it
+judges an individual attribute instead of a whole compilation. A recogniser accepts an attribute when the
+attribute type — or any type in its base chain — is the resolved framework attribute type, **or** when it
+carries the framework's simple attribute name *and* is declared in an assembly belonging to the
+framework. The name alone is never sufficient. That is what keeps a hand-written look-alike in a
+same-named namespace — `Microsoft.VisualStudio.TestTools.UnitTesting` is an ordinary namespace any project
+may declare — from marking a method as a test: it fails the assembly half of the name-based rule and is
+not in the base chain of the real attribute. The consequence of the aligned probes is only that the
+analysis wakes up, discovers no test method, and shuts down under the fail-closed rule below.
+
+The name-based rule exists for the two cases the symbol-based rule cannot cover: a sealed framework
+attribute whose specialisations derive from a sibling type, and the ambiguous metadata name of a
+compilation referencing two major versions at once.
 
 The assembly-name comparison is ordinal for TUnit and case-insensitive for xUnit, NUnit and MSTest, whose
 names are long, dotted and reproduced by hand often enough that insisting on exact casing would only ever
@@ -142,13 +165,14 @@ Three small files and one line:
 
 1. `src/NetEvolve.FrameShift/TestSurface/<Framework>TestFrameworkProbe.cs` — the framework name, the
    attribute metadata name(s), the accepted assembly-name prefix(es), and a `TryCreateRecognizer` that
-   returns `null` when neither the attribute type resolves nor a framework assembly is referenced. Choose
-   the strictness deliberately: TUnit, xUnit and NUnit accept either signal, because a resolvable
-   framework attribute in an unowned namespace is evidence enough; `MSTestTestFrameworkProbe` requires
-   both, because `Microsoft.VisualStudio.TestTools.UnitTesting` is an ordinary namespace that any project
-   may declare a look-alike attribute in.
+   returns `null` when neither the attribute type resolves nor a framework assembly is referenced. Follow
+   the existing four and accept either signal; do not require both. Requiring both makes the probe blind
+   to a compilation that references two major versions of the framework, because the metadata name is then
+   ambiguous and does not resolve. The recogniser, not the probe, is where a look-alike attribute is
+   rejected.
 2. `src/NetEvolve.FrameShift/TestSurface/<Framework>TestMethodRecognizer.cs` — the attribute rule for that
-   framework, walking the base chain and applying the name-plus-assembly fallback.
+   framework, walking the base chain and applying the name-plus-assembly fallback. The recogniser has to
+   tolerate a `null` attribute type, because the probe may have woken it on the assembly reference alone.
 3. `src/NetEvolve.FrameShift/Analyzers/<Framework>TestSurfaceAnalyzer.cs` — a `DiagnosticAnalyzer`
    declaring FSH0003 and FSH0004 and delegating to `TestSurfaceAnalysis.Execute`.
 4. One entry in the registration region of `TestFrameworkProbeRegistry`, appended at the end so the
@@ -182,6 +206,12 @@ involved.
   follows from the list order, tests pin it (`TestFrameworkProbeRegistryTests`,
   `MixedFrameworkTestSurfaceTests`), and reordering the list is a behaviour change rather than a
   refactoring.
+- **A referenced-but-unused framework wakes its probe.** Because either signal is enough, a project that
+  references a framework package without writing a single test of it gets a recogniser, and the framework's
+  analyzer runs a discovery pass before finding nothing. The fail-closed rule makes that harmless — no test
+  discovered means no diagnostic, including none about the manifest — but the discovery walk is paid for.
+  The repository's own test projects are exactly this case: they reference all four frameworks as
+  compile-time metadata and run on TUnit.
 - **A framework's attribute or assembly rename between major versions is a standing maintenance
   obligation.** MSTest 4 renaming its framework assembly already forced the probe to accept two identities;
   a future rename in any framework means a silent false negative until the probe is updated, and the

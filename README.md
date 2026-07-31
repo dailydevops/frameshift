@@ -56,12 +56,25 @@ Inside `src/NetEvolve.FrameShift` the code is organised by layer, and each layer
 
 - **NetEvolve.FrameShift** (`netstandard2.0`) — the analyzers, the source generator and the packaged MSBuild assets. Built with `EnforceExtendedAnalyzerRules`, packed as a development dependency with the assembly under `analyzers/dotnet/cs` and the build assets under `build/` and `buildTransitive/`. See the [package README](src/NetEvolve.FrameShift/README.md).
 
+**The analyzer is single-target on purpose, and it stays that way.** Exactly one assembly may sit in `analyzers/dotnet/cs`: Roslyn loads analyzers from that one path, there is no target-framework fan-out for it, and a second assembly there is a packaging error rather than a second choice. `netstandard2.0` is the only target that satisfies every host that loads the component — the .NET Core-based compiler server of the .NET SDK, the .NET Framework-based one inside Visual Studio, and `csc` on either — so the target is dictated by the hosts, not by the code. Adding target frameworks to the analyzer project would produce assemblies that nothing could ever load. Multi-targeting therefore belongs to the _test_ projects alone.
+
 ### Tests
 
-- **NetEvolve.FrameShift.Tests.Unit** (`net8.0`, `net9.0`, `net10.0`) — TUnit unit tests for the operators, the equivalence classifier, the reachability closure, the manifest format and the option parsing. Also hosts the shared test infrastructure.
-- **NetEvolve.FrameShift.Tests.Integration** (`net8.0`, `net9.0`, `net10.0`) — TUnit tests that drive whole compilations through the analyzers and the generator end to end, including the manifest round trip.
+- **NetEvolve.FrameShift.Tests.Unit** — TUnit unit tests for the operators, the equivalence classifier, the reachability closure, the manifest format and the option parsing. Also hosts the shared test infrastructure.
+- **NetEvolve.FrameShift.Tests.Integration** — TUnit tests that drive whole compilations through the analyzers and the generator end to end, including the manifest round trip.
+
+Both test projects share one target-framework list, defined once in `Directory.Build.props`:
+
+| Group          | Target frameworks                                 | Runs on        |
+| -------------- | ------------------------------------------------- | -------------- |
+| Modern .NET    | `net6.0`, `net7.0`, `net8.0`, `net9.0`, `net10.0` | every platform |
+| .NET Framework | `net472`, `net48`, `net481`                       | Windows only   |
+
+**Why the classic frameworks are tested but not shipped.** They are in the test matrix and deliberately not in the package, and those are two different questions. The package answer is above: one assembly, `netstandard2.0`, loadable everywhere. The test answer is that the same `netstandard2.0` assembly really does get loaded into a .NET Framework compiler host — that is what happens in Visual Studio — so the code has to be exercised on that runtime, not merely compiled for it. `net472`, `net48` and `net481` are the three .NET Framework versions worth distinguishing here, and they only build on Windows, which is why the list is conditional. Nothing about the _package_ changes with them: they add coverage, not artifacts.
 
 Both test projects reference the analyzer by project reference and run on TUnit. They additionally reference `xunit.core`, `xunit.v3.core`, `NUnit` and `MSTest.TestFramework` as compile-time-only metadata (`PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers"`), so the framework probes can be exercised against the real attribute types without a competing test platform extension entering the run.
+
+`xunit.v3.core` is the one package that does not cover the whole matrix: it ships assets for `net472` and for `net8.0` and above, and **none at all for `net6.0` and `net7.0`**. Every reference to an xUnit v3 type is therefore guarded by `#if FRAMESHIFT_XUNIT_V3`, a symbol defined for every target framework except `net6.0` and `net7.0`. The xUnit adapter is consequently covered on the remaining six — `net8.0`, `net9.0`, `net10.0`, `net472`, `net48`, `net481` — and the xUnit v2 tests, which use `xunit.core`, run everywhere. Keep such guards as narrow as the reference itself; per-framework `Compile` excludes are not used in this repository.
 
 ## Features
 
@@ -70,7 +83,7 @@ Both test projects reference the analyzer by project reference and run on TUnit.
 - 14 mutation operators covering arithmetic, relational, equality, logical, bitwise, unary, increment/decrement, conditional, null-coalescing, boolean, numeric and string literal mutations.
 - Verifies every mutant by in-memory recompilation, so mutants that could never compile are never reported.
 - Classifies mutants that cannot change observable behaviour, keeping the warnings actionable.
-- Pluggable test-framework support with probes and recognisers for TUnit, xUnit, NUnit and MSTest.
+- Pluggable test-framework support with probes and recognisers for TUnit, xUnit, NUnit and MSTest, all four detecting their framework by the same rule: the well-known test attribute type resolves, or one of the framework's assemblies is referenced.
 - Configuration entirely through MSBuild properties, with no configuration file to maintain.
 - Ships as a development dependency: no runtime footprint in the consuming application.
 
@@ -79,7 +92,8 @@ Both test projects reference the analyzer by project reference and run on TUnit.
 ### Prerequisites
 
 - [.NET SDK 10.0](https://dotnet.microsoft.com/download) or higher — the newest framework the test projects target. `global.json` pins only the test runner (`Microsoft.Testing.Platform`) and deliberately does not pin an SDK version.
-- The .NET 8.0 and .NET 9.0 runtimes, so the tests can run on every target framework. Installing the .NET 8 and .NET 9 SDKs is the simplest way to get them.
+- The .NET 6.0, 7.0, 8.0 and 9.0 runtimes, so the tests can run on every modern target framework. Installing the matching SDKs is the simplest way to get them; without a runtime the inner build still compiles but its test run cannot start.
+- On Windows, the .NET Framework 4.8.1 developer pack, which also provides the reference assemblies for `net472` and `net48`. On Linux and macOS the three .NET Framework targets are dropped from the matrix automatically, so no extra install is needed and no test is skipped silently — the target frameworks simply do not exist there.
 - [Git](https://git-scm.com/) for version control.
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) (17.14 or newer, for `.slnx` support), [JetBrains Rider](https://www.jetbrains.com/rider/) or [Visual Studio Code](https://code.visualstudio.com/).
 
@@ -128,9 +142,20 @@ dotnet test
 
 # Run a single test project on a single target framework
 dotnet test ./tests/NetEvolve.FrameShift.Tests.Unit/NetEvolve.FrameShift.Tests.Unit.csproj -f net10.0
+
+# Run one .NET Framework target (Windows only)
+dotnet test ./tests/NetEvolve.FrameShift.Tests.Unit/NetEvolve.FrameShift.Tests.Unit.csproj -f net481
 ```
 
+`dotnet test` without `-f` runs every target framework of the matrix, which on Windows is eight runs per project. Pin a framework with `-f` while iterating; run the full matrix before opening a pull request.
+
 The test projects declare their kind through assembly-level categorisation attributes in the project file — `NetEvolve.Extensions.TUnit.UnitTestAttribute` and `NetEvolve.Extensions.TUnit.IntegrationTestAttribute` — so `--filter` can select unit or integration tests by category instead of by project path.
+
+### Snapshot tests
+
+The generator output and the analyzer diagnostics are pinned with `Verify.TUnit`. Snapshots live in a `_snapshots` directory inside each test project, mirroring the directory structure of the test that owns them; the paths and the serialisation settings come from `tests/NetEvolve.FrameShift.Tests.Unit/Infrastructure/VerifyModuleInitializer.cs`, which the integration project shares through a linked `Compile` item.
+
+A snapshot is written once per test, not once per target framework: the generated manifest and the reported diagnostics are a property of the compilation the test builds, not of the runtime the test happens to execute on. A failing snapshot test writes a `.received.` file next to the accepted one — review the diff, and if the new output is correct, replace the accepted file with it and commit that change together with the code that caused it. Never accept a snapshot you have not read; the whole point of the file is that a reviewer can see the output change.
 
 ### Coverage
 
@@ -146,10 +171,10 @@ Measure each test project separately, with its own `--coverage-output` file name
 
 Both gates are enforced by the build itself, so measure them instead of trusting a number written down here:
 
-- `dotnet build ./FrameShift.slnx -c Release` must be free of errors **and** warnings. `NetEvolve.Defaults` turns on `TreatWarningsAsErrors` for `Release`, so a single analyzer warning fails it — and the repository's `.editorconfig` raises several analyzer rules to `error`, which fails `Debug` as well.
-- `dotnet test ./FrameShift.slnx` must be green on all three target frameworks of both test projects.
+- `dotnet build ./FrameShift.slnx -c Release` must be free of errors **and** warnings. `NetEvolve.Defaults` turns on `TreatWarningsAsErrors` for `Release`, so a single analyzer warning fails it — and the repository's `.editorconfig` raises several analyzer rules to `error`, which fails `Debug` as well. The bar applies to every target framework of every project, including the .NET Framework inner builds, where the available BCL surface differs.
+- `dotnet test ./FrameShift.slnx` must be green on **every** target framework of both test projects — no framework may be excluded to make a test pass, and a test that genuinely cannot apply to a framework is guarded by a conditional compilation symbol rather than quietly dropped.
 
-Run both before opening a pull request; CI runs the same commands.
+Run both before opening a pull request; CI runs the same commands against the same solution, through the shared `dailydevops/pipelines` workflow. Which target frameworks a given run covers follows from the platform it runs on: the three .NET Framework targets are only in the matrix on Windows. If you develop on Linux or macOS, a `net472`-only break is invisible to you locally — build on Windows, or expect CI to find it.
 
 ### Code Formatting
 
@@ -180,7 +205,10 @@ src/                                          # Production code
 
 tests/                                        # Test projects
 ├── NetEvolve.FrameShift.Tests.Unit/          # Unit tests and shared test infrastructure
+│   ├── Infrastructure/                       # Shared harness, linked into the integration project
+│   └── _snapshots/                           # Accepted Verify snapshots, mirroring the tests
 └── NetEvolve.FrameShift.Tests.Integration/   # End-to-end analyzer and generator tests
+    └── _snapshots/                           # Accepted Verify snapshots, mirroring the tests
 
 docs/
 └── rules/                                    # One document per diagnostic, target of the help links
