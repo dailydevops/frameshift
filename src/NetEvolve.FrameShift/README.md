@@ -14,9 +14,16 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 14 mutation operators covering arithmetic operators and compound assignments, relational and
+- 20 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical, conditional and bitwise/shift operators, logical negation,
-  increment/decrement, unary operators, null-coalescing, and boolean, numeric and string literals.
+  increment/decrement, unary operators, null-coalescing, boolean, numeric and string literals, and
+  the culture-sensitivity family below.
+- A culture-sensitivity operator family of six operators - `StringComparison` arguments,
+  `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
+  case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's
+  machine and fail under another locale, and every one of them is a place a test can pin the intent
+  instead of inheriting the ambient culture. Each of these operators resolves the framework type it
+  mutates through the compilation, so a same-named type of your own is never mistaken for it.
 - Every mutant is verified by in-memory recompilation of the mutated syntax tree, so a mutation that
   would not even build is never reported.
 - Mutants that cannot change observable behaviour are recognised and reported separately
@@ -267,6 +274,10 @@ dotnet_diagnostic.FSH0002.severity = none
   model, so the generator depends on the whole compilation and re-runs on every build and on every
   keystroke in the IDE. Its cost grows with the size of the test project. Set `FrameShiftEnabled` to
   `false`, or `FrameShiftWriteTestSurfaceManifest` to `false`, if that cost is not wanted.
+- The culture-sensitivity family mutates the *arguments and flags* a call passes, never the contents
+  of a regular expression pattern: the `RegexOptions` operator flips option flags, and no operator
+  rewrites pattern text. A pattern that is only exercised by one input therefore still looks fully
+  covered.
 - C# only, and reachability never leaves the analysed compilation: overrides in other assemblies are
   outside what a single compilation can observe.
 
