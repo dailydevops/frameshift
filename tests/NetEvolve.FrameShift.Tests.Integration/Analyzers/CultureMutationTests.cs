@@ -42,6 +42,18 @@ public class CultureMutationTests
     private const string AnchorMemberId = "M:Fixture.Reached.Identity(System.Int32)~System.Int32";
 
     /// <summary>
+    /// The test method id every manifest of this fixture attributes its references to. No test asserts on
+    /// it, because these tests state what the culture operators report, not which test reached what.
+    /// </summary>
+    private const string AnonymousTestId = "M:Fixture.Tests.AnonymousTests.Reaches";
+
+    /// <summary>
+    /// The case count recorded for <see cref="AnonymousTestId" />: a lower bound, because nothing here
+    /// establishes how many input combinations the reaching test carries.
+    /// </summary>
+    private const string LowerBoundCount = "1+";
+
+    /// <summary>
     /// The comparing member of <see cref="ComparisonSource" />, used to cover it instead of the anchor.
     /// </summary>
     private const string ComparisonMemberId = "M:Fixture.Names.AreSame(System.String,System.String)~System.Boolean";
@@ -575,18 +587,32 @@ public class CultureMutationTests
     /// Builds a manifest recording <paramref name="referencedMemberIds" /> as the production members the
     /// tests of the first pass touched.
     /// </summary>
+    /// <remarks>
+    /// Every reference is attributed to one anonymous test whose case count is the lower bound
+    /// <see cref="LowerBoundCount" />. These tests are about which mutation points are reachable and state
+    /// nothing about test data, so a lower bound is the honest count — and it keeps <c>FSH0006</c> silent,
+    /// which is what lets every exact diagnostic set below stay a statement about the culture operators
+    /// alone.
+    /// </remarks>
     /// <param name="referencedMemberIds">The declaration ids of the covered members.</param>
     /// <returns>The manifest as an additional file.</returns>
     private static InMemoryAdditionalText CreateManifest(params string[] referencedMemberIds)
     {
         var builder = new StringBuilder();
         _ = builder.Append(TestSurfaceManifestFormat.Header).Append('\n');
+        _ = builder
+            .Append(TestSurfaceManifestFormat.TestPrefix)
+            .Append(TestSurfaceManifestFormat.FieldSeparator)
+            .Append(AnonymousTestId)
+            .Append(TestSurfaceManifestFormat.FieldSeparator)
+            .Append(LowerBoundCount)
+            .Append('\n');
 
         foreach (var referencedMemberId in referencedMemberIds)
         {
             _ = builder
                 .Append(TestSurfaceManifestFormat.ReferencePrefix)
-                .Append(' ')
+                .Append(TestSurfaceManifestFormat.FieldSeparator)
                 .Append(referencedMemberId)
                 .Append('\n');
         }

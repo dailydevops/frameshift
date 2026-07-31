@@ -83,7 +83,7 @@ internal sealed class CultureInfoMutator : MutationOperatorBase
         // fail and no type test is needed here.
         var memberAccess = (MemberAccessExpressionSyntax)node;
 
-        if (IsConstantRequired(memberAccess) || IsAssignmentTarget(memberAccess))
+        if (ConstantContext.IsRequired(memberAccess) || IsAssignmentTarget(memberAccess))
         {
             return [];
         }
@@ -182,43 +182,4 @@ internal sealed class CultureInfoMutator : MutationOperatorBase
     /// <returns><see langword="true" /> if the node is assigned to.</returns>
     private static bool IsAssignmentTarget(ExpressionSyntax node) =>
         node.Parent is AssignmentExpressionSyntax assignment && ReferenceEquals(assignment.Left, node);
-
-    /// <summary>
-    /// Determines whether <paramref name="node" /> sits in a position that only accepts a compile
-    /// time constant, such as an attribute argument, a <see langword="const" /> initializer, a default
-    /// parameter value, a <c>case</c> label, a <c>goto case</c> statement or a constant pattern.
-    /// </summary>
-    /// <param name="node">The node to inspect.</param>
-    /// <returns><see langword="true" /> if the node must stay a constant expression.</returns>
-    private static bool IsConstantRequired(SyntaxNode node)
-    {
-        for (var current = node.Parent; current is not null; current = current.Parent)
-        {
-            switch (current)
-            {
-                case AttributeSyntax:
-                case AttributeArgumentSyntax:
-                case CaseSwitchLabelSyntax:
-                case ConstantPatternSyntax:
-                case RelationalPatternSyntax:
-                case ParameterSyntax:
-                case EnumMemberDeclarationSyntax:
-                    return true;
-
-                case GotoStatementSyntax gotoStatement when gotoStatement.IsKind(SyntaxKind.GotoCaseStatement):
-                case FieldDeclarationSyntax field when field.Modifiers.Any(SyntaxKind.ConstKeyword):
-                case LocalDeclarationStatementSyntax local when local.Modifiers.Any(SyntaxKind.ConstKeyword):
-                    return true;
-
-                case MemberDeclarationSyntax:
-                case CompilationUnitSyntax:
-                    return false;
-
-                default:
-                    continue;
-            }
-        }
-
-        return false;
-    }
 }

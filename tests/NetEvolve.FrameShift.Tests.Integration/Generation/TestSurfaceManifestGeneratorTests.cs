@@ -1,6 +1,7 @@
 namespace NetEvolve.FrameShift.Tests.Integration.Generation;
 
 using System.Collections.Immutable;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
@@ -436,28 +437,35 @@ public class TestSurfaceManifestGeneratorTests
     }
 
     /// <summary>
-    /// Determinism rests on the ordering: the test entries come first, the referenced members second, and
-    /// both groups are sorted ordinally rather than in the order the walk happened to find them.
+    /// Determinism rests on the ordering, and the layout is now one block per test: a <c>T</c> entry
+    /// carrying the case count opens the block, the members that very test reached follow it directly, the
+    /// blocks are ordered ordinally by test id and the references inside a block ordinally by their own id
+    /// — never in the order the walk happened to find them.
     /// </summary>
+    /// <remarks>
+    /// The expectation is rebuilt from the parsed manifest rather than spelled out, so the test states the
+    /// layout rule itself. Both interleaving (a reference landing in the wrong block) and a lost ordering
+    /// break it, because the joined text is compared entry by entry.
+    /// </remarks>
     [Test]
-    public async Task Generate_ManifestEntries_AreGroupedAndSortedOrdinally()
+    public async Task Generate_ManifestEntries_AreGroupedIntoBlocksAndSortedOrdinally()
     {
         var text = Generate(CreateTest(TestFramework.TUnit, TwoTestsSource, CreateProduction()));
         var (_, _, manifest) = Read(text);
         var entries = Lines(text).Skip(2).SkipLast(1).ToImmutableArray();
+        var testIds = manifest.TestMethodIds.OrderBy(id => id, StringComparer.Ordinal).ToImmutableArray();
 
         var markers = string.Concat(entries.Select(entry => entry[0]));
-        var expectedMarkers =
-            new string('T', manifest.TestMethodIds.Count) + new string('R', manifest.ReferencedMemberIds.Count);
+        var expectedMarkers = string.Concat(
+            testIds.Select(id => 'T' + new string('R', manifest.ReferencesByTest[id].Count))
+        );
 
-        var (actualTests, expectedTests) = Sorted(entries, 'T');
-        var (actualReferences, expectedReferences) = Sorted(entries, 'R');
+        var expectedEntries = testIds.SelectMany(id => BlockOf(manifest, id));
 
         _ = await Assert.That(manifest.TestMethodIds.Count).IsEqualTo(2);
         _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsGreaterThan(2);
         _ = await Assert.That(markers).IsEqualTo(expectedMarkers);
-        _ = await Assert.That(string.Join("|", actualTests)).IsEqualTo(string.Join("|", expectedTests));
-        _ = await Assert.That(string.Join("|", actualReferences)).IsEqualTo(string.Join("|", expectedReferences));
+        _ = await Assert.That(string.Join("|", entries)).IsEqualTo(string.Join("|", expectedEntries));
     }
 
     /// <summary>
@@ -639,15 +647,36 @@ public class TestSurfaceManifestGeneratorTests
         return [.. lines];
     }
 
-    private static (ImmutableArray<string> Actual, ImmutableArray<string> Expected) Sorted(
-        ImmutableArray<string> entries,
-        char marker
-    )
+    /// <summary>
+    /// Renders the canonical block of one test: the <c>T</c> entry with its case count, followed by the
+    /// members that test reached in ordinal order.
+    /// </summary>
+    /// <param name="manifest">The parsed manifest.</param>
+    /// <param name="testMethodId">The declaration id of the test the block belongs to.</param>
+    /// <returns>The lines of the block, in canonical order.</returns>
+    private static IEnumerable<string> BlockOf(TestSurfaceManifest manifest, string testMethodId)
     {
-        var actual = entries.Where(entry => entry[0] == marker).ToImmutableArray();
+        yield return Entry(
+            TestSurfaceManifestFormat.TestPrefix,
+            testMethodId + TestSurfaceManifestFormat.FieldSeparator + manifest.TestCaseCounts[testMethodId].ToString()
+        );
 
-        return (actual, [.. actual.OrderBy(entry => entry, StringComparer.Ordinal)]);
+        var referencedMemberIds = manifest.ReferencesByTest[testMethodId];
+
+        foreach (var referencedMemberId in referencedMemberIds.OrderBy(id => id, StringComparer.Ordinal))
+        {
+            yield return Entry(TestSurfaceManifestFormat.ReferencePrefix, referencedMemberId);
+        }
     }
+
+    /// <summary>
+    /// Renders one entry line: the marker, the field separator and the payload.
+    /// </summary>
+    /// <param name="marker">The line marker.</param>
+    /// <param name="payload">Everything behind the separator.</param>
+    /// <returns>The rendered line, without a line ending.</returns>
+    private static string Entry(char marker, string payload) =>
+        new StringBuilder().Append(marker).Append(TestSurfaceManifestFormat.FieldSeparator).Append(payload).ToString();
 
     /// <summary>
     /// Determines whether a documentation comment id can be turned back into the symbol it names.

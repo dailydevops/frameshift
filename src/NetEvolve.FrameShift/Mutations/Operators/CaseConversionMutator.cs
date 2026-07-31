@@ -81,7 +81,7 @@ internal sealed class CaseConversionMutator : MutationOperatorBase
         if (
             invocation.Expression is not MemberAccessExpressionSyntax access
             || !access.IsKind(SyntaxKind.SimpleMemberAccessExpression)
-            || IsConstantRequired(invocation)
+            || ConstantContext.IsRequired(invocation)
         )
         {
             return [];
@@ -233,39 +233,4 @@ internal sealed class CaseConversionMutator : MutationOperatorBase
     private static bool IsInvariant(string methodName) =>
         string.Equals(methodName, ToUpperInvariantName, StringComparison.Ordinal)
         || string.Equals(methodName, ToLowerInvariantName, StringComparison.Ordinal);
-
-    /// <summary>
-    /// Determines whether <paramref name="node" /> sits in a position that only accepts a compile time
-    /// constant, such as an attribute argument, a <see langword="const" /> initializer or a default
-    /// parameter value. A case conversion is never constant, so such a position can only ever hold code
-    /// that does not compile, and offering a mutant for it would be pointless.
-    /// </summary>
-    /// <param name="node">The node to inspect.</param>
-    /// <returns><see langword="true" /> if the node must stay a constant expression.</returns>
-    private static bool IsConstantRequired(SyntaxNode node)
-    {
-        for (var current = node.Parent; current is not null; current = current.Parent)
-        {
-            switch (current)
-            {
-                case AttributeSyntax:
-                case AttributeArgumentSyntax:
-                case ParameterSyntax:
-                    return true;
-
-                case FieldDeclarationSyntax field when field.Modifiers.Any(SyntaxKind.ConstKeyword):
-                case LocalDeclarationStatementSyntax local when local.Modifiers.Any(SyntaxKind.ConstKeyword):
-                    return true;
-
-                case MemberDeclarationSyntax:
-                case CompilationUnitSyntax:
-                    return false;
-
-                default:
-                    continue;
-            }
-        }
-
-        return false;
-    }
 }

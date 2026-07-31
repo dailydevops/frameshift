@@ -40,6 +40,26 @@ public class RegexPatternValidityTests
     ];
 
     /// <summary>
+    /// The simple names of every exception type the <see cref="Regex" /> constructor can reject a pattern
+    /// or an option value with. The check falls back to the type name of the exception when the runtime
+    /// supplies no message at all, so an error that is exactly one of these names is the signature of that
+    /// fallback having fired.
+    /// </summary>
+    private static readonly string[] _exceptionTypeNames =
+    [
+        nameof(ArgumentException),
+        nameof(ArgumentOutOfRangeException),
+        nameof(NotSupportedException),
+        "RegexParseException",
+    ];
+
+#if NET7_0_OR_GREATER
+    private const int AdditionalFailureShapes = 3;
+#else
+    private const int AdditionalFailureShapes = 1;
+#endif
+
+    /// <summary>
     /// Feeds one malformed pattern per failure class of the pattern grammar into the rejection tests.
     /// </summary>
     /// <returns>One factory per malformed pattern.</returns>
@@ -138,6 +158,45 @@ public class RegexPatternValidityTests
 
         _ = await Assert.That(valid).IsFalse();
         _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+    }
+
+    /// <summary>
+    /// Every failure shape of every runtime of the matrix produces a real explanation, so the fallback to
+    /// the exception type name is never what a caller receives. That is asserted over all of them at once
+    /// rather than one by one, because the interesting statement is about the whole set: not a single
+    /// rejection the constructor can produce arrives without a message.
+    /// </summary>
+    [Test]
+    public async Task IsValid_EveryFailureShape_NeverFallsBackToTheExceptionTypeName()
+    {
+        var errors = new List<string>();
+
+        foreach (var pattern in _malformedPatterns)
+        {
+            _ = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var error);
+            errors.Add(error ?? string.Empty);
+        }
+
+        _ = RegexPatternValidity.IsValid("abc", (RegexOptions)0x8000, out var optionError);
+        errors.Add(optionError ?? string.Empty);
+
+#if NET7_0_OR_GREATER
+        _ = RegexPatternValidity.IsValid(@"(a)\1", RegexOptions.NonBacktracking, out var unsupportedError);
+        errors.Add(unsupportedError ?? string.Empty);
+
+        _ = RegexPatternValidity.IsValid(
+            "abc",
+            RegexOptions.NonBacktracking | RegexOptions.RightToLeft,
+            out var combinationError
+        );
+        errors.Add(combinationError ?? string.Empty);
+#endif
+
+        var fallbacks = errors.Where(error => _exceptionTypeNames.Contains(error, StringComparer.Ordinal));
+
+        _ = await Assert.That(errors.Count).IsEqualTo(_malformedPatterns.Length + AdditionalFailureShapes);
+        _ = await Assert.That(errors.Count(error => string.IsNullOrWhiteSpace(error))).IsEqualTo(0);
+        _ = await Assert.That(string.Join(" / ", fallbacks)).IsEqualTo(string.Empty);
     }
 
     [Test]

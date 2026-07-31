@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
+using Microsoft.CodeAnalysis.Text;
 using NetEvolve.FrameShift.Analyzers;
 using NetEvolve.FrameShift.Diagnostics;
 using NetEvolve.FrameShift.Tests.Infrastructure;
@@ -47,6 +48,12 @@ public class TUnitTestSurfaceAnalyzerTests
 
     private const string PartialTestPath = "PartialCalculatorTests.cs";
     private const string PartialLocalOnlyTestName = "PartialLocalStateOnly_TouchesNoProduction";
+
+    private const string ExoticShapePath = "ExoticShapeTests.cs";
+    private const string GenericTestName = "Generic_TouchesNoProduction";
+    private const string NestedTestName = "Nested_TouchesNoProduction";
+    private const string ExplicitInterfaceTestName = "RunExplicitly_TouchesNoProduction";
+    private const string FileLocalTestName = "FileLocal_TouchesNoProduction";
 
     private const string NoTestsScenario = "framework referenced, no test method";
     private const string ForeignAttributeScenario = "test attribute of an unrelated framework";
@@ -154,6 +161,71 @@ public class TUnitTestSurfaceAnalyzerTests
         """;
 
     /// <summary>
+    /// The four declaration shapes a test method can take in which the two identities the analysis
+    /// depends on are least obvious: a generic method, a method of a type nested in a generic one, an
+    /// explicit interface implementation - whose symbol carries the interface in its name - and a method
+    /// of a file-local type, whose metadata name the compiler mangles per file. Each of them exercises
+    /// nothing but its own assembly, so each of them is an <c>FSH0004</c> report.
+    /// </summary>
+    /// <remarks>
+    /// <c>ExoticCases</c> is declared before <c>IRunnable</c> on purpose: both declare a method of the
+    /// same name, and the fixture needs the identifier of the implementation rather than the one of the
+    /// interface member.
+    /// </remarks>
+    private const string ExoticShapeSource = """
+        namespace Tests;
+
+        using TUnit.Core;
+
+        public class ExoticCases : IRunnable
+        {
+            [Test]
+            public void Generic_TouchesNoProduction<TValue>() => Verify(Compute());
+
+            [Test]
+            void IRunnable.RunExplicitly_TouchesNoProduction() => Verify(Compute());
+
+            private static int Compute() => 41;
+
+            private static void Verify(int value)
+            {
+            }
+        }
+
+        public interface IRunnable
+        {
+            void RunExplicitly_TouchesNoProduction();
+        }
+
+        public class Outer<TValue>
+        {
+            public class Inner
+            {
+                [Test]
+                public void Nested_TouchesNoProduction() => Verify(Compute());
+
+                private static int Compute() => 41;
+
+                private static void Verify(int value)
+                {
+                }
+            }
+        }
+
+        file class FileLocalCases
+        {
+            [Test]
+            public void FileLocal_TouchesNoProduction() => Verify(Compute());
+
+            private static int Compute() => 41;
+
+            private static void Verify(int value)
+            {
+            }
+        }
+        """;
+
+    /// <summary>
     /// A compilation that carries the framework reference but declares no test method at all.
     /// </summary>
     private const string WithoutTestsSource = """
@@ -230,6 +302,18 @@ public class TUnitTestSurfaceAnalyzerTests
     private const string CaseAttributeMetadataName = "Tests.CaseAttribute";
     private const string CaseAttributeName = "CaseAttribute";
     private const string UnregisteredFrameworkName = "Fixture";
+
+    /// <summary>
+    /// The names of the four unusually shaped test methods of <see cref="ExoticShapeSource" />, which is
+    /// at the same time the exact set of tests the analyzer has to name on that fixture.
+    /// </summary>
+    private static readonly string[] _exoticTestNames =
+    [
+        GenericTestName,
+        ExplicitInterfaceTestName,
+        NestedTestName,
+        FileLocalTestName,
+    ];
 
     [Test]
     public async Task Fixtures_BothAssemblies_CompileWithoutErrors()
@@ -343,6 +427,71 @@ public class TUnitTestSurfaceAnalyzerTests
             .That(GetMessage(diagnostics[0]).Contains(PartialLocalOnlyTestName, StringComparison.Ordinal))
             .IsTrue();
     }
+
+    [Test]
+    public async Task Fixtures_ExoticallyShapedTests_CompileWithoutErrors()
+    {
+        var test = CreateExoticShapeTest();
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
+    /// <summary>
+    /// Every one of the four unusual declaration shapes is named exactly once and anchored at its own
+    /// name, which is the outcome the location fallbacks of the analysis exist for and never have to
+    /// supply: a generic method, a method of a type nested in a generic one, an explicit interface
+    /// implementation and a method of a file-local type all resolve to their identifier like any other.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_ExoticallyShapedTestsWithoutProductionReference_ReportsEachOneAtItsIdentifier()
+    {
+        var test = CreateExoticShapeTest();
+        var expected = _exoticTestNames.Select(name => FindMethod(test, name).Identifier.Span);
+
+        var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
+
+        var messages = diagnostics.Select(diagnostic => GetMessage(diagnostic)).ToImmutableArray();
+        var mentions = _exoticTestNames.Select(name => CountMentions(messages, name));
+
+        _ = await Assert.That(diagnostics.Length).IsEqualTo(_exoticTestNames.Length);
+        _ = await Assert.That(Describe(mentions)).IsEqualTo("1, 1, 1, 1");
+        _ = await Assert
+            .That(Describe(diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan)))
+            .IsEqualTo(Describe(expected));
+    }
+
+    /// <summary>
+    /// The invariant both fallbacks of the reporting path rest on, asserted on the shapes most likely to
+    /// break it: a discovered test method is always declared by a <see cref="MethodDeclarationSyntax" />
+    /// and always has a documentation comment id. As long as that holds, neither the location fallback
+    /// nor the display-string fallback of the report key can be reached, and a shape that ever broke it
+    /// would fail here instead of silently changing what a developer reads.
+    /// </summary>
+    [Test]
+    public async Task Discovery_ExoticallyShapedTests_YieldAMethodDeclarationAndADeclarationIdForEachOfThem()
+    {
+        var test = CreateExoticShapeTest();
+        var recognizer = TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(test)!;
+
+        var methods = TestMethodDiscovery.FindTestMethods(test, recognizer, CancellationToken.None);
+
+        var withoutDeclaration = methods.Where(method => !HasMethodDeclaration(method));
+        var withoutDeclarationId = methods.Where(method =>
+            string.IsNullOrEmpty(DocumentationCommentId.CreateDeclarationId(method.OriginalDefinition))
+        );
+
+        _ = await Assert.That(methods.Length).IsEqualTo(_exoticTestNames.Length);
+        _ = await Assert.That(Describe(withoutDeclaration.Select(method => method.Name))).IsEqualTo(string.Empty);
+        _ = await Assert.That(Describe(withoutDeclarationId.Select(method => method.Name))).IsEqualTo(string.Empty);
+    }
+
+    private static bool HasMethodDeclaration(IMethodSymbol method) =>
+        method
+            .DeclaringSyntaxReferences.Select(reference => reference.GetSyntax(CancellationToken.None))
+            .OfType<MethodDeclarationSyntax>()
+            .Any();
 
     [Test]
     public async Task Analyzer_ManifestMatchingTheCollectedSurface_ReportsNoManifestProblem()
@@ -656,6 +805,15 @@ public class TUnitTestSurfaceAnalyzerTests
             filePath: PartialTestPath
         );
 
+    private static CSharpCompilation CreateExoticShapeTest() =>
+        CompilationFactory.Create(
+            ExoticShapeSource,
+            TestAssemblyName,
+            includeTUnit: true,
+            additionalReferences: [CreateProduction().ToMetadataReference()],
+            filePath: ExoticShapePath
+        );
+
     private static string CreateManifest(Compilation test)
     {
         var recognizer = TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(test)!;
@@ -685,6 +843,26 @@ public class TUnitTestSurfaceAnalyzerTests
         manifest is null ? [] : [new InMemoryAdditionalText(manifest)];
 
     private static string GetMessage(Diagnostic diagnostic) => diagnostic.GetMessage(CultureInfo.InvariantCulture);
+
+    private static int CountMentions(ImmutableArray<string> messages, string name) =>
+        messages.Count(message => message.Contains(name, StringComparison.Ordinal));
+
+    private static string Describe(IEnumerable<string> values) => DescribeValues(values);
+
+    private static string Describe(IEnumerable<int> values) =>
+        DescribeValues(values.Select(value => value.ToString(CultureInfo.InvariantCulture)));
+
+    private static string Describe(IEnumerable<TextSpan> spans) =>
+        DescribeValues(spans.Select(span => span.ToString()));
+
+    /// <summary>
+    /// Renders a set of values as one comparable, order-independent string, so that an assertion can
+    /// state the exact expected set instead of a count.
+    /// </summary>
+    /// <param name="values">The values to render.</param>
+    /// <returns>The rendered set.</returns>
+    private static string DescribeValues(IEnumerable<string> values) =>
+        string.Join(", ", values.OrderBy(value => value, StringComparer.Ordinal));
 
     private static string WithGhostReference(string manifest) => manifest + ReferencePrefix + GhostReferenceId + "\n";
 
@@ -791,6 +969,14 @@ public class TUnitTestSurfaceAnalyzerTests
 
         public bool IsTestMethod(IMethodSymbol method) =>
             method.GetAttributes().Any(attribute => IsCaseAttribute(attribute.AttributeClass));
+
+        /// <summary>
+        /// Counts every recognised method as exactly one case, which is what the fixture's attribute
+        /// expresses: it carries no data of its own, so the inputs are hardcoded in the body.
+        /// </summary>
+        /// <param name="method">The counted method.</param>
+        /// <returns>An exact count of one.</returns>
+        public TestCaseCount GetTestCaseCount(IMethodSymbol method) => TestCaseCount.Exact(1);
 
         private static bool IsCaseAttribute(INamedTypeSymbol? attributeClass) =>
             attributeClass is not null
