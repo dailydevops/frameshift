@@ -159,11 +159,14 @@ public class UnaryOperatorMutatorTests
     {
         var mutator = new UnaryOperatorMutator();
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("unary");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.UnaryOperator);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(new[] { SyntaxKind.UnaryMinusExpression, SyntaxKind.UnaryPlusExpression });
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("unary");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.UnaryOperator);
+            _ = await Assert
+                .That(mutator.SupportedSyntaxKinds)
+                .IsEquivalentTo(new[] { SyntaxKind.UnaryMinusExpression, SyntaxKind.UnaryPlusExpression });
+        }
     }
 
     [Test]
@@ -188,15 +191,18 @@ public class UnaryOperatorMutatorTests
 
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
-        _ = await Assert
-            .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.UnaryOperator });
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
+            _ = await Assert
+                .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
+                .IsEquivalentTo(new[] { MutationKind.UnaryOperator });
+        }
     }
 
     [Test]
@@ -207,9 +213,12 @@ public class UnaryOperatorMutatorTests
         var mutator = new UnaryOperatorMutator();
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
-        _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
-        _ = await Assert.That(result.Mutations).Count().IsEqualTo(2);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
+            _ = await Assert.That(result.Mutations).Count().IsEqualTo(2);
+        }
     }
 
     [Test]
@@ -253,9 +262,12 @@ public class UnaryOperatorMutatorTests
         var swap = Single(result.Mutations, "unary.negate-to-plus");
         var removal = Single(result.Mutations, "unary.remove-negate");
 
-        _ = await Assert.That(swap.Replacement.ToString()).IsEqualTo("+value");
-        _ = await Assert.That(removal.Replacement.ToString()).IsEqualTo("value");
-        _ = await Assert.That(removal.Original).IsEqualTo(result.Node);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(swap.Replacement.ToString()).IsEqualTo("+value");
+            _ = await Assert.That(removal.Replacement.ToString()).IsEqualTo("value");
+            _ = await Assert.That(removal.Original).IsEqualTo(result.Node);
+        }
     }
 
     [Test]
@@ -266,12 +278,15 @@ public class UnaryOperatorMutatorTests
 
         var mutated = mutation.ApplyTo(result.Tree).ToString();
 
-        _ = await Assert
-            .That(mutated)
-            .IsEqualTo(TriviaSource.Replace("- /* sign */", "+ /* sign */", StringComparison.Ordinal));
-        _ = await Assert.That(mutated).Contains("// Inverts a value.");
-        _ = await Assert.That(mutated).Contains("/* leading */");
-        _ = await Assert.That(mutated).Contains("return /*!*/+ /* sign */ value; // tail");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(TriviaSource.Replace("- /* sign */", "+ /* sign */", StringComparison.Ordinal));
+            _ = await Assert.That(mutated).Contains("// Inverts a value.");
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("return /*!*/+ /* sign */ value; // tail");
+        }
     }
 
     [Test]
@@ -282,12 +297,15 @@ public class UnaryOperatorMutatorTests
 
         var mutated = mutation.ApplyTo(result.Tree).ToString();
 
-        _ = await Assert
-            .That(mutated)
-            .IsEqualTo(TriviaSource.Replace("- /* sign */ value", "value", StringComparison.Ordinal));
-        _ = await Assert.That(mutated).Contains("// Inverts a value.");
-        _ = await Assert.That(mutated).Contains("/* leading */");
-        _ = await Assert.That(mutated).Contains("return /*!*/value; // tail");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(TriviaSource.Replace("- /* sign */ value", "value", StringComparison.Ordinal));
+            _ = await Assert.That(mutated).Contains("// Inverts a value.");
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("return /*!*/value; // tail");
+        }
     }
 
     [Test]
@@ -297,12 +315,15 @@ public class UnaryOperatorMutatorTests
         string[] expectedDisplayNames = ["-x => x"];
         var result = Mutate(NegateOnlyOperatorSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(expectedDisplayNames);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(expectedDisplayNames);
+        }
     }
 
     [Test]
@@ -323,12 +344,15 @@ public class UnaryOperatorMutatorTests
         string[] expectedDisplayNames = ["+x => x"];
         var result = Mutate(PlusOnlyOperatorSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(expectedDisplayNames);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(expectedDisplayNames);
+        }
     }
 
     [Test]
@@ -354,12 +378,15 @@ public class UnaryOperatorMutatorTests
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(NullableLiftedNegateOnlySource);
         var unary = SyntaxNodeLocator.FindMarked<PrefixUnaryExpressionSyntax>(tree);
 
-        _ = await Assert
-            .That(semanticModel.GetTypeInfo(unary.Operand).Type?.ToDisplayString())
-            .IsEqualTo("Fixtures.Money?");
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(semanticModel.GetTypeInfo(unary.Operand).Type?.ToDisplayString())
+                .IsEqualTo("Fixtures.Money?");
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+        }
     }
 
     /// <summary>
@@ -372,10 +399,13 @@ public class UnaryOperatorMutatorTests
         string[] expectedIds = ["unary.remove-negate"];
         var result = Mutate(BorrowedOperatorNameSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo("-x => x");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo("-x => x");
+        }
     }
 
     /// <summary>
@@ -390,9 +420,14 @@ public class UnaryOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(NonConstantLiteralSource);
         var unary = (PrefixUnaryExpressionSyntax)node;
 
-        _ = await Assert.That(model.GetConstantValue(unary).HasValue).IsFalse();
-        _ = await Assert.That(model.GetConstantValue(unary.Operand).HasValue).IsTrue();
-        _ = await Assert.That(Sorted(mutations.Select(mutation => mutation.OperatorId))).IsEquivalentTo(expectedIds);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(model.GetConstantValue(unary).HasValue).IsFalse();
+            _ = await Assert.That(model.GetConstantValue(unary.Operand).HasValue).IsTrue();
+            _ = await Assert
+                .That(Sorted(mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+        }
     }
 
     [Test]

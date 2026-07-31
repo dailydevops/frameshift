@@ -354,8 +354,11 @@ public class FormatProviderArgumentMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheFormatProviderFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo(OperatorId);
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.FormatProvider);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo(OperatorId);
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.FormatProvider);
+        }
     }
 
     /// <summary>
@@ -391,10 +394,13 @@ public class FormatProviderArgumentMutatorTests
         string[] expectedIds = [RemoveId];
         var (mutations, _, tree, _, errors) = Mutate(CreateSource(expression));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.FormatProvider);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(CreateSource(expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.FormatProvider);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(CreateSource(expected));
+        }
     }
 
     [Test]
@@ -405,12 +411,15 @@ public class FormatProviderArgumentMutatorTests
         var invocation = SyntaxNodeLocator.FindMarked<InvocationExpressionSyntax>(tree);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo(RemoveId);
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("CultureInfo.InvariantCulture => (removed)");
-        _ = await Assert.That(mutation.Location.SourceSpan).IsEqualTo(invocation.ArgumentList.Arguments[0].Span);
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("(CultureInfo.InvariantCulture)");
-        _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("()");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo(RemoveId);
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("CultureInfo.InvariantCulture => (removed)");
+            _ = await Assert.That(mutation.Location.SourceSpan).IsEqualTo(invocation.ArgumentList.Arguments[0].Span);
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("(CultureInfo.InvariantCulture)");
+            _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("()");
+        }
     }
 
     [Test]
@@ -420,8 +429,11 @@ public class FormatProviderArgumentMutatorTests
         var mutated = mutations.Single().ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(mutated).Contains("value.ToString()");
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated).Contains("value.ToString()");
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     /// <summary>
@@ -439,10 +451,13 @@ public class FormatProviderArgumentMutatorTests
             StringComparison.Ordinal
         );
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("value, format, provider");
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("value, format, provider");
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -460,11 +475,14 @@ public class FormatProviderArgumentMutatorTests
             StringComparison.Ordinal
         );
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(MethodKindOf(tree, model)).IsEqualTo(MethodKind.ReducedExtension);
-        _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("provider");
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(MethodKindOf(tree, model)).IsEqualTo(MethodKind.ReducedExtension);
+            _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("provider");
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -482,10 +500,13 @@ public class FormatProviderArgumentMutatorTests
             StringComparison.Ordinal
         );
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("int, System.Globalization.CultureInfo");
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("int, System.Globalization.CultureInfo");
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -498,9 +519,12 @@ public class FormatProviderArgumentMutatorTests
     {
         var (mutations, _, tree, model, errors) = Mutate(ForeignProviderSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("int, Fake.IFormatProvider");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("int, Fake.IFormatProvider");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -513,10 +537,13 @@ public class FormatProviderArgumentMutatorTests
         var (mutations, _, tree, model, errors) = Mutate(ParamsSource);
         var method = ResolveMethod(tree, model);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.Parameters[0].IsParams).IsTrue();
-        _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("object[]");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Parameters[0].IsParams).IsTrue();
+            _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("object[]");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -545,9 +572,12 @@ public class FormatProviderArgumentMutatorTests
     {
         var (mutations, _, tree, model, errors) = Mutate(OmittedProviderSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("value, format, provider");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(ParameterNames(tree, model)).IsEqualTo("value, format, provider");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -559,8 +589,11 @@ public class FormatProviderArgumentMutatorTests
     {
         var (mutations, _, tree, model, _) = Mutate(UnresolvedSource);
 
-        _ = await Assert.That(ResolveMethod(tree, model)).IsNull();
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ResolveMethod(tree, model)).IsNull();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -580,9 +613,12 @@ public class FormatProviderArgumentMutatorTests
 
         var (mutations, _, tree, model, _) = Mutate(source);
 
-        _ = await Assert.That(ResolveMethod(tree, model)?.Name).IsEqualTo("Format");
-        _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("System.IFormatProvider, string, object");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ResolveMethod(tree, model)?.Name).IsEqualTo("Format");
+            _ = await Assert.That(ParameterTypes(tree, model)).IsEqualTo("System.IFormatProvider, string, object");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -607,9 +643,12 @@ public class FormatProviderArgumentMutatorTests
         );
         var (mutations, _, tree, _, errors) = Mutate(source);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -617,8 +656,11 @@ public class FormatProviderArgumentMutatorTests
     {
         var (mutations, _, tree, _, errors) = Mutate(TriviaSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(TriviaExpected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(TriviaExpected);
+        }
     }
 
     /// <summary>
@@ -634,10 +676,13 @@ public class FormatProviderArgumentMutatorTests
         var mutation = mutations.Single();
         var viability = new MutantCompiler(compilation).Verify(mutation, tree, CancellationToken.None);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).Contains("Render(value)");
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(OperatorIds(mutations)).IsEquivalentTo(expectedIds);
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).Contains("Render(value)");
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     private static string CreateSource(string expression) =>

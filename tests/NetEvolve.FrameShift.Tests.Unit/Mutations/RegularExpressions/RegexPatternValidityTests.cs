@@ -71,8 +71,11 @@ public class RegexPatternValidityTests
     {
         var patterns = MalformedPatterns().Select(factory => factory()).ToArray();
 
-        _ = await Assert.That(patterns).IsEquivalentTo(_malformedPatterns);
-        _ = await Assert.That(patterns.Length).IsEqualTo(13);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(patterns).IsEquivalentTo(_malformedPatterns);
+            _ = await Assert.That(patterns.Length).IsEqualTo(13);
+        }
     }
 
     [Test]
@@ -90,8 +93,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(string.Empty, RegexOptions.None, out var error);
 
-        _ = await Assert.That(valid).IsTrue();
-        _ = await Assert.That(error).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
     }
 
     [Test]
@@ -110,8 +116,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var error);
 
-        _ = await Assert.That(valid).IsTrue();
-        _ = await Assert.That(error).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
     }
 
     [Test]
@@ -120,8 +129,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var error);
 
-        _ = await Assert.That(valid).IsFalse();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsFalse();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 
     [Test]
@@ -129,8 +141,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(UnterminatedClass, RegexOptions.None, out var error);
 
-        _ = await Assert.That(valid).IsFalse();
-        _ = await Assert.That(error!.Contains(UnterminatedClass, StringComparison.Ordinal)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsFalse();
+            _ = await Assert.That(error!.Contains(UnterminatedClass, StringComparison.Ordinal)).IsTrue();
+        }
     }
 
     [Test]
@@ -156,8 +171,11 @@ public class RegexPatternValidityTests
         // runtime that does not know it, and it must not escape as an exception.
         var valid = RegexPatternValidity.IsValid("abc", (RegexOptions)0x8000, out var error);
 
-        _ = await Assert.That(valid).IsFalse();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsFalse();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -194,9 +212,12 @@ public class RegexPatternValidityTests
 
         var fallbacks = errors.Where(error => _exceptionTypeNames.Contains(error, StringComparer.Ordinal));
 
-        _ = await Assert.That(errors.Count).IsEqualTo(_malformedPatterns.Length + AdditionalFailureShapes);
-        _ = await Assert.That(errors.Count(error => string.IsNullOrWhiteSpace(error))).IsEqualTo(0);
-        _ = await Assert.That(string.Join(" / ", fallbacks)).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors.Count).IsEqualTo(_malformedPatterns.Length + AdditionalFailureShapes);
+            _ = await Assert.That(errors.Count(error => string.IsNullOrWhiteSpace(error))).IsEqualTo(0);
+            _ = await Assert.That(string.Join(" / ", fallbacks)).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -208,11 +229,14 @@ public class RegexPatternValidityTests
         var second = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var secondError);
         var third = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var thirdError);
 
-        _ = await Assert.That(first).IsEqualTo(expected);
-        _ = await Assert.That(second).IsEqualTo(expected);
-        _ = await Assert.That(third).IsEqualTo(expected);
-        _ = await Assert.That(secondError).IsEqualTo(firstError);
-        _ = await Assert.That(thirdError).IsEqualTo(firstError);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(first).IsEqualTo(expected);
+            _ = await Assert.That(second).IsEqualTo(expected);
+            _ = await Assert.That(third).IsEqualTo(expected);
+            _ = await Assert.That(secondError).IsEqualTo(firstError);
+            _ = await Assert.That(thirdError).IsEqualTo(firstError);
+        }
     }
 
     [Test]
@@ -223,10 +247,13 @@ public class RegexPatternValidityTests
         var withoutOption = RegexPatternValidity.IsValid(pattern, RegexOptions.None, out var withoutError);
         var withOption = RegexPatternValidity.IsValid(pattern, RegexOptions.IgnoreCase, out var withError);
 
-        _ = await Assert.That(withoutOption).IsTrue();
-        _ = await Assert.That(withOption).IsTrue();
-        _ = await Assert.That(withoutError).IsNull();
-        _ = await Assert.That(withError).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(withoutOption).IsTrue();
+            _ = await Assert.That(withOption).IsTrue();
+            _ = await Assert.That(withoutError).IsNull();
+            _ = await Assert.That(withError).IsNull();
+        }
     }
 
 #if NET7_0_OR_GREATER
@@ -246,10 +273,13 @@ public class RegexPatternValidityTests
             out var nonBacktrackingError
         );
 
-        _ = await Assert.That(underNone).IsTrue();
-        _ = await Assert.That(noneError).IsNull();
-        _ = await Assert.That(underNonBacktracking).IsFalse();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(nonBacktrackingError)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(underNone).IsTrue();
+            _ = await Assert.That(noneError).IsNull();
+            _ = await Assert.That(underNonBacktracking).IsFalse();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(nonBacktrackingError)).IsFalse();
+        }
     }
 
     [Test]
@@ -260,8 +290,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(pattern, RegexOptions.NonBacktracking, out var error);
 
-        _ = await Assert.That(valid).IsTrue();
-        _ = await Assert.That(error).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
     }
 
     [Test]
@@ -273,8 +306,11 @@ public class RegexPatternValidityTests
             out var error
         );
 
-        _ = await Assert.That(valid).IsFalse();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsFalse();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 
     [Test]
@@ -282,8 +318,11 @@ public class RegexPatternValidityTests
     {
         var valid = RegexPatternValidity.IsValid(UnterminatedClass, RegexOptions.NonBacktracking, out var error);
 
-        _ = await Assert.That(valid).IsFalse();
-        _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(valid).IsFalse();
+            _ = await Assert.That(string.IsNullOrWhiteSpace(error)).IsFalse();
+        }
     }
 #endif
 }

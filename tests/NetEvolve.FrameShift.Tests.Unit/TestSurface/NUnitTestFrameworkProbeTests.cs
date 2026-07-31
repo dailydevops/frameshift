@@ -185,10 +185,13 @@ public class NUnitTestFrameworkProbeTests
         var decorated = FindMethod(compilation, "DecoratedTest");
         var plain = FindMethod(compilation, "PlainMethod");
 
-        _ = await Assert.That(NUnitTestFrameworkProbe.GetTestAttributeTypes(compilation)).IsEmpty();
-        _ = await Assert.That(NUnitTestFrameworkProbe.GetTestBuilderInterfaceTypes(compilation)).IsEmpty();
-        _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(NUnitTestFrameworkProbe.GetTestAttributeTypes(compilation)).IsEmpty();
+            _ = await Assert.That(NUnitTestFrameworkProbe.GetTestBuilderInterfaceTypes(compilation)).IsEmpty();
+            _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     [Test]
@@ -215,8 +218,11 @@ public class NUnitTestFrameworkProbeTests
         var frameworkAssembly = SatelliteAssembly(framework, FrameworkLikeAssemblyName);
         var foreignAssembly = SatelliteAssembly(foreign, ForeignAssemblyName);
 
-        _ = await Assert.That(NUnitTestFrameworkProbe.IsFrameworkAssembly(frameworkAssembly)).IsTrue();
-        _ = await Assert.That(NUnitTestFrameworkProbe.IsFrameworkAssembly(foreignAssembly)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(NUnitTestFrameworkProbe.IsFrameworkAssembly(frameworkAssembly)).IsTrue();
+            _ = await Assert.That(NUnitTestFrameworkProbe.IsFrameworkAssembly(foreignAssembly)).IsFalse();
+        }
     }
 
     [Test]

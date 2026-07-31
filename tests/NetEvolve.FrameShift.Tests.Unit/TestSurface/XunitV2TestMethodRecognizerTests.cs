@@ -491,8 +491,11 @@ public class XunitV2TestMethodRecognizerTests
         var recognizer = CreateRecognizer(compilation);
         var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
 
-        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new XunitV2TestMethodRecognizer(null).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+            _ = await Assert.That(new XunitV2TestMethodRecognizer(null).IsTestMethod(method)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -510,10 +513,13 @@ public class XunitV2TestMethodRecognizerTests
         var derived = FindMethod(compilation, CasesTypeName, "DerivedAttributeTest");
         var plain = FindMethod(compilation, CasesTypeName, "PlainMethod");
 
-        _ = await Assert.That(recognizer.FrameworkName).IsEqualTo(FrameworkName);
-        _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.FrameworkName).IsEqualTo(FrameworkName);
+            _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     [Test]
@@ -618,10 +624,13 @@ public class XunitV2TestMethodRecognizerTests
         var exact = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "ThreeInlineData"));
         var bound = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "ClassDataTheory"));
 
-        _ = await Assert.That(exact.Value).IsEqualTo(3);
-        _ = await Assert.That(exact.IsExact).IsTrue();
-        _ = await Assert.That(bound.Value).IsEqualTo(1);
-        _ = await Assert.That(bound.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exact.Value).IsEqualTo(3);
+            _ = await Assert.That(exact.IsExact).IsTrue();
+            _ = await Assert.That(bound.Value).IsEqualTo(1);
+            _ = await Assert.That(bound.IsExact).IsFalse();
+        }
     }
 
     /// <summary>

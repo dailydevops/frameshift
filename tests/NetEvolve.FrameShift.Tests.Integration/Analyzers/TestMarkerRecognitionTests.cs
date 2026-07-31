@@ -841,9 +841,12 @@ public class TestMarkerRecognitionTests
             .ConfigureAwait(false);
         var problems = DescribeManifestProblems(cycle.Diagnostics);
 
-        _ = await Assert.That(DescribeRecordedMembers(cycle.Manifest)).IsEqualTo(ExercisedMember);
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(UntouchedMember);
-        _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeRecordedMembers(cycle.Manifest)).IsEqualTo(ExercisedMember);
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(UntouchedMember);
+            _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -876,8 +879,11 @@ public class TestMarkerRecognitionTests
             .ConfigureAwait(false);
         var problems = DescribeManifestProblems(cycle.Diagnostics);
 
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(NothingExercised);
-        _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(NothingExercised);
+            _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -935,8 +941,11 @@ public class TestMarkerRecognitionTests
             .ConfigureAwait(false);
         var problems = DescribeManifestProblems(cycle.Diagnostics);
 
-        _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(UntouchedMember);
-        _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeGaps(cycle.Diagnostics)).IsEqualTo(UntouchedMember);
+            _ = await Assert.That(problems).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>

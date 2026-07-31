@@ -47,12 +47,15 @@ public class NullableBooleanLiteralMutatorTests
         var mutator = new NullableBooleanLiteralMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("nullable-boolean-literal");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
-        _ = await Assert.That(supported).Count().IsEqualTo(3);
-        _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
-        _ = await Assert.That(supported).Contains(SyntaxKind.FalseLiteralExpression);
-        _ = await Assert.That(supported).Contains(SyntaxKind.NullLiteralExpression);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("nullable-boolean-literal");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
+            _ = await Assert.That(supported).Count().IsEqualTo(3);
+            _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
+            _ = await Assert.That(supported).Contains(SyntaxKind.FalseLiteralExpression);
+            _ = await Assert.That(supported).Contains(SyntaxKind.NullLiteralExpression);
+        }
     }
 
     /// <summary>
@@ -79,8 +82,11 @@ public class NullableBooleanLiteralMutatorTests
         var swaps = new BooleanLiteralMutator().CreateMutations(literal, semanticModel, CancellationToken.None);
         var nulls = new NullableBooleanLiteralMutator().CreateMutations(literal, semanticModel, CancellationToken.None);
 
-        _ = await Assert.That(Join(swaps)).IsEqualTo(expectedSwapId);
-        _ = await Assert.That(Join(nulls)).IsEqualTo(expectedNullId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(swaps)).IsEqualTo(expectedSwapId);
+            _ = await Assert.That(Join(nulls)).IsEqualTo(expectedNullId);
+        }
     }
 
     [Test]
@@ -88,12 +94,15 @@ public class NullableBooleanLiteralMutatorTests
     {
         var (tree, mutations) = Run(TrueSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("true => null");
-        _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("true => null");
+            _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
+        }
     }
 
     [Test]
@@ -101,11 +110,14 @@ public class NullableBooleanLiteralMutatorTests
     {
         var (tree, mutations) = Run(FalseSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("false => null");
-        _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("false => null");
+            _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
+        }
     }
 
     [Test]
@@ -113,15 +125,18 @@ public class NullableBooleanLiteralMutatorTests
     {
         var (tree, mutations) = Run(NullSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-true");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => true");
-        _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(TrueSource);
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-false");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("null => false");
-        _ = await Assert.That(mutations[1].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
-        _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(FalseSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-true");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => true");
+            _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(TrueSource);
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-false");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("null => false");
+            _ = await Assert.That(mutations[1].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(FalseSource);
+        }
     }
 
     [Test]
@@ -130,9 +145,12 @@ public class NullableBooleanLiteralMutatorTests
         var expected = FieldInitializerSource.Replace("= false", "= null", StringComparison.Ordinal);
         var (tree, mutations) = Run(FieldInitializerSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -146,9 +164,12 @@ public class NullableBooleanLiteralMutatorTests
         var expected = LiftedComparisonSource.Replace("== true", "== null", StringComparison.Ordinal);
         var (tree, mutations) = Run(LiftedComparisonSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -161,8 +182,11 @@ public class NullableBooleanLiteralMutatorTests
         var expected = TriviaSource.Replace("true;", "null;", StringComparison.Ordinal);
         var (tree, mutations) = Run(TriviaSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
+        }
     }
 
     [Test]

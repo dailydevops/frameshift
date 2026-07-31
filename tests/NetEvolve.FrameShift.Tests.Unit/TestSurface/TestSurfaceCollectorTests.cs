@@ -176,12 +176,15 @@ public class TestSurfaceCollectorTests
         var production = CreateProduction();
         var test = CreateTest(production);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     [Test]
@@ -344,8 +347,11 @@ public class TestSurfaceCollectorTests
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
 
-        _ = await Assert.That(ReferencesOf(manifest, CallsDualUseHelperId)).IsEqualTo(DualUseHelperSurface);
-        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(OnlyFromNonTestId)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ReferencesOf(manifest, CallsDualUseHelperId)).IsEqualTo(DualUseHelperSurface);
+            _ = await Assert.That(manifest.ReferencedMemberIds.Contains(OnlyFromNonTestId)).IsFalse();
+        }
     }
 
     [Test]
@@ -379,8 +385,13 @@ public class TestSurfaceCollectorTests
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
 
-        _ = await Assert.That(manifest.ReferencesByTest[SharesHelperFirstId].Contains(FromDualUseHelperId)).IsFalse();
-        _ = await Assert.That(manifest.ReferencesByTest[CallsDualUseHelperId].Contains(TouchedId)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(manifest.ReferencesByTest[SharesHelperFirstId].Contains(FromDualUseHelperId))
+                .IsFalse();
+            _ = await Assert.That(manifest.ReferencesByTest[CallsDualUseHelperId].Contains(TouchedId)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -431,8 +442,11 @@ public class TestSurfaceCollectorTests
             DocumentationCommentId.GetSymbolsForDeclarationId(id, production).IsEmpty
         );
 
-        _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsEqualTo(12);
-        _ = await Assert.That(Join(unresolved)).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsEqualTo(12);
+            _ = await Assert.That(Join(unresolved)).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -473,9 +487,12 @@ public class TestSurfaceCollectorTests
 
         var manifest = CollectSurface(production);
 
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(manifest.ReferencesByTest.Count).IsEqualTo(0);
-        _ = await Assert.That(manifest.TestCaseCounts.Count).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(manifest.ReferencesByTest.Count).IsEqualTo(0);
+            _ = await Assert.That(manifest.TestCaseCounts.Count).IsEqualTo(0);
+        }
     }
 
     /// <summary>

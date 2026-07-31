@@ -367,9 +367,12 @@ public class StringComparisonMutatorTests
     {
         var (_, mutations) = Run(Fixture(member));
 
-        _ = await Assert.That(Ids(mutations)).IsEqualTo(expected);
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others(member));
-        _ = await Assert.That(mutations.All(mutation => mutation.Kind == MutationKind.StringComparison)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Ids(mutations)).IsEqualTo(expected);
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others(member));
+            _ = await Assert.That(mutations.All(mutation => mutation.Kind == MutationKind.StringComparison)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -426,8 +429,11 @@ public class StringComparisonMutatorTests
         );
         var (tree, mutations) = Run(VariableInitialiserSource);
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "OrdinalIgnoreCase"))).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "OrdinalIgnoreCase"))).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -440,8 +446,11 @@ public class StringComparisonMutatorTests
         var expected = Swap(SwitchArmSource, "/*!*/StringComparison.Ordinal", "/*!*/StringComparison.InvariantCulture");
         var (tree, mutations) = Run(SwitchArmSource, SyntaxNodeLocator.FindMarked<MemberAccessExpressionSyntax>);
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "InvariantCulture"))).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "InvariantCulture"))).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -450,8 +459,11 @@ public class StringComparisonMutatorTests
         var expected = Swap(NullableSource, "StringComparison.Ordinal", "StringComparison.CurrentCulture");
         var (tree, mutations) = Run(NullableSource);
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -464,8 +476,11 @@ public class StringComparisonMutatorTests
         );
         var (tree, mutations) = Run(FullyQualifiedSource);
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -491,9 +506,12 @@ public class StringComparisonMutatorTests
         var (tree, mutations) = Run(AliasSource);
         var rewritten = Rewrite(tree, MutationTo(mutations, "CurrentCulture"));
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(rewritten).Contains("Comparison.CurrentCulture");
-        _ = await Assert.That(rewritten).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(rewritten).Contains("Comparison.CurrentCulture");
+            _ = await Assert.That(rewritten).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -508,8 +526,11 @@ public class StringComparisonMutatorTests
         var mutator = new StringComparisonMutator();
         var (_, mutations) = Run(UsingStaticSource, FindImportedMember);
 
-        _ = await Assert.That(mutator.SupportedSyntaxKinds.Contains(SyntaxKind.IdentifierName)).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.SupportedSyntaxKinds.Contains(SyntaxKind.IdentifierName)).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -522,8 +543,11 @@ public class StringComparisonMutatorTests
         var (tree, mutations) = Run(TriviaInsideAccessSource);
         var rewritten = Rewrite(tree, MutationTo(mutations, "CurrentCulture"));
 
-        _ = await Assert.That(rewritten).Contains("StringComparison. /* pinned */ CurrentCulture");
-        _ = await Assert.That(rewritten).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(rewritten).Contains("StringComparison. /* pinned */ CurrentCulture");
+            _ = await Assert.That(rewritten).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -544,8 +568,11 @@ public class StringComparisonMutatorTests
         var expected = Swap(ReceiverSource, "StringComparison.Ordinal.", "StringComparison.CurrentCulture.");
         var (tree, mutations) = Run(ReceiverSource);
 
-        _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
-        _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Targets(mutations)).IsEqualTo(Others("Ordinal"));
+            _ = await Assert.That(Rewrite(tree, MutationTo(mutations, "CurrentCulture"))).IsEqualTo(expected);
+        }
     }
 
     /// <summary>

@@ -31,12 +31,15 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId);
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
-        _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId);
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+        }
     }
 
     [Test]
@@ -46,9 +49,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId + "|" + OtherReferenceId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert
+                .That(Join(manifest.ReferencesByTest[TestId]))
+                .IsEqualTo(ReferenceId + "|" + OtherReferenceId);
+        }
     }
 
     /// <summary>
@@ -70,15 +78,18 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
-        _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
-        _ = await Assert
-            .That(Join(manifest.ReferencesByTest[OtherTestId]))
-            .IsEqualTo(ReferenceId + "|" + OtherReferenceId);
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(1));
-        _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.Exact(2));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+            _ = await Assert
+                .That(Join(manifest.ReferencesByTest[OtherTestId]))
+                .IsEqualTo(ReferenceId + "|" + OtherReferenceId);
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(1));
+            _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.Exact(2));
+        }
     }
 
     [Test]
@@ -88,11 +99,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
-        _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
+            _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
+        }
     }
 
     [Test]
@@ -102,9 +116,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+        }
     }
 
     /// <summary>
@@ -118,9 +135,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(0));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(0));
+        }
     }
 
     [Test]
@@ -128,9 +148,12 @@ public class TestSurfaceManifestReaderTests
     {
         var parsed = TestSurfaceManifestReader.TryRead(Build("\n", Header), out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+        }
     }
 
     [Test]
@@ -155,11 +178,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
-        _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
-        _ = await Assert.That(manifest.ReferencesByTest[OtherTestId]).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+            _ = await Assert.That(manifest.ReferencesByTest[OtherTestId]).IsEmpty();
+        }
     }
 
     [Test]
@@ -173,10 +199,13 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(manifest.ReferencedMemberIds.IsEmpty).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(manifest.ReferencedMemberIds.IsEmpty).IsTrue();
+        }
     }
 
     [Test]
@@ -186,14 +215,17 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert
-            .That(error)
-            .IsEqualTo(
-                "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
-                    + "but found 'T M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum 1'."
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo(
+                    "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
+                        + "but found 'T M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum 1'."
+                );
+        }
     }
 
     [Test]
@@ -203,14 +235,17 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert
-            .That(error)
-            .IsEqualTo(
-                "Line 3: expected the test-surface manifest header 'frameshift-test-surface/1', "
-                    + "but found 'frameshift-test-surface/0'."
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo(
+                    "Line 3: expected the test-surface manifest header 'frameshift-test-surface/1', "
+                        + "but found 'frameshift-test-surface/0'."
+                );
+        }
     }
 
     [Test]
@@ -218,9 +253,12 @@ public class TestSurfaceManifestReaderTests
     {
         var parsed = TestSurfaceManifestReader.TryRead(SourceText.From(string.Empty), out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(error).IsEqualTo(MissingHeaderError);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo(MissingHeaderError);
+        }
     }
 
     [Test]
@@ -230,9 +268,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(error).IsEqualTo(MissingHeaderError);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo(MissingHeaderError);
+        }
     }
 
     [Test]
@@ -246,11 +287,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert
-            .That(error)
-            .IsEqualTo($"Line 2: the '{marker}' entry does not specify a documentation comment id.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo($"Line 2: the '{marker}' entry does not specify a documentation comment id.");
+        }
     }
 
     /// <summary>
@@ -264,14 +308,17 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert
-            .That(error)
-            .IsEqualTo(
-                "Line 2: the 'T' entry for 'M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum' does not "
-                    + "specify a test case count."
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo(
+                    "Line 2: the 'T' entry for 'M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum' does not "
+                        + "specify a test case count."
+                );
+        }
     }
 
     [Test]
@@ -287,9 +334,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(error).IsEqualTo($"Line 2: '{reported}' is not a valid test case count.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo($"Line 2: '{reported}' is not a valid test case count.");
+        }
     }
 
     /// <summary>
@@ -303,9 +353,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(error).IsEqualTo("Line 2: the 'R' entry appears before any 'T' entry.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo("Line 2: the 'R' entry appears before any 'T' entry.");
+        }
     }
 
     [Test]
@@ -315,9 +368,12 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(error).IsEqualTo("Line 4: the 'R' entry appears before any 'T' entry.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo("Line 4: the 'R' entry appears before any 'T' entry.");
+        }
     }
 
     [Test]
@@ -329,11 +385,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId);
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId);
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+        }
     }
 
     /// <summary>
@@ -347,14 +406,17 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsFalse();
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert
-            .That(error)
-            .IsEqualTo(
-                "Line 3: the 'T' entry for 'M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum' is "
-                    + "declared more than once."
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo(
+                    "Line 3: the 'T' entry for 'M:Tests.CalculatorTests.Add_TwoValues_ReturnsSum' is "
+                        + "declared more than once."
+                );
+        }
     }
 
     [Test]
@@ -371,10 +433,13 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(manifest.ReferencesByTest[TestId].Count).IsEqualTo(2);
-        _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId + "|" + OtherReferenceId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(manifest.ReferencesByTest[TestId].Count).IsEqualTo(2);
+            _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(ReferenceId + "|" + OtherReferenceId);
+        }
     }
 
     [Test]
@@ -390,11 +455,14 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert
-            .That(Join(manifest.ReferencedMemberIds))
-            .IsEqualTo("M:Production.Calculator.ADD|M:Production.Calculator.Add");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert
+                .That(Join(manifest.ReferencedMemberIds))
+                .IsEqualTo("M:Production.Calculator.ADD|M:Production.Calculator.Add");
+        }
     }
 
     /// <summary>
@@ -408,10 +476,13 @@ public class TestSurfaceManifestReaderTests
 
         var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(Keys(manifest.TestCaseCounts)).IsEqualTo(TestId + "|" + OtherTestId);
-        _ = await Assert.That(Keys(manifest.ReferencesByTest)).IsEqualTo(TestId + "|" + OtherTestId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Keys(manifest.TestCaseCounts)).IsEqualTo(TestId + "|" + OtherTestId);
+            _ = await Assert.That(Keys(manifest.ReferencesByTest)).IsEqualTo(TestId + "|" + OtherTestId);
+        }
     }
 
     [Test]

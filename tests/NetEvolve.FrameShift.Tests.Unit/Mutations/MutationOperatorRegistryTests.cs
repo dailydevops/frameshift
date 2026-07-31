@@ -53,9 +53,12 @@ public class MutationOperatorRegistryTests
     {
         var actual = MutationOperatorRegistry.All.Select(mutationOperator => mutationOperator.Id);
 
-        _ = await Assert.That(_expectedOperatorIds.Length).IsEqualTo(ExpectedOperatorCount);
-        _ = await Assert.That(MutationOperatorRegistry.All.Length).IsEqualTo(ExpectedOperatorCount);
-        _ = await Assert.That(Join(Sort(actual))).IsEqualTo(Join(_expectedOperatorIds));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_expectedOperatorIds.Length).IsEqualTo(ExpectedOperatorCount);
+            _ = await Assert.That(MutationOperatorRegistry.All.Length).IsEqualTo(ExpectedOperatorCount);
+            _ = await Assert.That(Join(Sort(actual))).IsEqualTo(Join(_expectedOperatorIds));
+        }
     }
 
     [Test]
@@ -112,10 +115,13 @@ public class MutationOperatorRegistryTests
     {
         var operators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.ClassDeclaration);
 
-        _ = await Assert.That(operators.Length).IsEqualTo(0);
-        _ = await Assert
-            .That(MutationOperatorRegistry.SupportedSyntaxKinds.Contains(SyntaxKind.ClassDeclaration))
-            .IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(operators.Length).IsEqualTo(0);
+            _ = await Assert
+                .That(MutationOperatorRegistry.SupportedSyntaxKinds.Contains(SyntaxKind.ClassDeclaration))
+                .IsFalse();
+        }
     }
 
     [Test]
@@ -124,12 +130,15 @@ public class MutationOperatorRegistryTests
         var booleanOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.TrueLiteralExpression);
         var conditionalOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.ConditionalExpression);
 
-        _ = await Assert
-            .That(Join(Sort(booleanOperators.Select(item => item.Id))))
-            .IsEqualTo("boolean-literal, nullable-boolean-literal");
-        _ = await Assert
-            .That(Join(Sort(conditionalOperators.Select(item => item.Id))))
-            .IsEqualTo("conditional-expression, negation");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Join(Sort(booleanOperators.Select(item => item.Id))))
+                .IsEqualTo("boolean-literal, nullable-boolean-literal");
+            _ = await Assert
+                .That(Join(Sort(conditionalOperators.Select(item => item.Id))))
+                .IsEqualTo("conditional-expression, negation");
+        }
     }
 
     /// <summary>
@@ -144,17 +153,20 @@ public class MutationOperatorRegistryTests
         var invocationOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.InvocationExpression);
         var stringLiteralOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.StringLiteralExpression);
 
-        _ = await Assert
-            .That(Join(Sort(memberAccessOperators.Select(item => item.Id))))
-            .IsEqualTo(
-                "culture.culture-info, culture.regex-options, culture.string-comparer, culture.string-comparison"
-            );
-        _ = await Assert
-            .That(Join(Sort(invocationOperators.Select(item => item.Id))))
-            .IsEqualTo("culture.case-conversion, culture.format-provider");
-        _ = await Assert
-            .That(Join(Sort(stringLiteralOperators.Select(item => item.Id))))
-            .IsEqualTo("regex.alternation, regex.anchor, regex.group, regex.quantifier, string-literal");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Join(Sort(memberAccessOperators.Select(item => item.Id))))
+                .IsEqualTo(
+                    "culture.culture-info, culture.regex-options, culture.string-comparer, culture.string-comparison"
+                );
+            _ = await Assert
+                .That(Join(Sort(invocationOperators.Select(item => item.Id))))
+                .IsEqualTo("culture.case-conversion, culture.format-provider");
+            _ = await Assert
+                .That(Join(Sort(stringLiteralOperators.Select(item => item.Id))))
+                .IsEqualTo("regex.alternation, regex.anchor, regex.group, regex.quantifier, string-literal");
+        }
     }
 
     [Test]
@@ -162,15 +174,18 @@ public class MutationOperatorRegistryTests
     {
         var kinds = MutationOperatorRegistry.SupportedSyntaxKinds;
 
-        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.SimpleMemberAccessExpression)).IsEqualTo(1);
-        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.InvocationExpression)).IsEqualTo(1);
-        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.StringLiteralExpression)).IsEqualTo(1);
-        _ = await Assert
-            .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression).Length)
-            .IsGreaterThan(1);
-        _ = await Assert
-            .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.StringLiteralExpression).Length)
-            .IsGreaterThan(1);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.SimpleMemberAccessExpression)).IsEqualTo(1);
+            _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.InvocationExpression)).IsEqualTo(1);
+            _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.StringLiteralExpression)).IsEqualTo(1);
+            _ = await Assert
+                .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression).Length)
+                .IsGreaterThan(1);
+            _ = await Assert
+                .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.StringLiteralExpression).Length)
+                .IsGreaterThan(1);
+        }
     }
 
     [Test]
@@ -191,8 +206,11 @@ public class MutationOperatorRegistryTests
     {
         var kinds = MutationOperatorRegistry.SupportedSyntaxKinds;
 
-        _ = await Assert.That(kinds.Distinct().Count()).IsEqualTo(kinds.Length);
-        _ = await Assert.That(kinds.Length).IsGreaterThan(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(kinds.Distinct().Count()).IsEqualTo(kinds.Length);
+            _ = await Assert.That(kinds.Length).IsGreaterThan(0);
+        }
     }
 
     private static bool IsMismatch(SyntaxKind kind)

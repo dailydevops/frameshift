@@ -126,10 +126,13 @@ public class NumericLiteralMutatorTests
         var mutator = new NumericLiteralMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("numeric-literal");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NumericLiteral);
-        _ = await Assert.That(supported).Count().IsEqualTo(1);
-        _ = await Assert.That(supported).Contains(SyntaxKind.NumericLiteralExpression);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("numeric-literal");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NumericLiteral);
+            _ = await Assert.That(supported).Count().IsEqualTo(1);
+            _ = await Assert.That(supported).Contains(SyntaxKind.NumericLiteralExpression);
+        }
     }
 
     [Test]
@@ -162,13 +165,20 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public int Get() => 5; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("5 => 6");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("5 => 4");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo("public class Sample { public int Get() => 6; }");
-        _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo("public class Sample { public int Get() => 4; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("5 => 6");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("5 => 4");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get() => 6; }");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[1]))
+                .IsEqualTo("public class Sample { public int Get() => 4; }");
+        }
     }
 
     [Test]
@@ -176,10 +186,15 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public int Get() => 0; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo("public class Sample { public int Get() => 1; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get() => 1; }");
+        }
     }
 
     [Test]
@@ -187,10 +202,15 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public int Get() => 1; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.one-to-zero");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("1 => 0");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo("public class Sample { public int Get() => 0; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.one-to-zero");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("1 => 0");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get() => 0; }");
+        }
     }
 
     /// <summary>
@@ -221,10 +241,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        }
     }
 
     /// <summary>
@@ -243,10 +266,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture("object", literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture("object", expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture("object", expected));
+        }
     }
 
     /// <summary>
@@ -274,10 +300,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        }
     }
 
     /// <summary>
@@ -300,10 +329,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.one-to-zero");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("1 => 0");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.one-to-zero");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("1 => 0");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        }
     }
 
     /// <summary>
@@ -341,13 +373,16 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {incremented}");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"{literal} => {decremented}");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, incremented));
-        _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(Fixture(type, decremented));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {incremented}");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"{literal} => {decremented}");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, incremented));
+            _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(Fixture(type, decremented));
+        }
     }
 
     /// <summary>
@@ -360,11 +395,18 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public int Get() => -5; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("5 => 6");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("5 => 4");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo("public class Sample { public int Get() => -6; }");
-        _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo("public class Sample { public int Get() => -4; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("5 => 6");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("5 => 4");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get() => -6; }");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[1]))
+                .IsEqualTo("public class Sample { public int Get() => -4; }");
+        }
     }
 
     /// <summary>
@@ -388,9 +430,12 @@ public class NumericLiteralMutatorTests
     {
         var (_, mutations) = Run(Fixture(type, "-" + literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {incremented}");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"{literal} => {decremented}");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {incremented}");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"{literal} => {decremented}");
+        }
     }
 
     [Test]
@@ -398,9 +443,12 @@ public class NumericLiteralMutatorTests
     {
         var (_, mutations) = Run("public class Sample { public byte? Get() => 255; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
+        }
     }
 
     /// <summary>
@@ -414,14 +462,17 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public dynamic Get() => 42; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public dynamic Get() => 43; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public dynamic Get() => 43; }");
+        }
     }
 
     [Test]
@@ -429,9 +480,12 @@ public class NumericLiteralMutatorTests
     {
         var (_, mutations) = Run(ByteArgumentSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
+        }
     }
 
     /// <summary>
@@ -453,10 +507,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => {expected}");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        }
     }
 
     /// <summary>
@@ -471,10 +528,13 @@ public class NumericLiteralMutatorTests
         var mutator = new NumericLiteralMutator();
         Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
 
-        _ = await Assert
-            .That(semanticModel.GetTypeInfo(literal).ConvertedType?.SpecialType)
-            .IsEqualTo(SpecialType.System_Byte);
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(semanticModel.GetTypeInfo(literal).ConvertedType?.SpecialType)
+                .IsEqualTo(SpecialType.System_Byte);
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -494,8 +554,11 @@ public class NumericLiteralMutatorTests
         var mutator = new NumericLiteralMutator();
         Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
 
-        _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -507,14 +570,17 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { private int _value = 42; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { private int _value = 43; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { private int _value = 43; }");
+        }
     }
 
     /// <summary>
@@ -527,14 +593,17 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public int Get() { int value = 42; return value; } }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public int Get() { int value = 43; return value; } }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public int Get() { int value = 43; return value; } }");
+        }
     }
 
     /// <summary>
@@ -550,9 +619,12 @@ public class NumericLiteralMutatorTests
     {
         var (_, mutations) = Run(Fixture("int", expression));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("2147483647 => 2147483646");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("2147483647 => 2147483646");
+        }
     }
 
     /// <summary>
@@ -565,12 +637,15 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public double Get() => 5; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public double Get() => 6; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public double Get() => 6; }");
+        }
     }
 
     [Test]
@@ -578,11 +653,14 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public float Get() => 0; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public float Get() => 1; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public float Get() => 1; }");
+        }
     }
 
     /// <summary>
@@ -605,10 +683,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.negate");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => -{literal}");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, "-" + literal));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.negate");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literal} => -{literal}");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, "-" + literal));
+        }
     }
 
     /// <summary>
@@ -638,10 +719,13 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run(Fixture(type, literal));
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("0 => 1");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(Fixture(type, expected));
+        }
     }
 
     /// <summary>
@@ -654,11 +738,14 @@ public class NumericLiteralMutatorTests
     {
         var (tree, mutations) = Run("public class Sample { public double Get() => -0.0; }");
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public double Get() => -1.0; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.zero-to-one");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public double Get() => -1.0; }");
+        }
     }
 
     /// <summary>
@@ -783,12 +870,15 @@ public class NumericLiteralMutatorTests
         var mutator = new NumericLiteralMutator();
         Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
 
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
-        _ = await Assert.That(literal.ToString()).IsEqualTo("1591");
-        _ = await Assert.That(literal.Parent?.Kind()).IsEqualTo(SyntaxKind.PragmaWarningDirectiveTrivia);
-        _ = await Assert.That(literal.Parent?.Parent).IsNull();
-        _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+            _ = await Assert.That(literal.ToString()).IsEqualTo("1591");
+            _ = await Assert.That(literal.Parent?.Kind()).IsEqualTo(SyntaxKind.PragmaWarningDirectiveTrivia);
+            _ = await Assert.That(literal.Parent?.Parent).IsNull();
+            _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     [Test]

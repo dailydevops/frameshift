@@ -159,8 +159,11 @@ public class MSTestFrameworkProbeTests
         var compilation = CreateMSTest();
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)!;
 
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     [Test]
@@ -190,9 +193,12 @@ public class MSTestFrameworkProbeTests
 
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(recognizer).IsNotNull();
-        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer).IsNotNull();
+            _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     /// <summary>
@@ -208,9 +214,12 @@ public class MSTestFrameworkProbeTests
 
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(recognizer?.FrameworkName).IsEqualTo("MSTest");
-        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer?.FrameworkName).IsEqualTo("MSTest");
+            _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     /// <summary>
@@ -227,10 +236,13 @@ public class MSTestFrameworkProbeTests
 
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(recognizer).IsNotNull();
-        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer).IsNotNull();
+            _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
     }
 
     [Test]
@@ -252,8 +264,11 @@ public class MSTestFrameworkProbeTests
         var framework = SatelliteAssembly(frameworkConsumer, FrameworkAssemblyName);
         var foreign = SatelliteAssembly(foreignConsumer, ForeignAssemblyName);
 
-        _ = await Assert.That(MSTestTestFrameworkProbe.IsFrameworkAssembly(framework)).IsTrue();
-        _ = await Assert.That(MSTestTestFrameworkProbe.IsFrameworkAssembly(foreign)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(MSTestTestFrameworkProbe.IsFrameworkAssembly(framework)).IsTrue();
+            _ = await Assert.That(MSTestTestFrameworkProbe.IsFrameworkAssembly(foreign)).IsFalse();
+        }
     }
 
     /// <summary>

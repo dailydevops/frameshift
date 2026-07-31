@@ -127,8 +127,11 @@ public class XunitV2TestFrameworkProbeTests
 
         var recognizer = XunitV2TestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(recognizer).IsNotNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer).IsNotNull();
+        }
     }
 
     [Test]
@@ -207,9 +210,12 @@ public class XunitV2TestFrameworkProbeTests
         var decorated = FindMethod(compilation, "DecoratedTest");
         var plain = FindMethod(compilation, "PlainMethod");
 
-        _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     [Test]
@@ -238,9 +244,12 @@ public class XunitV2TestFrameworkProbeTests
         var xunitV3 = SatelliteAssembly(CreateSatelliteConsumer(PlainSource, XunitV3AssemblyName), XunitV3AssemblyName);
         var foreign = SatelliteAssembly(CreateSatelliteConsumer(PlainSource, ForeignAssemblyName), ForeignAssemblyName);
 
-        _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(framework)).IsTrue();
-        _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(xunitV3)).IsFalse();
-        _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(foreign)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(framework)).IsTrue();
+            _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(xunitV3)).IsFalse();
+            _ = await Assert.That(XunitV2TestFrameworkProbe.IsFrameworkAssembly(foreign)).IsFalse();
+        }
     }
 
     [Test]
@@ -273,8 +282,11 @@ public class XunitV2TestFrameworkProbeTests
     {
         var resolved = XunitV2TestFrameworkProbe.GetTestAttributeType(CreateXunitV2Fixture());
 
-        _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("Xunit.FactAttribute");
-        _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("Xunit.FactAttribute");
+            _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+        }
     }
 
     [Test]
@@ -295,8 +307,11 @@ public class XunitV2TestFrameworkProbeTests
     {
         var compilation = CreateSatelliteConsumer(CasesSource, FrameworkAssemblyName);
 
-        _ = await Assert.That(XunitV2TestFrameworkProbe.FindFrameworkAssembly(compilation)).IsNotNull();
-        _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV2TestFrameworkProbe.FindFrameworkAssembly(compilation)).IsNotNull();
+            _ = await Assert.That(XunitV2TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+        }
     }
 
     [Test]
@@ -336,14 +351,17 @@ public class XunitV2TestFrameworkProbeTests
         var compilation = CompilationFactory.Create(PlainSource, TestFramework.All, filePath: "Cases.cs");
         var resolved = XunitV2TestFrameworkProbe.GetTestAttributeType(compilation);
 
-        _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(compilation.GetTypeByMetadataName("Xunit.FactAttribute")).IsNull();
-        _ = await Assert.That(compilation.GetTypesByMetadataName("Xunit.FactAttribute").Length).IsEqualTo(2);
-        _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("Xunit.FactAttribute");
-        _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
-        _ = await Assert
-            .That(XunitV2TestFrameworkProbe.Instance.TryCreateRecognizer(compilation)?.FrameworkName)
-            .IsEqualTo(FrameworkName);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(compilation.GetTypeByMetadataName("Xunit.FactAttribute")).IsNull();
+            _ = await Assert.That(compilation.GetTypesByMetadataName("Xunit.FactAttribute").Length).IsEqualTo(2);
+            _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("Xunit.FactAttribute");
+            _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+            _ = await Assert
+                .That(XunitV2TestFrameworkProbe.Instance.TryCreateRecognizer(compilation)?.FrameworkName)
+                .IsEqualTo(FrameworkName);
+        }
     }
 #endif
 

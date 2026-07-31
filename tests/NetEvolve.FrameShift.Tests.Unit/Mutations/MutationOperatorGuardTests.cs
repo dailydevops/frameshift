@@ -48,8 +48,11 @@ public class MutationOperatorGuardTests
     {
         var ids = RegisteredOperatorIds().Select(factory => factory()).ToArray();
 
-        _ = await Assert.That(ids).IsEquivalentTo(MutationOperatorRegistry.All.Select(item => item.Id).ToArray());
-        _ = await Assert.That(ids.Length).IsEqualTo(MutationOperatorRegistry.All.Length);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ids).IsEquivalentTo(MutationOperatorRegistry.All.Select(item => item.Id).ToArray());
+            _ = await Assert.That(ids.Length).IsEqualTo(MutationOperatorRegistry.All.Length);
+        }
     }
 
     [Test]
@@ -91,9 +94,12 @@ public class MutationOperatorGuardTests
 
         var mutations = mutationOperator.CreateMutations(node, semanticModel, CancellationToken.None).ToArray();
 
-        _ = await Assert.That(node.Kind()).IsEqualTo(UnsupportedKind);
-        _ = await Assert.That(mutationOperator.SupportedSyntaxKinds.Contains(UnsupportedKind)).IsFalse();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Kind()).IsEqualTo(UnsupportedKind);
+            _ = await Assert.That(mutationOperator.SupportedSyntaxKinds.Contains(UnsupportedKind)).IsFalse();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -102,8 +108,11 @@ public class MutationOperatorGuardTests
     {
         var mutationOperator = Find(operatorId);
 
-        _ = await Assert.That(mutationOperator.SupportedSyntaxKinds.IsDefaultOrEmpty).IsFalse();
-        _ = await Assert.That(mutationOperator.Id).IsEqualTo(operatorId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutationOperator.SupportedSyntaxKinds.IsDefaultOrEmpty).IsFalse();
+            _ = await Assert.That(mutationOperator.Id).IsEqualTo(operatorId);
+        }
     }
 
     [Test]
@@ -123,9 +132,12 @@ public class MutationOperatorGuardTests
             _ = new ProbeMutator(string.Empty, MutationKind.ArithmeticOperator, [SyntaxKind.AddExpression])
         );
 
-        _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
-        _ = await Assert.That(exception.ParamName).IsEqualTo("id");
-        _ = await Assert.That(exception.Message).Contains("The operator id must not be empty.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
+            _ = await Assert.That(exception.ParamName).IsEqualTo("id");
+            _ = await Assert.That(exception.Message).Contains("The operator id must not be empty.");
+        }
     }
 
     [Test]
@@ -135,9 +147,12 @@ public class MutationOperatorGuardTests
             _ = new ProbeMutator(ProbeId, MutationKind.ArithmeticOperator, default)
         );
 
-        _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
-        _ = await Assert.That(exception.ParamName).IsEqualTo("supportedSyntaxKinds");
-        _ = await Assert.That(exception.Message).Contains("At least one supported syntax kind must be specified.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
+            _ = await Assert.That(exception.ParamName).IsEqualTo("supportedSyntaxKinds");
+            _ = await Assert.That(exception.Message).Contains("At least one supported syntax kind must be specified.");
+        }
     }
 
     [Test]
@@ -147,8 +162,11 @@ public class MutationOperatorGuardTests
             _ = new ProbeMutator(ProbeId, MutationKind.ArithmeticOperator, ImmutableArray<SyntaxKind>.Empty)
         );
 
-        _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
-        _ = await Assert.That(exception.ParamName).IsEqualTo("supportedSyntaxKinds");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exception.GetType()).IsEqualTo(typeof(ArgumentException));
+            _ = await Assert.That(exception.ParamName).IsEqualTo("supportedSyntaxKinds");
+        }
     }
 
     [Test]
@@ -156,9 +174,12 @@ public class MutationOperatorGuardTests
     {
         var mutator = new ProbeMutator(ProbeId, MutationKind.StringLiteral, [SyntaxKind.AddExpression]);
 
-        _ = await Assert.That(mutator.Id).IsEqualTo(ProbeId);
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringLiteral);
-        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo(new[] { SyntaxKind.AddExpression });
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo(ProbeId);
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringLiteral);
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo(new[] { SyntaxKind.AddExpression });
+        }
     }
 
     [Test]
@@ -170,9 +191,12 @@ public class MutationOperatorGuardTests
 
         var mutations = mutator.CreateMutations(node, semanticModel, CancellationToken.None).ToArray();
 
-        _ = await Assert.That(mutator.CoreInvocations).IsEqualTo(1);
-        _ = await Assert.That(mutations.Length).IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("probe.identity");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.CoreInvocations).IsEqualTo(1);
+            _ = await Assert.That(mutations.Length).IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("probe.identity");
+        }
     }
 
     [Test]
@@ -184,8 +208,11 @@ public class MutationOperatorGuardTests
 
         var mutations = mutator.CreateMutations(node, semanticModel, CancellationToken.None).ToArray();
 
-        _ = await Assert.That(mutations).IsEmpty();
-        _ = await Assert.That(mutator.CoreInvocations).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).IsEmpty();
+            _ = await Assert.That(mutator.CoreInvocations).IsEqualTo(0);
+        }
     }
 
     [Test]
@@ -209,11 +236,14 @@ public class MutationOperatorGuardTests
 
         var mutation = mutator.Create(node, node.Left, "add-to-left", "a + b => a");
 
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo("probe.add-to-left");
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("a + b => a");
-        _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.StringLiteral);
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo(node.ToString());
-        _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo(node.Left.ToString());
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo("probe.add-to-left");
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("a + b => a");
+            _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.StringLiteral);
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo(node.ToString());
+            _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo(node.Left.ToString());
+        }
     }
 
     private static IMutationOperator Find(string operatorId) =>

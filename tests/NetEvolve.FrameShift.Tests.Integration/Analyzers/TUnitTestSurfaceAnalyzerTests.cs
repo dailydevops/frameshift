@@ -321,12 +321,15 @@ public class TUnitTestSurfaceAnalyzerTests
         var production = CreateProduction();
         var test = CreateTest(production);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -362,11 +365,14 @@ public class TUnitTestSurfaceAnalyzerTests
 
         var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
-        _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
-        _ = await Assert
-            .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+            _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
+            _ = await Assert
+                .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -418,14 +424,17 @@ public class TUnitTestSurfaceAnalyzerTests
 
         var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
-        _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
-        _ = await Assert
-            .That(GetMessage(diagnostics[0]).Contains(PartialLocalOnlyTestName, StringComparison.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+            _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
+            _ = await Assert
+                .That(GetMessage(diagnostics[0]).Contains(PartialLocalOnlyTestName, StringComparison.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -455,11 +464,14 @@ public class TUnitTestSurfaceAnalyzerTests
         var messages = diagnostics.Select(diagnostic => GetMessage(diagnostic)).ToImmutableArray();
         var mentions = _exoticTestNames.Select(name => CountMentions(messages, name));
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(_exoticTestNames.Length);
-        _ = await Assert.That(Describe(mentions)).IsEqualTo("1, 1, 1, 1");
-        _ = await Assert
-            .That(Describe(diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan)))
-            .IsEqualTo(Describe(expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(_exoticTestNames.Length);
+            _ = await Assert.That(Describe(mentions)).IsEqualTo("1, 1, 1, 1");
+            _ = await Assert
+                .That(Describe(diagnostics.Select(diagnostic => diagnostic.Location.SourceSpan)))
+                .IsEqualTo(Describe(expected));
+        }
     }
 
     /// <summary>
@@ -482,9 +494,12 @@ public class TUnitTestSurfaceAnalyzerTests
             string.IsNullOrEmpty(DocumentationCommentId.CreateDeclarationId(method.OriginalDefinition))
         );
 
-        _ = await Assert.That(methods.Length).IsEqualTo(_exoticTestNames.Length);
-        _ = await Assert.That(Describe(withoutDeclaration.Select(method => method.Name))).IsEqualTo(string.Empty);
-        _ = await Assert.That(Describe(withoutDeclarationId.Select(method => method.Name))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(methods.Length).IsEqualTo(_exoticTestNames.Length);
+            _ = await Assert.That(Describe(withoutDeclaration.Select(method => method.Name))).IsEqualTo(string.Empty);
+            _ = await Assert.That(Describe(withoutDeclarationId.Select(method => method.Name))).IsEqualTo(string.Empty);
+        }
     }
 
     private static bool HasMethodDeclaration(IMethodSymbol method) =>
@@ -560,8 +575,13 @@ public class TUnitTestSurfaceAnalyzerTests
         var diagnostics = await RunAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, reformatted)
             .ConfigureAwait(false);
 
-        _ = await Assert.That(reformatted).IsNotEqualTo(manifest);
-        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reformatted).IsNotEqualTo(manifest);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     [Test]
@@ -649,10 +669,15 @@ public class TUnitTestSurfaceAnalyzerTests
             reported.AddRange(DiagnosticAssertions.Ids(await RunAllAsync(test, shape).ConfigureAwait(false)));
         }
 
-        _ = await Assert.That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal)).IsFalse();
-        _ = await Assert
-            .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal))
+                .IsFalse();
+            _ = await Assert
+                .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
+                .IsTrue();
+        }
     }
 
     private static IEnumerable<string?> GetManifestShapes(string manifest) =>
@@ -751,12 +776,15 @@ public class TUnitTestSurfaceAnalyzerTests
             )
             .ConfigureAwait(false);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(diagnostics))
-            .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
+        }
     }
 
     /// <summary>
@@ -772,8 +800,11 @@ public class TUnitTestSurfaceAnalyzerTests
             .RunAsync(new UnregisteredFrameworkAnalyzer(), compilation, DiagnosticIds.TestWithoutProductionReference)
             .ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
-        _ = await Assert.That(GetMessage(diagnostics[0]).Contains("LocalOnly", StringComparison.Ordinal)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+            _ = await Assert.That(GetMessage(diagnostics[0]).Contains("LocalOnly", StringComparison.Ordinal)).IsTrue();
+        }
     }
 
     private static Task<ImmutableArray<Diagnostic>> RunWithFilesAsync(

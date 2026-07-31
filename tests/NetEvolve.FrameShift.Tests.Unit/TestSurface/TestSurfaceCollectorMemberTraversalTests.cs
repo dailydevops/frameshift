@@ -303,12 +303,15 @@ public class TestSurfaceCollectorMemberTraversalTests
         var production = CreateProduction();
         var test = CreateTest(production);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(production)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     [Test]
@@ -409,8 +412,11 @@ public class TestSurfaceCollectorMemberTraversalTests
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
 
-        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(UnreducedExtensionId)).IsTrue();
-        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(ReducedExtensionId)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.ReferencedMemberIds.Contains(UnreducedExtensionId)).IsTrue();
+            _ = await Assert.That(manifest.ReferencedMemberIds.Contains(ReducedExtensionId)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -430,8 +436,13 @@ public class TestSurfaceCollectorMemberTraversalTests
 
         var manifest = CollectSurface(test);
 
-        _ = await Assert.That(DiagnosticAssertions.Ids(CompilationFactory.GetCompileErrors(test))).Contains("CS0122");
-        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(InaccessibleMemberId)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Ids(CompilationFactory.GetCompileErrors(test)))
+                .Contains("CS0122");
+            _ = await Assert.That(manifest.ReferencedMemberIds.Contains(InaccessibleMemberId)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -451,8 +462,11 @@ public class TestSurfaceCollectorMemberTraversalTests
 
         var names = withoutReference.Select(method => method.Name).ToList();
 
-        _ = await Assert.That(names.Contains("OnlyTouchesAutoProperties", StringComparer.Ordinal)).IsTrue();
-        _ = await Assert.That(names.Contains("ReadsBlockBodiedProperty", StringComparer.Ordinal)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(names.Contains("OnlyTouchesAutoProperties", StringComparer.Ordinal)).IsTrue();
+            _ = await Assert.That(names.Contains("ReadsBlockBodiedProperty", StringComparer.Ordinal)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -521,8 +535,11 @@ public class TestSurfaceCollectorMemberTraversalTests
 
         var references = ReferencesOf(manifest, "ReadsExpressionBodiedProperty");
 
-        _ = await Assert.That(references.Contains("M:Production.Signals.FromBlockProperty~System.Int32")).IsFalse();
-        _ = await Assert.That(references.Contains("M:Production.Signals.FromEventAdd~System.Int32")).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(references.Contains("M:Production.Signals.FromBlockProperty~System.Int32")).IsFalse();
+            _ = await Assert.That(references.Contains("M:Production.Signals.FromEventAdd~System.Int32")).IsFalse();
+        }
     }
 
     [Test]
@@ -542,8 +559,11 @@ public class TestSurfaceCollectorMemberTraversalTests
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
 
-        _ = await Assert.That(Join(manifest.ReferencesByTest.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
-        _ = await Assert.That(Join(manifest.TestCaseCounts.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.ReferencesByTest.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
+            _ = await Assert.That(Join(manifest.TestCaseCounts.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
+        }
     }
 
     /// <summary>

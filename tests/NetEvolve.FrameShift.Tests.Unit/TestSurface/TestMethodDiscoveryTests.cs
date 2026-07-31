@@ -228,9 +228,12 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation).Length).IsGreaterThan(0);
-        _ = await Assert.That(Describe(found)).Contains("FirstCases.Alpha");
-        _ = await Assert.That(Describe(found)).Contains("SecondCases.Beta");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation).Length).IsGreaterThan(0);
+            _ = await Assert.That(Describe(found)).Contains("FirstCases.Alpha");
+            _ = await Assert.That(Describe(found)).Contains("SecondCases.Beta");
+        }
     }
 
     /// <summary>
@@ -253,9 +256,12 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(found.Length).IsEqualTo(3);
-        _ = await Assert.That(found[2].Name).IsEqualTo(OrphanedMethodName);
-        _ = await Assert.That(found[2].ContainingType).IsNotNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(found.Length).IsEqualTo(3);
+            _ = await Assert.That(found[2].Name).IsEqualTo(OrphanedMethodName);
+            _ = await Assert.That(found[2].ContainingType).IsNotNull();
+        }
     }
 
     /// <summary>
@@ -272,8 +278,11 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(found.Length).IsEqualTo(3);
-        _ = await Assert.That(found.All(HasMethodDeclarationInSource)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(found.Length).IsEqualTo(3);
+            _ = await Assert.That(found.All(HasMethodDeclarationInSource)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -291,10 +300,13 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(Describe(found)).IsEqualTo("LocalFunctionCases.Outer");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(Describe(found)).IsEqualTo("LocalFunctionCases.Outer");
+        }
     }
 
     /// <summary>
@@ -312,11 +324,14 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(Describe(found)).IsEqualTo("PartialCases.Alpha");
-        _ = await Assert.That(HasMethodDeclarationInSource(found[0])).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(Describe(found)).IsEqualTo("PartialCases.Alpha");
+            _ = await Assert.That(HasMethodDeclarationInSource(found[0])).IsTrue();
+        }
     }
 
     [Test]
@@ -353,10 +368,13 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(Describe(found)).IsEqualTo("FirstCases.Alpha|SecondCases.Beta");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(compilation)))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(Describe(found)).IsEqualTo("FirstCases.Alpha|SecondCases.Beta");
+        }
     }
 
     [Test]
@@ -421,10 +439,15 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(Describe(withCounts.Select(entry => entry.Method))).IsEqualTo(Describe(withoutCounts));
-        _ = await Assert
-            .That(DescribeWithCounts(withCounts))
-            .IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+|<invalid-global-code>.Orphaned=1+");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Describe(withCounts.Select(entry => entry.Method)))
+                .IsEqualTo(Describe(withoutCounts));
+            _ = await Assert
+                .That(DescribeWithCounts(withCounts))
+                .IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+|<invalid-global-code>.Orphaned=1+");
+        }
     }
 
     [Test]
@@ -454,8 +477,11 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+");
-        _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha|Beta");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("FirstCases.Alpha=3|SecondCases.Beta=1+");
+            _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha|Beta");
+        }
     }
 
     /// <summary>
@@ -472,8 +498,11 @@ public class TestMethodDiscoveryTests
             CancellationToken.None
         );
 
-        _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("PartialCases.Alpha=3");
-        _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(DescribeWithCounts(found)).IsEqualTo("PartialCases.Alpha=3");
+            _ = await Assert.That(string.Join("|", recognizer.Counted)).IsEqualTo("Alpha");
+        }
     }
 
     [Test]

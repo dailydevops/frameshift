@@ -35,8 +35,11 @@ public class EquivalenceVerdictTests
     {
         var verdict = EquivalenceVerdict.Trivial(Reason);
 
-        _ = await Assert.That(verdict.IsTrivial).IsTrue();
-        _ = await Assert.That(verdict.Reason).IsEqualTo(Reason);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdict.IsTrivial).IsTrue();
+            _ = await Assert.That(verdict.Reason).IsEqualTo(Reason);
+        }
     }
 
     [Test]
@@ -44,8 +47,11 @@ public class EquivalenceVerdictTests
     {
         var verdict = EquivalenceVerdict.Trivial("x");
 
-        _ = await Assert.That(verdict.IsTrivial).IsTrue();
-        _ = await Assert.That(verdict.Reason).IsEqualTo("x");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdict.IsTrivial).IsTrue();
+            _ = await Assert.That(verdict.Reason).IsEqualTo("x");
+        }
     }
 
     [Test]
@@ -61,8 +67,11 @@ public class EquivalenceVerdictTests
     {
         var verdict = EquivalenceVerdict.NotTrivial;
 
-        _ = await Assert.That(verdict.IsTrivial).IsFalse();
-        _ = await Assert.That(verdict.Reason).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdict.IsTrivial).IsFalse();
+            _ = await Assert.That(verdict.Reason).IsNull();
+        }
     }
 
     [Test]
@@ -84,7 +93,10 @@ public class EquivalenceVerdictTests
         var first = EquivalenceVerdict.Trivial(Reason);
         var second = EquivalenceVerdict.Trivial(Reason);
 
-        _ = await Assert.That(ReferenceEquals(first, second)).IsFalse();
-        _ = await Assert.That(second.Reason).IsEqualTo(first.Reason);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ReferenceEquals(first, second)).IsFalse();
+            _ = await Assert.That(second.Reason).IsEqualTo(first.Reason);
+        }
     }
 }

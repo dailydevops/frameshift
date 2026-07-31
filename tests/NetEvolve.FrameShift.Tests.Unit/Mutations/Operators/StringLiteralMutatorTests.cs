@@ -86,10 +86,13 @@ public class StringLiteralMutatorTests
         var mutator = new StringLiteralMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("string-literal");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringLiteral);
-        _ = await Assert.That(supported).Count().IsEqualTo(1);
-        _ = await Assert.That(supported).Contains(SyntaxKind.StringLiteralExpression);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("string-literal");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringLiteral);
+            _ = await Assert.That(supported).Count().IsEqualTo(1);
+            _ = await Assert.That(supported).Contains(SyntaxKind.StringLiteralExpression);
+        }
     }
 
     [Test]
@@ -97,11 +100,14 @@ public class StringLiteralMutatorTests
     {
         var (tree, mutations) = Run(NonEmptySource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.StringLiteral);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("\"...\" => \"\"");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.StringLiteral);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("\"...\" => \"\"");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        }
     }
 
     [Test]
@@ -109,12 +115,15 @@ public class StringLiteralMutatorTests
     {
         var (tree, mutations) = Run(EmptySource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.empty-to-non-empty");
-        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("\"\" => \"FrameShift\"");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo("public class Sample { public string Get() => \"FrameShift\"; }");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.empty-to-non-empty");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("\"\" => \"FrameShift\"");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public string Get() => \"FrameShift\"; }");
+        }
     }
 
     [Test]
@@ -122,9 +131,12 @@ public class StringLiteralMutatorTests
     {
         var (tree, mutations) = Run(VerbatimSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        }
     }
 
     /// <summary>
@@ -137,11 +149,14 @@ public class StringLiteralMutatorTests
         var (tree, mutations) = Run(RawSource);
         var literal = (LiteralExpressionSyntax)FindStringLiteral(tree);
 
-        _ = await Assert.That(literal.Token.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)).IsTrue();
-        _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Token.IsKind(SyntaxKind.SingleLineRawStringLiteralToken)).IsTrue();
+            _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(EmptySource);
+        }
     }
 
     /// <summary>
@@ -155,11 +170,14 @@ public class StringLiteralMutatorTests
         var (tree, mutations) = Run(MultiLineRawSource);
         var literal = (LiteralExpressionSyntax)FindStringLiteral(tree);
 
-        _ = await Assert.That(literal.Token.IsKind(SyntaxKind.MultiLineRawStringLiteralToken)).IsTrue();
-        _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert.That(mutations[0].Replacement.ToString()).IsEqualTo("\"\"");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Token.IsKind(SyntaxKind.MultiLineRawStringLiteralToken)).IsTrue();
+            _ = await Assert.That(literal.Token.ValueText).IsEqualTo("abc");
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert.That(mutations[0].Replacement.ToString()).IsEqualTo("\"\"");
+        }
     }
 
     /// <summary>
@@ -173,8 +191,11 @@ public class StringLiteralMutatorTests
         var literal = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree);
         var mutations = Mutate(new StringLiteralMutator(), literal, semanticModel);
 
-        _ = await Assert.That(literal.Kind()).IsEqualTo(SyntaxKind.Utf8StringLiteralExpression);
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Kind()).IsEqualTo(SyntaxKind.Utf8StringLiteralExpression);
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -182,11 +203,14 @@ public class StringLiteralMutatorTests
     {
         var (tree, mutations) = Run(InstanceFieldSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo(InstanceFieldSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo(InstanceFieldSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
+        }
     }
 
     [Test]
@@ -194,11 +218,14 @@ public class StringLiteralMutatorTests
     {
         var (tree, mutations) = Run(LocalDeclarationSource);
 
-        _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
-        _ = await Assert
-            .That(Rewrite(tree, mutations[0]))
-            .IsEqualTo(LocalDeclarationSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo(LocalDeclarationSource.Replace("\"abc\"", "\"\"", StringComparison.Ordinal));
+        }
     }
 
     [Test]
@@ -220,9 +247,12 @@ public class StringLiteralMutatorTests
             .FindAll<LiteralExpressionSyntax>(tree)
             .Where(literal => literal.IsKind(SyntaxKind.StringLiteralExpression));
 
-        _ = await Assert.That(literals).IsEmpty();
-        _ = await Assert.That(Mutate(mutator, interpolated, semanticModel)).IsEmpty();
-        _ = await Assert.That(Mutate(mutator, text, semanticModel)).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literals).IsEmpty();
+            _ = await Assert.That(Mutate(mutator, interpolated, semanticModel)).IsEmpty();
+            _ = await Assert.That(Mutate(mutator, text, semanticModel)).IsEmpty();
+        }
     }
 
     [Test]
@@ -294,10 +324,13 @@ public class StringLiteralMutatorTests
         var literal = (LiteralExpressionSyntax)SyntaxFactory.ParseExpression("\"abc\"");
         var mutations = Mutate(new StringLiteralMutator(), literal, semanticModel);
 
-        _ = await Assert.That(literal.Parent).IsNull();
-        _ = await Assert.That(literal.IsKind(SyntaxKind.StringLiteralExpression)).IsTrue();
-        _ = await Assert.That(mutations.Length).IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(literal.Parent).IsNull();
+            _ = await Assert.That(literal.IsKind(SyntaxKind.StringLiteralExpression)).IsTrue();
+            _ = await Assert.That(mutations.Length).IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("string-literal.to-empty");
+        }
     }
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source) => Run(source, FindStringLiteral);

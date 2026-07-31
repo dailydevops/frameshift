@@ -185,8 +185,11 @@ public class XunitV3TestSurfaceAnalyzerTests
         var production = CreateProduction();
         var test = CreateTest(production);
 
-        _ = await Assert.That(Describe(production)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(Describe(test)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(production)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(Describe(test)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -222,11 +225,14 @@ public class XunitV3TestSurfaceAnalyzerTests
 
         var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
-        _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
-        _ = await Assert
-            .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+            _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
+            _ = await Assert
+                .That(GetMessage(diagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -360,13 +366,16 @@ public class XunitV3TestSurfaceAnalyzerTests
             )
             .ConfigureAwait(false);
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Describe(ownDiagnostics))
-            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(otherDiagnostics).Count().IsEqualTo(1);
-        _ = await Assert
-            .That(GetMessage(otherDiagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(ownDiagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(otherDiagnostics).Count().IsEqualTo(1);
+            _ = await Assert
+                .That(GetMessage(otherDiagnostics[0]).Contains(LocalOnlyTestName, StringComparison.Ordinal))
+                .IsTrue();
+        }
     }
 
     /// <summary>
@@ -384,10 +393,15 @@ public class XunitV3TestSurfaceAnalyzerTests
             reported.AddRange(DiagnosticAssertions.Ids(await RunAllAsync(test, shape).ConfigureAwait(false)));
         }
 
-        _ = await Assert.That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal)).IsFalse();
-        _ = await Assert
-            .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal))
+                .IsFalse();
+            _ = await Assert
+                .That(reported.Contains(DiagnosticIds.TestWithoutProductionReference, StringComparer.Ordinal))
+                .IsTrue();
+        }
     }
 
     [Test]

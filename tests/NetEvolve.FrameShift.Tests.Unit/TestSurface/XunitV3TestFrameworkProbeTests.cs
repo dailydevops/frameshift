@@ -139,8 +139,11 @@ internal sealed class XunitV3TestFrameworkProbeTests
     {
         var compilation = CreateXunitFixture(TestFramework.XunitV2);
 
-        _ = await Assert.That(XunitV3TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(XunitV3TestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV3TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(XunitV3TestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
+        }
     }
 
     /// <summary>
@@ -210,9 +213,12 @@ internal sealed class XunitV3TestFrameworkProbeTests
         var decorated = FindMethod(compilation, "DecoratedTest");
         var plain = FindMethod(compilation, "PlainMethod");
 
-        _ = await Assert.That(XunitV3TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
-        _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV3TestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer.IsTestMethod(decorated)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     [Test]
@@ -231,8 +237,11 @@ internal sealed class XunitV3TestFrameworkProbeTests
     {
         var resolved = XunitV3TestFrameworkProbe.GetTestAttributeType(CreateXunitFixture(TestFramework.XunitV3));
 
-        _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo(TestAttributeDisplayName);
-        _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo(TestAttributeDisplayName);
+            _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+        }
     }
 
     [Test]
@@ -257,10 +266,13 @@ internal sealed class XunitV3TestFrameworkProbeTests
         var resolved = XunitV3TestFrameworkProbe.GetTestAttributeType(compilation);
         var versionTwo = XunitV2TestFrameworkProbe.GetTestAttributeType(compilation);
 
-        _ = await Assert.That(compilation.GetTypeByMetadataName(TestAttributeDisplayName)).IsNull();
-        _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
-        _ = await Assert.That(versionTwo?.ContainingAssembly.Name).IsEqualTo(VersionTwoAssemblyName);
-        _ = await Assert.That(SymbolEqualityComparer.Default.Equals(resolved, versionTwo)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(compilation.GetTypeByMetadataName(TestAttributeDisplayName)).IsNull();
+            _ = await Assert.That(resolved?.ContainingAssembly.Name).IsEqualTo(FrameworkAssemblyName);
+            _ = await Assert.That(versionTwo?.ContainingAssembly.Name).IsEqualTo(VersionTwoAssemblyName);
+            _ = await Assert.That(SymbolEqualityComparer.Default.Equals(resolved, versionTwo)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -275,8 +287,11 @@ internal sealed class XunitV3TestFrameworkProbeTests
         var versionThree = XunitV3TestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
         var versionTwo = XunitV2TestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(versionThree?.FrameworkName).IsEqualTo(FrameworkName);
-        _ = await Assert.That(versionTwo?.FrameworkName).IsEqualTo(XunitV2TestFrameworkProbe.Name);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(versionThree?.FrameworkName).IsEqualTo(FrameworkName);
+            _ = await Assert.That(versionTwo?.FrameworkName).IsEqualTo(XunitV2TestFrameworkProbe.Name);
+        }
     }
 
     [Test]
@@ -314,10 +329,13 @@ internal sealed class XunitV3TestFrameworkProbeTests
         var frameworkLike = ReferencedAssembly(satellite, FrameworkLikeAssemblyName);
         var unrelated = ReferencedAssembly(foreign, ForeignAssemblyName);
 
-        _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(versionThree)).IsTrue();
-        _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(versionTwo)).IsFalse();
-        _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(frameworkLike)).IsTrue();
-        _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(unrelated)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(versionThree)).IsTrue();
+            _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(versionTwo)).IsFalse();
+            _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(frameworkLike)).IsTrue();
+            _ = await Assert.That(XunitV3TestFrameworkProbe.IsFrameworkAssembly(unrelated)).IsFalse();
+        }
     }
 
     [Test]
