@@ -118,6 +118,33 @@ public class MSTestMethodRecognizerTests
         }
         """;
 
+    /// <summary>
+    /// A consumer whose own attribute derives from the satellite's, so that the recogniser has to walk the
+    /// base chain before the name-based rule can apply: the attribute on the method is declared in the
+    /// compilation itself and only its base type sits in a framework assembly.
+    /// </summary>
+    private const string SatelliteDerivedConsumerSource = """
+        namespace Fixture;
+
+        using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+        public class CustomTestMethodAttribute : TestMethodAttribute
+        {
+        }
+
+        public class Cases
+        {
+            [CustomTestMethod]
+            public void DecoratedTest()
+            {
+            }
+
+            public void PlainMethod()
+            {
+            }
+        }
+        """;
+
     [Test]
     public async Task FrameworkName_Recognizer_NamesTheFramework()
     {
@@ -189,6 +216,54 @@ public class MSTestMethodRecognizerTests
     }
 
     /// <summary>
+    /// The name-based rule has to survive derivation. When the well-known type cannot be resolved — an
+    /// ambiguous name, or a compilation carrying nothing but the framework assembly — a user-written
+    /// specialisation is recognised only if the base chain is walked down to the framework attribute it
+    /// derives from, and refused when that base is declared outside the framework.
+    /// </summary>
+    /// <param name="satelliteAssemblyName">The assembly name the base attribute is declared in.</param>
+    /// <param name="expected">Whether the derived attribute makes the method a test.</param>
+    [Test]
+    [Arguments(FrameworkAssemblyName, true)]
+    [Arguments(ForeignAssemblyName, false)]
+    public async Task IsTestMethod_WithoutTheWellKnownType_AppliesTheNameRuleToTheBaseChain(
+        string satelliteAssemblyName,
+        bool expected
+    )
+    {
+        var compilation = CreateSatelliteConsumer(SatelliteDerivedConsumerSource, satelliteAssemblyName);
+        var recognizer = new MSTestTestMethodRecognizer(null);
+
+        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsEqualTo(expected);
+        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+    }
+
+    /// <summary>
+    /// The recogniser a probe hands out on the assembly rule alone has only the name-based rule left. It
+    /// must simply find nothing where no attribute of the framework is in play, which is what makes
+    /// detecting the framework generously harmless.
+    /// </summary>
+    [Test]
+    public async Task IsTestMethod_WithoutTheWellKnownType_FindsNoTestsInAPlainCompilation()
+    {
+        var source = """
+            namespace Fixture;
+
+            public class Cases
+            {
+                public void DecoratedTest()
+                {
+                }
+            }
+            """;
+
+        var compilation = CompilationFactory.Create(source, TestFramework.MSTest, filePath: CasesPath);
+        var recognizer = new MSTestTestMethodRecognizer(null);
+
+        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsFalse();
+    }
+
+    /// <summary>
     /// A method whose attribute cannot be bound at all must not crash the recogniser, because an analyzer
     /// runs on incomplete code all day long.
     /// </summary>
@@ -221,6 +296,8 @@ public class MSTestMethodRecognizerTests
             Describe(CreateCases()),
             Describe(CreateSatelliteConsumer(FrameworkAssemblyName)),
             Describe(CreateSatelliteConsumer(ForeignAssemblyName)),
+            Describe(CreateSatelliteConsumer(SatelliteDerivedConsumerSource, FrameworkAssemblyName)),
+            Describe(CreateSatelliteConsumer(SatelliteDerivedConsumerSource, ForeignAssemblyName)),
         };
 
         _ = await Assert
@@ -231,12 +308,23 @@ public class MSTestMethodRecognizerTests
     private static CSharpCompilation CreateCases() =>
         CompilationFactory.Create([(CasesPath, CasesSource), (ForeignPath, ForeignSource)], TestFramework.MSTest);
 
-    private static CSharpCompilation CreateSatelliteConsumer(string satelliteAssemblyName)
+    private static CSharpCompilation CreateSatelliteConsumer(string satelliteAssemblyName) =>
+        CreateSatelliteConsumer(SatelliteConsumerSource, satelliteAssemblyName);
+
+    /// <summary>
+    /// Compiles the satellite into an assembly called <paramref name="satelliteAssemblyName" /> and builds
+    /// a compilation of <paramref name="source" /> that references it, which is how a fixture controls the
+    /// assembly the well-known attribute name is declared in.
+    /// </summary>
+    /// <param name="source">The source of the consuming compilation.</param>
+    /// <param name="satelliteAssemblyName">The assembly name of the satellite.</param>
+    /// <returns>The consuming compilation.</returns>
+    private static CSharpCompilation CreateSatelliteConsumer(string source, string satelliteAssemblyName)
     {
         var satellite = CompilationFactory.Create(SatelliteSource, satelliteAssemblyName, filePath: SatellitePath);
 
         return CompilationFactory.Create(
-            SatelliteConsumerSource,
+            source,
             additionalReferences: [satellite.ToMetadataReference()],
             filePath: CasesPath
         );

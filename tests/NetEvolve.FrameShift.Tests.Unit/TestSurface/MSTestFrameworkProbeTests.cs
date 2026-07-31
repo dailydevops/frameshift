@@ -10,15 +10,15 @@ using TUnit.Core;
 
 /// <summary>
 /// Covers the MSTest end of the framework seam. The probe decides whether the test-side analysis runs at
-/// all, so both halves of its guard matter: claiming a compilation that merely looks like MSTest would
-/// make the analysis judge invisible tests, while refusing a genuine MSTest project would silently
-/// switch FrameShift off for it.
+/// all, and refusing a genuine MSTest project would silently switch FrameShift off for it, so each of the
+/// two traces it accepts is exercised on its own.
 /// </summary>
 /// <remarks>
-/// Unlike the other probes, MSTest requires the well-known attribute type <em>and</em> a referenced
-/// framework assembly, because <c>Microsoft.VisualStudio.TestTools.UnitTesting</c> is an ordinary
-/// namespace any project may declare a look-alike attribute in. Both halves are therefore exercised on
-/// their own.
+/// Exactly as in the TUnit, xUnit and NUnit probes, either trace is enough: the well-known attribute type
+/// resolves, <em>or</em> a framework assembly is referenced. Whichever trace is missing, the recogniser
+/// that comes back is still safe, because judging a method needs positive evidence of its own — that is
+/// the fail-open / fail-closed split documented on <c>ITestFrameworkProbe</c>, and these tests pin both
+/// halves of it.
 /// </remarks>
 public class MSTestFrameworkProbeTests
 {
@@ -85,6 +85,41 @@ public class MSTestFrameworkProbeTests
         }
         """;
 
+    /// <summary>
+    /// A second file of the satellite, deriving from the attribute the satellite itself declares. The
+    /// satellite does not reference MSTest, so nothing is ambiguous while it is compiled — the ambiguity
+    /// only arises in a consumer that references the satellite <em>and</em> the real package.
+    /// </summary>
+    private const string AmbiguousSatelliteDerivedSource = """
+        namespace Satellite;
+
+        using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+        public class SatelliteTestMethodAttribute : TestMethodAttribute
+        {
+        }
+        """;
+
+    /// <summary>
+    /// A consumer of the ambiguous pair. It names only the satellite's derived attribute, because spelling
+    /// out the doubly declared <c>TestMethodAttribute</c> would not compile.
+    /// </summary>
+    private const string AmbiguousConsumerSource = """
+        namespace Fixture;
+
+        public class Cases
+        {
+            [Satellite.SatelliteTestMethod]
+            public void DecoratedTest()
+            {
+            }
+
+            public void PlainMethod()
+            {
+            }
+        }
+        """;
+
     private const string MSTestSource = """
         namespace Fixture;
 
@@ -139,12 +174,13 @@ public class MSTestFrameworkProbeTests
     }
 
     /// <summary>
-    /// The attribute type on its own is not enough. A project that declares
-    /// <c>Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute</c> itself is not an MSTest
-    /// project, and treating it as one would let the analysis judge tests it does not understand.
+    /// The resolved attribute type on its own is a trace of the framework, even without a framework
+    /// assembly: a type carrying the framework's exact full name in the framework's own namespace is the
+    /// framework's identity, and taking it at face value is what the other three probes do too. The tests
+    /// of such a project are therefore recognised rather than the analysis being shut down.
     /// </summary>
     [Test]
-    public async Task TryCreateRecognizer_AttributeLookAlikeWithoutTheFrameworkAssembly_ReturnsNull()
+    public async Task TryCreateRecognizer_AttributeTypeWithoutTheFrameworkAssembly_RecognisesItsTests()
     {
         var compilation = CreateSatelliteConsumer(
             LookAlikeConsumerSource,
@@ -154,22 +190,47 @@ public class MSTestFrameworkProbeTests
 
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(recognizer).IsNull();
+        _ = await Assert.That(recognizer).IsNotNull();
+        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
     }
 
     /// <summary>
-    /// The framework assembly on its own is not enough either: without the attribute type nothing could
-    /// ever be recognised as a test, so the probe reports absence instead of handing out a blind
-    /// recogniser.
+    /// A framework assembly without a resolvable attribute type is a trace as well, and the probe must not
+    /// read the missing type as absence — the type is also missing when its name is ambiguous. What comes
+    /// back is a recogniser that has only the name-based rule left and consequently finds no tests, which
+    /// is indistinguishable from a test project without tests and therefore harmless.
     /// </summary>
     [Test]
-    public async Task TryCreateRecognizer_FrameworkAssemblyWithoutTheAttributeType_ReturnsNull()
+    public async Task TryCreateRecognizer_FrameworkAssemblyWithoutTheAttributeType_FindsNoTests()
     {
         var compilation = CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, FrameworkAssemblyName);
 
         var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
 
-        _ = await Assert.That(recognizer).IsNull();
+        _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+        _ = await Assert.That(recognizer?.FrameworkName).IsEqualTo("MSTest");
+        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+    }
+
+    /// <summary>
+    /// Declaring the well-known attribute twice — here the real package alongside a framework-named
+    /// assembly of its own — makes
+    /// <see cref="Compilation.GetTypeByMetadataName(string)" /> answer <see langword="null" /> although
+    /// MSTest is plainly there. That must not be mistaken for absence: the probe stays awake on the
+    /// assembly rule, and the recogniser it hands out still finds the tests through the name-based rule.
+    /// </summary>
+    [Test]
+    public async Task TryCreateRecognizer_WithAnAmbiguousAttributeType_StillRecognisesTests()
+    {
+        var compilation = CreateAmbiguousConsumer();
+
+        var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
+
+        _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+        _ = await Assert.That(recognizer).IsNotNull();
+        _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, DecoratedTestName))).IsTrue();
+        _ = await Assert.That(recognizer.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
     }
 
     [Test]
@@ -239,6 +300,7 @@ public class MSTestFrameworkProbeTests
             Describe(CreateSatelliteConsumer(LookAlikeConsumerSource, LookAlikeSatelliteSource, ForeignAssemblyName)),
             Describe(CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, FrameworkAssemblyName)),
             Describe(CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, DifferentlyCasedAssemblyName)),
+            Describe(CreateAmbiguousConsumer()),
         };
 
         _ = await Assert
@@ -248,6 +310,28 @@ public class MSTestFrameworkProbeTests
 
     private static CSharpCompilation CreateMSTest() =>
         CompilationFactory.Create(MSTestSource, TestFramework.MSTest, filePath: "Cases.cs");
+
+    /// <summary>
+    /// Builds a compilation in which
+    /// <c>Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute</c> is declared twice: once by
+    /// the real MSTest package and once by a satellite carrying a framework-like assembly name, which is
+    /// what makes the well-known name unresolvable while MSTest is plainly referenced.
+    /// </summary>
+    /// <returns>The consuming compilation.</returns>
+    private static CSharpCompilation CreateAmbiguousConsumer()
+    {
+        var satellite = CompilationFactory.Create(
+            [("Satellite.cs", LookAlikeSatelliteSource), ("SatelliteDerived.cs", AmbiguousSatelliteDerivedSource)],
+            FrameworkAssemblyName
+        );
+
+        return CompilationFactory.Create(
+            AmbiguousConsumerSource,
+            TestFramework.MSTest,
+            additionalReferences: [satellite.ToMetadataReference()],
+            filePath: "Cases.cs"
+        );
+    }
 
     /// <summary>
     /// Compiles <paramref name="satelliteSource" /> into an assembly called
