@@ -10,6 +10,19 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// the boolean condition of an <c>if</c>, <c>while</c> or <c>do</c> statement and of a conditional
 /// expression (<c>x</c> becomes <c>!(x)</c>).
 /// </summary>
+/// <remarks>
+/// <para>
+/// The two directions treat <c>bool?</c> deliberately differently. Removing a negation accepts it,
+/// because <c>!x</c> on a <c>bool?</c> is itself a <c>bool?</c>, so the operand can take the place of the
+/// whole expression without changing the type of the position. Introducing one rejects it, because the
+/// wrapped <c>!(x)</c> would again be a <c>bool?</c>, and a <c>bool?</c> is not a valid condition of an
+/// <c>if</c>, <c>while</c> or <c>do</c> statement nor of a conditional expression, so the mutant would
+/// never compile.
+/// </para>
+/// <para>
+/// The three states of a <c>bool?</c> are reached by <see cref="NullableBooleanLiteralMutator" /> instead.
+/// </para>
+/// </remarks>
 internal sealed class LogicalNegationMutator : MutationOperatorBase
 {
     private static readonly ImmutableArray<SyntaxKind> _supportedSyntaxKinds =
@@ -96,6 +109,12 @@ internal sealed class LogicalNegationMutator : MutationOperatorBase
         return [CreateMutation(condition, replacement, "negate-condition", "x => !(x)")];
     }
 
+    /// <summary>
+    /// Determines whether <paramref name="type" /> is <c>bool</c> or <c>bool?</c>, which are the two
+    /// operand types the removal of a negation leaves in a well typed position.
+    /// </summary>
+    /// <param name="type">The type to inspect, which may be <see langword="null" /> for an unresolved node.</param>
+    /// <returns><see langword="true" /> if the type is <c>bool</c> or <c>bool?</c>.</returns>
     private static bool IsBoolean(ITypeSymbol? type)
     {
         if (type is null)

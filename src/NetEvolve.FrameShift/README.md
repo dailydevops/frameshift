@@ -14,10 +14,15 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 20 mutation operators covering arithmetic operators and compound assignments, relational and
+- 21 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical, conditional and bitwise/shift operators, logical negation,
   increment/decrement, unary operators, null-coalescing, boolean, numeric and string literals, and
   the culture-sensitivity family below.
+- A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
+  three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted
+  type is resolved through the semantic model, so a literal on a plain `bool` is never touched. It is
+  the family that provokes the difference between `flag == true` and `flag != false`, which only shows
+  once `flag` is `null`.
 - A culture-sensitivity operator family of six operators - `StringComparison` arguments,
   `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
   case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's
