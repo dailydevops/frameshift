@@ -8,6 +8,31 @@
     <PackageTags>analyzers;mutation-testing;roslyn;tunit;xunit;nunit;mstest</PackageTags>
     <CopyrightYearStart>2026</CopyrightYearStart>
   </PropertyGroup>
+  <PropertyGroup Label="Target frameworks">
+    <!--
+      `net6.0` and `net7.0` are deliberately absent: xunit.v3.core ships no assets for them, so a
+      restore silently falls back to its .NET Framework assets (NU1701) and the xUnit adapter cannot
+      be tested there.
+    -->
+    <_NetTargetFrameworks>net8.0;net9.0;net10.0</_NetTargetFrameworks>
+    <_ClassicTargetFrameworks>net472;net48;net481</_ClassicTargetFrameworks>
+    <!--
+      Available for a future runtime library. Nothing in this repository targets it today: the analyzer
+      ships as a Roslyn component and therefore stays on `netstandard2.0` alone, because exactly one
+      assembly may sit in `analyzers/dotnet/cs`.
+    -->
+    <_ProjectTargetFrameworks>netstandard2.0;$(_NetTargetFrameworks)</_ProjectTargetFrameworks>
+    <_ProjectTargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(_ProjectTargetFrameworks);$(_ClassicTargetFrameworks)</_ProjectTargetFrameworks>
+    <!--
+      The classic frameworks are excluded from the test matrix: the test harness builds its synthetic
+      compilations from `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")`, which only CoreCLR
+      publishes, and TUnit's generated infrastructure needs `ModuleInitializerAttribute`. Covering them
+      would mean a second reference-assembly resolver and a set of polyfills, for a component that
+      Roslyn only ever loads on modern .NET.
+    -->
+    <_TestTargetFrameworks>$(_NetTargetFrameworks)</_TestTargetFrameworks>
+    <CheckEolTargetFramework>false</CheckEolTargetFramework>
+  </PropertyGroup>
   <PropertyGroup>
     <!-- Workaround, until https://github.com/GitTools/GitVersion/pull/4206 is released -->
     <GitVersionTargetFramework>net10.0</GitVersionTargetFramework>
