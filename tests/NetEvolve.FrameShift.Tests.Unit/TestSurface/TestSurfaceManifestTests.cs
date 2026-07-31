@@ -61,11 +61,14 @@ public class TestSurfaceManifestTests
     {
         var manifest = TestSurfaceManifest.Empty;
 
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(manifest.TestMethodIds).IsEmpty();
-        _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
-        _ = await Assert.That(manifest.TestCaseCounts).IsEmpty();
-        _ = await Assert.That(manifest.ReferencesByTest).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(manifest.TestMethodIds).IsEmpty();
+            _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
+            _ = await Assert.That(manifest.TestCaseCounts).IsEmpty();
+            _ = await Assert.That(manifest.ReferencesByTest).IsEmpty();
+        }
     }
 
     [Test]
@@ -93,9 +96,12 @@ public class TestSurfaceManifestTests
     {
         var manifest = new TestSurfaceManifest(Ids(), Ids(MemberId));
 
-        _ = await Assert.That(manifest.IsEmpty).IsFalse();
-        _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(MemberId);
-        _ = await Assert.That(manifest.TestMethodIds).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.IsEmpty).IsFalse();
+            _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(MemberId);
+            _ = await Assert.That(manifest.TestMethodIds).IsEmpty();
+        }
     }
 
     [Test]
@@ -103,9 +109,12 @@ public class TestSurfaceManifestTests
     {
         var manifest = new TestSurfaceManifest(Ids(TestId), Ids(MemberId));
 
-        _ = await Assert.That(manifest.IsEmpty).IsFalse();
-        _ = await Assert.That(manifest.TestMethodIds).Contains(TestId);
-        _ = await Assert.That(manifest.ReferencedMemberIds).Contains(MemberId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.IsEmpty).IsFalse();
+            _ = await Assert.That(manifest.TestMethodIds).Contains(TestId);
+            _ = await Assert.That(manifest.ReferencedMemberIds).Contains(MemberId);
+        }
     }
 
     /// <summary>
@@ -122,10 +131,13 @@ public class TestSurfaceManifestTests
             ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase, MemberId)
         );
 
-        _ = await Assert.That(lax.Contains(TestId.ToUpperInvariant())).IsTrue();
-        _ = await Assert.That(manifest.TestMethodIds.Contains(TestId.ToUpperInvariant())).IsFalse();
-        _ = await Assert.That(manifest.ReferencedMemberIds.Contains(MemberId.ToUpperInvariant())).IsFalse();
-        _ = await Assert.That(manifest.TestMethodIds.Contains(TestId)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(lax.Contains(TestId.ToUpperInvariant())).IsTrue();
+            _ = await Assert.That(manifest.TestMethodIds.Contains(TestId.ToUpperInvariant())).IsFalse();
+            _ = await Assert.That(manifest.ReferencedMemberIds.Contains(MemberId.ToUpperInvariant())).IsFalse();
+            _ = await Assert.That(manifest.TestMethodIds.Contains(TestId)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -137,10 +149,15 @@ public class TestSurfaceManifestTests
     {
         var manifest = new TestSurfaceManifest(Ids(TestId, OtherTestId), Ids(MemberId, OtherMemberId));
 
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
-        _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.AtLeast(1));
-        _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
-        _ = await Assert.That(Join(manifest.ReferencesByTest[OtherTestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+            _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert
+                .That(Join(manifest.ReferencesByTest[OtherTestId]))
+                .IsEqualTo(MemberId + "|" + OtherMemberId);
+        }
     }
 
     [Test]
@@ -151,11 +168,14 @@ public class TestSurfaceManifestTests
             (OtherTestId, TestCaseCount.AtLeast(1), [MemberId, OtherMemberId])
         );
 
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
-        _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
-        _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.AtLeast(1));
-        _ = await Assert.That(manifest.IsEmpty).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
+            _ = await Assert.That(Join(manifest.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+            _ = await Assert.That(manifest.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+            _ = await Assert.That(manifest.IsEmpty).IsFalse();
+        }
     }
 
     [Test]
@@ -163,10 +183,13 @@ public class TestSurfaceManifestTests
     {
         var manifest = Blocks((TestId, TestCaseCount.Exact(1), []));
 
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
-        _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
-        _ = await Assert.That(manifest.IsEmpty).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(manifest.ReferencedMemberIds).IsEmpty();
+            _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
+            _ = await Assert.That(manifest.IsEmpty).IsFalse();
+        }
     }
 
     /// <summary>
@@ -184,8 +207,11 @@ public class TestSurfaceManifestTests
             references.ToImmutable()
         );
 
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.AtLeast(1));
+        }
     }
 
     [Test]
@@ -199,9 +225,12 @@ public class TestSurfaceManifestTests
             ImmutableDictionary<string, ImmutableHashSet<string>>.Empty
         );
 
-        _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
-        _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(2));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(manifest.ReferencesByTest[TestId]).IsEmpty();
+            _ = await Assert.That(manifest.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(2));
+        }
     }
 
     [Test]
@@ -215,8 +244,11 @@ public class TestSurfaceManifestTests
             references.ToImmutable()
         );
 
-        _ = await Assert.That(manifest.ReferencesByTest[TestId].Contains(MemberId.ToUpperInvariant())).IsFalse();
-        _ = await Assert.That(manifest.ReferencesByTest[TestId].Contains(MemberId)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.ReferencesByTest[TestId].Contains(MemberId.ToUpperInvariant())).IsFalse();
+            _ = await Assert.That(manifest.ReferencesByTest[TestId].Contains(MemberId)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -232,12 +264,15 @@ public class TestSurfaceManifestTests
 
         var merged = TestSurfaceManifest.Merge([first, second]);
 
-        _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
-        _ = await Assert.That(Join(merged.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
-        _ = await Assert.That(merged.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
-        _ = await Assert.That(merged.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.Exact(1));
-        _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId);
-        _ = await Assert.That(Join(merged.ReferencesByTest[OtherTestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId + "|" + OtherTestId);
+            _ = await Assert.That(Join(merged.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert.That(merged.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+            _ = await Assert.That(merged.TestCaseCounts[OtherTestId]).IsEqualTo(TestCaseCount.Exact(1));
+            _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId);
+            _ = await Assert.That(Join(merged.ReferencesByTest[OtherTestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        }
     }
 
     /// <summary>
@@ -252,9 +287,12 @@ public class TestSurfaceManifestTests
 
         var merged = TestSurfaceManifest.Merge([first, second]);
 
-        _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(merged.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
-        _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(merged.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
+            _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        }
     }
 
     [Test]
@@ -275,9 +313,12 @@ public class TestSurfaceManifestTests
 
         var merged = TestSurfaceManifest.Merge([Blocks((TestId, TestCaseCount.Exact(1), [MemberId])), flat]);
 
-        _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId);
-        _ = await Assert.That(Join(merged.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
-        _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId);
+            _ = await Assert.That(Join(merged.ReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId);
+        }
     }
 
     [Test]

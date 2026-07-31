@@ -262,8 +262,11 @@ public class CaseConversionMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheCaseConversionFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo("culture.case-conversion");
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.CaseConversion);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo("culture.case-conversion");
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.CaseConversion);
+        }
     }
 
     /// <summary>
@@ -319,12 +322,15 @@ public class CaseConversionMutatorTests
         string[] expectedIds = [firstId, secondId];
         var (mutations, node, _, _, errors) = MutateCall(CreateSource(source), source);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expectedNames));
-        _ = await Assert.That(Join(OperatorIds(mutations))).IsEqualTo(Join(expectedIds));
-        _ = await Assert.That(Join(Kinds(mutations))).IsEqualTo("CaseConversion, CaseConversion");
-        _ = await Assert.That(mutations[0].Original.ToString()).IsEqualTo($"value.{source}()");
-        _ = await Assert.That(mutations[0].Location.SourceSpan).IsEqualTo(node.Span);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expectedNames));
+            _ = await Assert.That(Join(OperatorIds(mutations))).IsEqualTo(Join(expectedIds));
+            _ = await Assert.That(Join(Kinds(mutations))).IsEqualTo("CaseConversion, CaseConversion");
+            _ = await Assert.That(mutations[0].Original.ToString()).IsEqualTo($"value.{source}()");
+            _ = await Assert.That(mutations[0].Location.SourceSpan).IsEqualTo(node.Span);
+        }
     }
 
     /// <summary>
@@ -353,9 +359,12 @@ public class CaseConversionMutatorTests
         var mutated = Pick(mutations, source, target).ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutated).IsEqualTo(CreateSource(target));
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutated).IsEqualTo(CreateSource(target));
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -365,8 +374,11 @@ public class CaseConversionMutatorTests
         var (mutations, _, tree, _, errors) = MutateCall(TriviaSource, "ToUpper");
         var mutated = Pick(mutations, "ToUpper", "ToUpperInvariant").ApplyTo(tree).ToString();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutated).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutated).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -380,10 +392,13 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateCall(CultureArgumentSource, "ToUpper");
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.Parameters.Length).IsEqualTo(1);
-        _ = await Assert.That(method?.Parameters[0].Type.Name).IsEqualTo("CultureInfo");
-        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Parameters.Length).IsEqualTo(1);
+            _ = await Assert.That(method?.Parameters[0].Type.Name).IsEqualTo("CultureInfo");
+            _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+        }
     }
 
     [Test]
@@ -398,9 +413,12 @@ public class CaseConversionMutatorTests
         var mutated = Pick(mutations, "ToUpper", "ToUpperInvariant").ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutated).IsEqualTo(expected);
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutated).IsEqualTo(expected);
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -415,9 +433,12 @@ public class CaseConversionMutatorTests
         var mutated = Pick(mutations, "ToUpper", "ToLower").ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutated).IsEqualTo(expected);
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutated).IsEqualTo(expected);
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -428,10 +449,13 @@ public class CaseConversionMutatorTests
         var (mutations, node, tree, _, errors) = MutateCall(ChainedSource, "ToUpper");
         var mutated = Pick(mutations, "ToUpper", "ToLower").ApplyTo(tree).ToString();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(node.ToString()).IsEqualTo("value.Trim().ToUpper()");
-        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
-        _ = await Assert.That(mutated).IsEqualTo(expectedSource);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(node.ToString()).IsEqualTo("value.Trim().ToUpper()");
+            _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+            _ = await Assert.That(mutated).IsEqualTo(expectedSource);
+        }
     }
 
     [Test]
@@ -443,10 +467,13 @@ public class CaseConversionMutatorTests
         var mutated = Pick(mutations, "ToUpper", "ToUpperInvariant").ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
-        _ = await Assert.That(mutated).IsEqualTo(expectedSource);
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+            _ = await Assert.That(mutated).IsEqualTo(expectedSource);
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     /// <summary>
@@ -463,10 +490,13 @@ public class CaseConversionMutatorTests
         var invocation = (InvocationExpressionSyntax)node;
         var method = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(invocation.Expression.Kind()).IsEqualTo(SyntaxKind.MemberBindingExpression);
-        _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(invocation.Expression.Kind()).IsEqualTo(SyntaxKind.MemberBindingExpression);
+            _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -478,12 +508,15 @@ public class CaseConversionMutatorTests
     {
         var (mutations, node, _, _, errors) = Mutate(MethodGroupSource, SyntaxNodeLocator.FindMarked);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.SimpleMemberAccessExpression);
-        _ = await Assert
-            .That(_mutator.SupportedSyntaxKinds.Contains(SyntaxKind.SimpleMemberAccessExpression))
-            .IsFalse();
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.SimpleMemberAccessExpression);
+            _ = await Assert
+                .That(_mutator.SupportedSyntaxKinds.Contains(SyntaxKind.SimpleMemberAccessExpression))
+                .IsFalse();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -496,11 +529,14 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateCall(ExtensionMethodSource, "ToUpper");
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.IsExtensionMethod).IsTrue();
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("CaseExtensions");
-        _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.None);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.IsExtensionMethod).IsTrue();
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("CaseExtensions");
+            _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.None);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -522,10 +558,13 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateCall(source, methodName);
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.Name).IsEqualTo(methodName);
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Label");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Name).IsEqualTo(methodName);
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Label");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -545,9 +584,12 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateCall(source, "ToUpper");
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.ContainingType.Name).IsEqualTo(expectedTypeName);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo(expectedTypeName);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -571,9 +613,12 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, _) = MutateCall(source, "ToUpper");
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(method?.Name).IsEqualTo("ToUpper");
-        _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("ToUpper");
+            _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -586,9 +631,12 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, _, _) = MutateMarked(PointerAccessSource);
         var invocation = (InvocationExpressionSyntax)node;
 
-        _ = await Assert.That(invocation.Expression is MemberAccessExpressionSyntax).IsTrue();
-        _ = await Assert.That(invocation.Expression.Kind()).IsEqualTo(SyntaxKind.PointerMemberAccessExpression);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(invocation.Expression is MemberAccessExpressionSyntax).IsTrue();
+            _ = await Assert.That(invocation.Expression.Kind()).IsEqualTo(SyntaxKind.PointerMemberAccessExpression);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -601,9 +649,12 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, _) = MutateMarked(UnresolvedOverloadSource);
         var info = model.GetSymbolInfo(node);
 
-        _ = await Assert.That(info.Symbol).IsNull();
-        _ = await Assert.That(info.CandidateReason).IsEqualTo(CandidateReason.OverloadResolutionFailure);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(info.Symbol).IsNull();
+            _ = await Assert.That(info.CandidateReason).IsEqualTo(CandidateReason.OverloadResolutionFailure);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -616,9 +667,12 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateMarked(DelegateInvokeSource);
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.DelegateInvoke);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.DelegateInvoke);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -631,10 +685,13 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateMarked(OtherStringMethodSource);
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.Name).IsEqualTo("Trim");
-        _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Name).IsEqualTo("Trim");
+            _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -661,10 +718,13 @@ public class CaseConversionMutatorTests
         var (mutations, node, _, model, errors) = MutateMarked(source);
         var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(method?.Name).IsEqualTo(expectedName);
-        _ = await Assert.That(method?.Parameters.Length).IsEqualTo(expectedParameterCount);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Name).IsEqualTo(expectedName);
+            _ = await Assert.That(method?.Parameters.Length).IsEqualTo(expectedParameterCount);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -689,9 +749,12 @@ public class CaseConversionMutatorTests
         ];
         var (mutations, _, _, _, errors) = MutateMarked(source);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
-        _ = await Assert.That(Join(OperatorIds(mutations))).IsEqualTo(Join(expectedIds));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(Join(DisplayNames(mutations))).IsEqualTo(Join(expected));
+            _ = await Assert.That(Join(OperatorIds(mutations))).IsEqualTo(Join(expectedIds));
+        }
     }
 
     private static string CreateSource(string methodName) =>

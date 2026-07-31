@@ -486,14 +486,20 @@ public class EquivalenceClassifierFoldingTests
 
     private static async Task AssertTrivialFoldAsync(EquivalenceVerdict verdict)
     {
-        _ = await Assert.That(verdict.IsTrivial).IsTrue();
-        _ = await Assert.That(verdict.Reason).IsEqualTo(ConstantFoldingReason);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdict.IsTrivial).IsTrue();
+            _ = await Assert.That(verdict.Reason).IsEqualTo(ConstantFoldingReason);
+        }
     }
 
     private static async Task AssertNotTrivialAsync(EquivalenceVerdict verdict)
     {
-        _ = await Assert.That(verdict.Reason).IsNull();
-        _ = await Assert.That(verdict.IsTrivial).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdict.Reason).IsNull();
+            _ = await Assert.That(verdict.IsTrivial).IsFalse();
+        }
     }
 
     /// <summary>

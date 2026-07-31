@@ -157,20 +157,23 @@ public class BitwiseOperatorMutatorTests
     {
         var mutator = new BitwiseOperatorMutator();
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("bitwise");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.BitwiseOperator);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(
-                new[]
-                {
-                    SyntaxKind.BitwiseAndExpression,
-                    SyntaxKind.BitwiseOrExpression,
-                    SyntaxKind.ExclusiveOrExpression,
-                    SyntaxKind.LeftShiftExpression,
-                    SyntaxKind.RightShiftExpression,
-                }
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("bitwise");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.BitwiseOperator);
+            _ = await Assert
+                .That(mutator.SupportedSyntaxKinds)
+                .IsEquivalentTo(
+                    new[]
+                    {
+                        SyntaxKind.BitwiseAndExpression,
+                        SyntaxKind.BitwiseOrExpression,
+                        SyntaxKind.ExclusiveOrExpression,
+                        SyntaxKind.LeftShiftExpression,
+                        SyntaxKind.RightShiftExpression,
+                    }
+                );
+        }
     }
 
     [Test]
@@ -196,15 +199,18 @@ public class BitwiseOperatorMutatorTests
 
         var result = Mutate(Fixture($"left {symbol} right"));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
-        _ = await Assert
-            .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.BitwiseOperator });
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
+            _ = await Assert
+                .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
+                .IsEquivalentTo(new[] { MutationKind.BitwiseOperator });
+        }
     }
 
     [Test]
@@ -219,13 +225,16 @@ public class BitwiseOperatorMutatorTests
     {
         var result = Mutate(Fixture($"left {symbol} right"));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(new[] { expectedId });
-        _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo(expectedDisplayName);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
-        _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");
-        _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(new[] { expectedId });
+            _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo(expectedDisplayName);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+            _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");
+            _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        }
     }
 
     [Test]
@@ -243,9 +252,12 @@ public class BitwiseOperatorMutatorTests
         var mutator = new BitwiseOperatorMutator();
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
-        _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
-        _ = await Assert.That(result.Mutations).Count().IsEqualTo(expectedCount);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
+            _ = await Assert.That(result.Mutations).Count().IsEqualTo(expectedCount);
+        }
     }
 
     [Test]
@@ -307,12 +319,15 @@ public class BitwiseOperatorMutatorTests
 
         var mutated = mutation.ApplyTo(result.Tree).ToString();
 
-        _ = await Assert
-            .That(mutated)
-            .IsEqualTo(TriviaSource.Replace("& /* after */", "^ /* after */", StringComparison.Ordinal));
-        _ = await Assert.That(mutated).Contains("// Masks two values.");
-        _ = await Assert.That(mutated).Contains("/* leading */");
-        _ = await Assert.That(mutated).Contains("left /* inner */ ^ /* after */ right; // tail");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(TriviaSource.Replace("& /* after */", "^ /* after */", StringComparison.Ordinal));
+            _ = await Assert.That(mutated).Contains("// Masks two values.");
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("left /* inner */ ^ /* after */ right; // tail");
+        }
     }
 
     [Test]
@@ -362,9 +377,12 @@ public class BitwiseOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(EnumShiftSource);
         var binary = (BinaryExpressionSyntax)node;
 
-        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -378,9 +396,12 @@ public class BitwiseOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(MethodGroupOperandSource);
         var binary = (BinaryExpressionSyntax)node;
 
-        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -413,9 +434,12 @@ public class BitwiseOperatorMutatorTests
     {
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert.That(result.Mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
-        _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+            _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");
+        }
     }
 
     [Test]
@@ -424,10 +448,13 @@ public class BitwiseOperatorMutatorTests
         string[] expectedIds = ["bitwise.left-shift-to-right-shift"];
         var result = Mutate(Fixture("nullableLeft << right"));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("nullableLeft >> right");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("nullableLeft >> right");
+        }
     }
 
     /// <summary>
@@ -440,9 +467,12 @@ public class BitwiseOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(BooleanShiftCountSource);
         var binary = (BinaryExpressionSyntax)node;
 
-        _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
-        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Kind()).IsEqualTo(SyntaxKind.LeftShiftExpression);
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -454,9 +484,12 @@ public class BitwiseOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(EnumShiftCountSource);
         var binary = (BinaryExpressionSyntax)node;
 
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
-        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.TypeKind).IsEqualTo(TypeKind.Enum);
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -469,9 +502,12 @@ public class BitwiseOperatorMutatorTests
         var (mutations, _, node, model) = MutateAllowingErrors(MixedIntegralAndBooleanSource);
         var binary = (BinaryExpressionSyntax)node;
 
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
-        _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
-        _ = await Assert.That(mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("int");
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).ConvertedType?.ToDisplayString()).IsEqualTo("bool");
+            _ = await Assert.That(mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -483,8 +519,11 @@ public class BitwiseOperatorMutatorTests
     {
         var result = Mutate(AndOnlyUserDefinedSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]

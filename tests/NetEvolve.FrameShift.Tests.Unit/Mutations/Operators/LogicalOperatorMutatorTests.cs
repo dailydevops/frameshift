@@ -106,8 +106,11 @@ public class LogicalOperatorMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheLogicalFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo("logical");
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.LogicalOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo("logical");
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.LogicalOperator);
+        }
     }
 
     [Test]
@@ -124,10 +127,13 @@ public class LogicalOperatorMutatorTests
         string[] expected = [expectedName];
         var (mutations, _, _, errors) = Mutate(CreateSource(BooleanTemplate, source));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
-        _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
-        _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.LogicalOperator);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
+            _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.LogicalOperator);
+        }
     }
 
     [Test]
@@ -141,8 +147,11 @@ public class LogicalOperatorMutatorTests
         string[] expected = [expectedName];
         var (mutations, _, _, errors) = Mutate(CreateSource(NullableBooleanTemplate, source));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     [Test]
@@ -154,9 +163,12 @@ public class LogicalOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var leftType = model.GetTypeInfo(binary.Left).ConvertedType;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(leftType?.ToDisplayString()).IsEqualTo("int");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(leftType?.ToDisplayString()).IsEqualTo("int");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -164,8 +176,11 @@ public class LogicalOperatorMutatorTests
     {
         var (mutations, _, _, errors) = Mutate(CreateSource(IntegralTemplate, "^"));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -174,8 +189,11 @@ public class LogicalOperatorMutatorTests
         var expected = TriviaSource.Replace("&& right", "|| right", StringComparison.Ordinal);
         var (mutations, tree, _, errors) = Mutate(TriviaSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.Single().ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -189,8 +207,11 @@ public class LogicalOperatorMutatorTests
         var mutated = mutations.Single().ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(mutated).Contains(expectedText);
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated).Contains(expectedText);
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     /// <summary>
@@ -210,9 +231,12 @@ public class LogicalOperatorMutatorTests
         var (mutations, tree, model, errors) = Mutate(CreateSource(TrueFalseOperatorTemplate, source));
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("Flag");
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType?.ToDisplayString()).IsEqualTo("Flag");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+        }
     }
 
     /// <summary>
@@ -226,8 +250,11 @@ public class LogicalOperatorMutatorTests
     {
         var (mutations, _, _, errors) = Mutate(CreateSource(TrueFalseOperatorTemplate, source));
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -241,9 +268,12 @@ public class LogicalOperatorMutatorTests
         var (mutations, tree, model, _) = Mutate(MethodGroupOperandSource);
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
 
-        _ = await Assert.That(binary.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(binary.Kind()).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).ConvertedType).IsNull();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -263,11 +293,14 @@ public class LogicalOperatorMutatorTests
         var (mutations, tree, model, errors) = Mutate(CreateSource(MixedNullableBooleanTemplate, source));
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("bool");
-        _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.ToDisplayString()).IsEqualTo("bool?");
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
-        _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("bool");
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.ToDisplayString()).IsEqualTo("bool?");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo(expectedId);
+        }
     }
 
     [Test]

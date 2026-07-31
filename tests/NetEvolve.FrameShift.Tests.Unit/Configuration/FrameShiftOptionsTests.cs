@@ -174,12 +174,15 @@ public class FrameShiftOptionsTests
             var invariantSign = Read(FrameShiftOptionKeys.MaxMutantsPerMember, "-5");
             var cultureSign = Read(FrameShiftOptionKeys.MaxMutantsPerMember, minusSign + "5");
 
-            _ = await Assert
-                .That(invariantSign.MaxMutantsPerMember)
-                .IsEqualTo(FrameShiftOptions.MinimumMaxMutantsPerMember);
-            _ = await Assert
-                .That(cultureSign.MaxMutantsPerMember)
-                .IsEqualTo(FrameShiftOptions.DefaultMaxMutantsPerMember);
+            using (Assert.Multiple())
+            {
+                _ = await Assert
+                    .That(invariantSign.MaxMutantsPerMember)
+                    .IsEqualTo(FrameShiftOptions.MinimumMaxMutantsPerMember);
+                _ = await Assert
+                    .That(cultureSign.MaxMutantsPerMember)
+                    .IsEqualTo(FrameShiftOptions.DefaultMaxMutantsPerMember);
+            }
         }
         finally
         {
@@ -211,11 +214,14 @@ public class FrameShiftOptionsTests
             )
         );
 
-        _ = await Assert.That(options.IsEnabled).IsTrue();
-        _ = await Assert.That(options.VerifyMutantCompilation).IsFalse();
-        _ = await Assert.That(options.MaxMutantsPerMember).IsEqualTo(9);
-        _ = await Assert.That(options.ReportTrivialMutants).IsFalse();
-        _ = await Assert.That(options.EnableRegexPatternMutations).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(options.IsEnabled).IsTrue();
+            _ = await Assert.That(options.VerifyMutantCompilation).IsFalse();
+            _ = await Assert.That(options.MaxMutantsPerMember).IsEqualTo(9);
+            _ = await Assert.That(options.ReportTrivialMutants).IsFalse();
+            _ = await Assert.That(options.EnableRegexPatternMutations).IsFalse();
+        }
     }
 
     [Test]

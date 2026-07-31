@@ -355,10 +355,13 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert.That(Gaps(diagnostics)).IsEqualTo(ExpectAt(ComparisonLine, _ordinalMutants));
-        _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert.That(Gaps(diagnostics)).IsEqualTo(ExpectAt(ComparisonLine, _ordinalMutants));
+            _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -373,8 +376,13 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(ComparisonMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -388,16 +396,19 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert
-            .That(Gaps(diagnostics))
-            .IsEqualTo(
-                Expect(
-                    (FormatLine, "InvariantCulture => CurrentCulture"),
-                    (FormatLine, "CultureInfo.InvariantCulture => (removed)")
-                )
-            );
-        _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(Gaps(diagnostics))
+                .IsEqualTo(
+                    Expect(
+                        (FormatLine, "InvariantCulture => CurrentCulture"),
+                        (FormatLine, "CultureInfo.InvariantCulture => (removed)")
+                    )
+                );
+            _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -414,17 +425,20 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert
-            .That(Gaps(diagnostics))
-            .IsEqualTo(
-                Expect(
-                    (RemovableProviderLine, "CultureInfo.InvariantCulture => (removed)"),
-                    (RemovableProviderLine, "InvariantCulture => CurrentCulture"),
-                    (RequiredProviderLine, "InvariantCulture => CurrentCulture")
-                )
-            );
-        _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(Gaps(diagnostics))
+                .IsEqualTo(
+                    Expect(
+                        (RemovableProviderLine, "CultureInfo.InvariantCulture => (removed)"),
+                        (RemovableProviderLine, "InvariantCulture => CurrentCulture"),
+                        (RequiredProviderLine, "InvariantCulture => CurrentCulture")
+                    )
+                );
+            _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -468,17 +482,20 @@ public class CultureMutationTests
             .Summarise(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint))
             .Select(summary => summary.Line);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert
-            .That(Gaps(diagnostics))
-            .IsEqualTo(
-                Expect(
-                    (CaseConversionLine, "ToUpperInvariant => ToUpper"),
-                    (CaseConversionLine, "ToUpperInvariant => ToLowerInvariant")
-                )
-            );
-        _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { CaseConversionLine });
-        _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(Gaps(diagnostics))
+                .IsEqualTo(
+                    Expect(
+                        (CaseConversionLine, "ToUpperInvariant => ToUpper"),
+                        (CaseConversionLine, "ToUpperInvariant => ToLowerInvariant")
+                    )
+                );
+            _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { CaseConversionLine });
+            _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -492,24 +509,27 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert
-            .That(Gaps(diagnostics))
-            .IsEqualTo(
-                ExpectAt(
-                    RegexOptionsLine,
-                    [
-                        "RegexOptions - IgnoreCase",
-                        "RegexOptions + CultureInvariant",
-                        "RegexOptions + Multiline",
-                        "RegexOptions + Singleline",
-                        "RegexOptions + ExplicitCapture",
-                        "RegexOptions + IgnorePatternWhitespace",
-                        "RegexOptions + RightToLeft",
-                    ]
-                )
-            );
-        _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(Gaps(diagnostics))
+                .IsEqualTo(
+                    ExpectAt(
+                        RegexOptionsLine,
+                        [
+                            "RegexOptions - IgnoreCase",
+                            "RegexOptions + CultureInvariant",
+                            "RegexOptions + Multiline",
+                            "RegexOptions + Singleline",
+                            "RegexOptions + ExplicitCapture",
+                            "RegexOptions + IgnorePatternWhitespace",
+                            "RegexOptions + RightToLeft",
+                        ]
+                    )
+                );
+            _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -524,8 +544,13 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(diagnostics))
+                .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -551,10 +576,15 @@ public class CultureMutationTests
         var four = await RunAsync(compilation, manifest, CreateBudget(4)).ConfigureAwait(false);
         var one = await RunAsync(compilation, manifest, CreateBudget(1)).ConfigureAwait(false);
 
-        _ = await Assert.That(Errors(compilation)).IsEmpty();
-        _ = await Assert.That(Gaps(unlimited)).IsEqualTo(ExpectAt(DenseLine, [.. caseConversions, .. _ordinalMutants]));
-        _ = await Assert.That(Gaps(four)).IsEqualTo(ExpectAt(DenseLine, caseConversions));
-        _ = await Assert.That(Gaps(one)).IsEqualTo(ExpectAt(DenseLine, [caseConversions[0]]));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(Gaps(unlimited))
+                .IsEqualTo(ExpectAt(DenseLine, [.. caseConversions, .. _ordinalMutants]));
+            _ = await Assert.That(Gaps(four)).IsEqualTo(ExpectAt(DenseLine, caseConversions));
+            _ = await Assert.That(Gaps(one)).IsEqualTo(ExpectAt(DenseLine, [caseConversions[0]]));
+        }
     }
 
     /// <summary>
@@ -572,9 +602,12 @@ public class CultureMutationTests
 
         var diagnostics = await RunAsync(compilation, [CreateManifest(AnchorMemberId)]).ConfigureAwait(false);
 
-        _ = await Assert.That(string.Join("; ", Errors(compilation))).IsEqualTo(string.Empty);
-        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, AnalyzerRunner.AnalyzerFailureId)).IsEmpty();
-        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(string.Join("; ", Errors(compilation))).IsEqualTo(string.Empty);
+            _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, AnalyzerRunner.AnalyzerFailureId)).IsEmpty();
+            _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+        }
     }
 
     private static Task<ImmutableArray<Diagnostic>> RunAsync(

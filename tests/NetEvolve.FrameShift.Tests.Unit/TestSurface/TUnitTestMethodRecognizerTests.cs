@@ -554,9 +554,12 @@ public class TUnitTestMethodRecognizerTests
         var markerBase = TUnitTestFrameworkProbe.GetBaseTestAttributeType(compilation);
         var attribute = compilation.GetTypeByMetadataName(metadataName);
 
-        _ = await Assert.That(markerBase?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
-        _ = await Assert.That(attribute?.ToDisplayString()).IsEqualTo(metadataName);
-        _ = await Assert.That(DerivesFrom(attribute, markerBase)).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(markerBase?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
+            _ = await Assert.That(attribute?.ToDisplayString()).IsEqualTo(metadataName);
+            _ = await Assert.That(DerivesFrom(attribute, markerBase)).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -625,8 +628,11 @@ public class TUnitTestMethodRecognizerTests
 
         var found = FindTestMethods(compilation);
 
-        _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
-        _ = await Assert.That(found.Length).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
+            _ = await Assert.That(found.Length).IsEqualTo(0);
+        }
     }
 
     /// <summary>
@@ -642,8 +648,11 @@ public class TUnitTestMethodRecognizerTests
         var derived = FindMethod(compilation, "Fixture.SatelliteCases", "UsesDerivedAttribute");
         var recognizer = CreateRecognizer(compilation);
 
-        _ = await Assert.That(recognizer.IsTestMethod(direct)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(direct)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
+        }
     }
 
     [Test]
@@ -714,8 +723,11 @@ public class TUnitTestMethodRecognizerTests
         var compilation = CompilationFactory.Create(UnrelatedFixtureSource);
         var method = FindMethod(compilation, UnrelatedTypeName, "LooksLikeATest");
 
-        _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
-        _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)).IsNull();
+            _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -738,8 +750,11 @@ public class TUnitTestMethodRecognizerTests
         var markerBase = TUnitTestFrameworkProbe.GetBaseTestAttributeType(compilation);
         var recognizer = new TUnitTestMethodRecognizer(testAttributeType: null, baseTestAttributeType: markerBase);
 
-        _ = await Assert.That(markerBase?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
-        _ = await Assert.That(recognizer.IsTestMethod(method)).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(markerBase?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
+            _ = await Assert.That(recognizer.IsTestMethod(method)).IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -758,8 +773,13 @@ public class TUnitTestMethodRecognizerTests
         var method = FindMethod(compilation, CasesTypeName, methodName);
         var attributeType = TUnitTestFrameworkProbe.GetTestAttributeType(compilation);
 
-        _ = await Assert.That(attributeType?.ToDisplayString()).IsEqualTo("TUnit.Core.TestAttribute");
-        _ = await Assert.That(new TUnitTestMethodRecognizer(attributeType).IsTestMethod(method)).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(attributeType?.ToDisplayString()).IsEqualTo("TUnit.Core.TestAttribute");
+            _ = await Assert
+                .That(new TUnitTestMethodRecognizer(attributeType).IsTestMethod(method))
+                .IsEqualTo(expected);
+        }
     }
 
     /// <summary>
@@ -778,10 +798,13 @@ public class TUnitTestMethodRecognizerTests
         var satelliteAttribute = FindMethod(satellite, "Fixture.SatelliteCases", "UsesFrameworkAttributeDirectly");
         var satelliteDerived = FindMethod(satellite, "Fixture.SatelliteCases", "UsesDerivedAttribute");
 
-        _ = await Assert.That(recognizer.IsTestMethod(frameworkAttribute)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(dynamicBuilder)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(satelliteAttribute)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(satelliteDerived)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(frameworkAttribute)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(dynamicBuilder)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(satelliteAttribute)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(satelliteDerived)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -798,8 +821,13 @@ public class TUnitTestMethodRecognizerTests
         var compilation = CompilationFactory.Create(UnrelatedFixtureSource, includeTUnit: true);
         var method = FindMethod(compilation, UnrelatedTypeName, methodName);
 
-        _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new TUnitTestMethodRecognizer(testAttributeType: null).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsFalse();
+            _ = await Assert
+                .That(new TUnitTestMethodRecognizer(testAttributeType: null).IsTestMethod(method))
+                .IsFalse();
+        }
     }
 
     [Test]
@@ -884,8 +912,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, "Parameterless");
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -898,8 +929,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, "RepeatedParameterless");
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -910,8 +944,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, "ThreeInlineRows");
 
-        _ = await Assert.That(count.Value).IsEqualTo(3);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(3);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -930,8 +967,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, methodName);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -951,8 +991,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, methodName);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -966,10 +1009,13 @@ public class TUnitTestMethodRecognizerTests
         var lowerBound = CountCases(CountsTypeName, "InlineAndLowerBoundSource");
         var exact = CountCases(CountsTypeName, "InlineAndExactSource");
 
-        _ = await Assert.That(lowerBound.Value).IsEqualTo(2);
-        _ = await Assert.That(lowerBound.IsExact).IsFalse();
-        _ = await Assert.That(exact.Value).IsEqualTo(5);
-        _ = await Assert.That(exact.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(lowerBound.Value).IsEqualTo(2);
+            _ = await Assert.That(lowerBound.IsExact).IsFalse();
+            _ = await Assert.That(exact.Value).IsEqualTo(5);
+            _ = await Assert.That(exact.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -990,8 +1036,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, methodName);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -1012,8 +1061,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, methodName);
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -1025,8 +1077,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(CountsTypeName, "MissingSource");
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -1046,8 +1101,11 @@ public class TUnitTestMethodRecognizerTests
     {
         var count = CountCases(ClassDataTypeName, methodName);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -1064,8 +1122,11 @@ public class TUnitTestMethodRecognizerTests
         var resolved = CreateRecognizer(compilation).GetTestCaseCount(method);
         var unresolved = new TUnitTestMethodRecognizer(testAttributeType: null).GetTestCaseCount(method);
 
-        _ = await Assert.That(resolved.ToString()).IsEqualTo("1+");
-        _ = await Assert.That(unresolved.ToString()).IsEqualTo("1+");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(resolved.ToString()).IsEqualTo("1+");
+            _ = await Assert.That(unresolved.ToString()).IsEqualTo("1+");
+        }
     }
 
     /// <summary>
@@ -1082,8 +1143,11 @@ public class TUnitTestMethodRecognizerTests
         var inline = recognizer.GetTestCaseCount(FindMethod(compilation, CountsTypeName, "ThreeInlineRows"));
         var matrix = recognizer.GetTestCaseCount(FindMethod(compilation, CountsTypeName, "MatrixOfTwoAndThree"));
 
-        _ = await Assert.That(inline.ToString()).IsEqualTo("3");
-        _ = await Assert.That(matrix.ToString()).IsEqualTo("6");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(inline.ToString()).IsEqualTo("3");
+            _ = await Assert.That(matrix.ToString()).IsEqualTo("6");
+        }
     }
 
     [Test]

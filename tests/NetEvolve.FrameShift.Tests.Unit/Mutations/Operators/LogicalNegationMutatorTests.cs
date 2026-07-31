@@ -215,8 +215,11 @@ public class LogicalNegationMutatorTests
     [Test]
     public async Task Metadata_Always_IdentifiesTheNegationFamily()
     {
-        _ = await Assert.That(_mutator.Id).IsEqualTo("negation");
-        _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.LogicalNegation);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(_mutator.Id).IsEqualTo("negation");
+            _ = await Assert.That(_mutator.Kind).IsEqualTo(MutationKind.LogicalNegation);
+        }
     }
 
     [Test]
@@ -230,11 +233,14 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(source);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo("negation.remove-negation");
-        _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.LogicalNegation);
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(Unnegated(source));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo("negation.remove-negation");
+            _ = await Assert.That(mutation.Kind).IsEqualTo(MutationKind.LogicalNegation);
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(Unnegated(source));
+        }
     }
 
     [Test]
@@ -244,9 +250,12 @@ public class LogicalNegationMutatorTests
         var negation = SyntaxNodeLocator.FindMarked<PrefixUnaryExpressionSyntax>(tree);
         var operandType = model.GetTypeInfo(negation.Operand).Type;
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(operandType?.ToDisplayString()).IsEqualTo("Flag");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(operandType?.ToDisplayString()).IsEqualTo("Flag");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -254,8 +263,11 @@ public class LogicalNegationMutatorTests
     {
         var (mutations, _, _, errors) = Mutate(UnaryMinusSource);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -265,11 +277,14 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(IfSource);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
-        _ = await Assert.That(mutation.OperatorId).IsEqualTo("negation.negate-condition");
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("value > 0");
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
+            _ = await Assert.That(mutation.OperatorId).IsEqualTo("negation.negate-condition");
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("value > 0");
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -279,10 +294,13 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(WhileSource);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -292,10 +310,13 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(DoSource);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -305,10 +326,13 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(ConditionalSource);
         var mutation = mutations.Single();
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
-        _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
-        _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutation.DisplayName).IsEqualTo("x => !(x)");
+            _ = await Assert.That(mutation.Original.ToString()).IsEqualTo("flag");
+            _ = await Assert.That(mutation.ApplyTo(tree).ToString()).IsEqualTo(expected);
+        }
     }
 
     [Test]
@@ -317,9 +341,12 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, _, errors) = Mutate(NegatedIfSource);
         var ifStatement = SyntaxNodeLocator.FindMarked<IfStatementSyntax>(tree);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(ifStatement.Condition.ToString()).IsEqualTo("!flag");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(ifStatement.Condition.ToString()).IsEqualTo("!flag");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -334,8 +361,11 @@ public class LogicalNegationMutatorTests
         var conditional = SyntaxNodeLocator.FindMarked<ConditionalExpressionSyntax>(tree);
         var conditionType = model.GetTypeInfo(conditional.Condition).Type;
 
-        _ = await Assert.That(conditionType?.ToDisplayString()).IsEqualTo("bool?");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(conditionType?.ToDisplayString()).IsEqualTo("bool?");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]
@@ -345,8 +375,11 @@ public class LogicalNegationMutatorTests
         var mutated = mutations.Single().ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(mutated).Contains("if (!(value > 0))");
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated).Contains("if (!(value > 0))");
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     [Test]
@@ -356,8 +389,11 @@ public class LogicalNegationMutatorTests
         var mutated = mutations.Single().ApplyTo(tree).ToString();
         var compilation = CompilationFactory.Create(mutated);
 
-        _ = await Assert.That(mutated).Contains("Negate(bool value) => /*!*/value;");
-        _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutated).Contains("Negate(bool value) => /*!*/value;");
+            _ = await Assert.That(Describe(CompilationFactory.GetCompileErrors(compilation))).IsEqualTo(string.Empty);
+        }
     }
 
     /// <summary>
@@ -371,9 +407,12 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, model, _) = Mutate(MethodGroupOperandSource);
         var negation = SyntaxNodeLocator.FindMarked<PrefixUnaryExpressionSyntax>(tree);
 
-        _ = await Assert.That(negation.Kind()).IsEqualTo(SyntaxKind.LogicalNotExpression);
-        _ = await Assert.That(model.GetTypeInfo(negation.Operand).Type).IsNull();
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(negation.Kind()).IsEqualTo(SyntaxKind.LogicalNotExpression);
+            _ = await Assert.That(model.GetTypeInfo(negation.Operand).Type).IsNull();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -387,9 +426,12 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, model, errors) = Mutate(TrueFalseOperatorConditionSource);
         var ifStatement = SyntaxNodeLocator.FindMarked<IfStatementSyntax>(tree);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type?.ToDisplayString()).IsEqualTo("Flag");
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type?.ToDisplayString()).IsEqualTo("Flag");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -405,8 +447,11 @@ public class LogicalNegationMutatorTests
 
         var (mutations, _, _, errors) = Mutate(source);
 
-        _ = await Assert.That(errors).IsEqualTo(string.Empty);
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -420,9 +465,12 @@ public class LogicalNegationMutatorTests
         var (mutations, tree, model, _) = Mutate(MethodGroupConditionSource);
         var ifStatement = SyntaxNodeLocator.FindMarked<IfStatementSyntax>(tree);
 
-        _ = await Assert.That(ifStatement.Condition.ToString()).IsEqualTo("Flag");
-        _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type).IsNull();
-        _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ifStatement.Condition.ToString()).IsEqualTo("Flag");
+            _ = await Assert.That(model.GetTypeInfo(ifStatement.Condition).Type).IsNull();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
     }
 
     [Test]

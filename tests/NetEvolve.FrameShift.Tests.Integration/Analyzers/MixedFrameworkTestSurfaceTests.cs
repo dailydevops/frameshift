@@ -388,11 +388,14 @@ public class MixedFrameworkTestSurfaceTests
 
         var messages = diagnostics.Select(diagnostic => GetMessage(diagnostic)).ToImmutableArray();
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(2);
-        _ = await Assert.That(Count(messages, TUnitLocalOnlyTestName)).IsEqualTo(1);
-        _ = await Assert.That(Count(messages, NUnitLocalOnlyTestName)).IsEqualTo(1);
-        _ = await Assert.That(Count(messages, TUnitCoveringTestName)).IsEqualTo(0);
-        _ = await Assert.That(Count(messages, NUnitCoveringTestName)).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(2);
+            _ = await Assert.That(Count(messages, TUnitLocalOnlyTestName)).IsEqualTo(1);
+            _ = await Assert.That(Count(messages, NUnitLocalOnlyTestName)).IsEqualTo(1);
+            _ = await Assert.That(Count(messages, TUnitCoveringTestName)).IsEqualTo(0);
+            _ = await Assert.That(Count(messages, NUnitCoveringTestName)).IsEqualTo(0);
+        }
     }
 
     /// <summary>
@@ -574,8 +577,11 @@ public class MixedFrameworkTestSurfaceTests
         var diagnostics = await RunEveryAnalyzerOfIdAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, manifest)
             .ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
-        _ = await Assert.That(GetMessage(diagnostics[0]).Contains(StaleDetail, StringComparison.Ordinal)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
+            _ = await Assert.That(GetMessage(diagnostics[0]).Contains(StaleDetail, StringComparison.Ordinal)).IsTrue();
+        }
     }
 
     [Test]
@@ -647,12 +653,15 @@ public class MixedFrameworkTestSurfaceTests
 
         var messages = diagnostics.Select(diagnostic => GetMessage(diagnostic)).ToImmutableArray();
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(3);
-        _ = await Assert.That(Count(messages, XunitV2LocalOnlyTestName)).IsEqualTo(1);
-        _ = await Assert.That(Count(messages, XunitV3LocalOnlyTestName)).IsEqualTo(1);
-        _ = await Assert.That(Count(messages, BothVersionsLocalOnlyTestName)).IsEqualTo(1);
-        _ = await Assert.That(Count(messages, XunitV2CoveringTestName)).IsEqualTo(0);
-        _ = await Assert.That(Count(messages, XunitV3CoveringTestName)).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(3);
+            _ = await Assert.That(Count(messages, XunitV2LocalOnlyTestName)).IsEqualTo(1);
+            _ = await Assert.That(Count(messages, XunitV3LocalOnlyTestName)).IsEqualTo(1);
+            _ = await Assert.That(Count(messages, BothVersionsLocalOnlyTestName)).IsEqualTo(1);
+            _ = await Assert.That(Count(messages, XunitV2CoveringTestName)).IsEqualTo(0);
+            _ = await Assert.That(Count(messages, XunitV3CoveringTestName)).IsEqualTo(0);
+        }
     }
 
     /// <summary>
@@ -675,11 +684,18 @@ public class MixedFrameworkTestSurfaceTests
         var diagnostics = AnalyzerRunner.OfId(reported, DiagnosticIds.TestWithoutProductionReference);
         var messages = diagnostics.Select(diagnostic => GetMessage(diagnostic)).ToImmutableArray();
 
-        _ = await Assert
-            .That(DiagnosticAssertions.Ids(reported).Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal))
-            .IsFalse();
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(3);
-        _ = await Assert.That(Count(messages, BothVersionsLocalOnlyTestName)).IsEqualTo(1);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(
+                    DiagnosticAssertions
+                        .Ids(reported)
+                        .Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal)
+                )
+                .IsFalse();
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(3);
+            _ = await Assert.That(Count(messages, BothVersionsLocalOnlyTestName)).IsEqualTo(1);
+        }
     }
 
     /// <summary>
@@ -696,8 +712,11 @@ public class MixedFrameworkTestSurfaceTests
         var diagnostics = await RunEveryAnalyzerOfIdAsync(test, DiagnosticIds.InvalidTestSurfaceManifest, manifest)
             .ConfigureAwait(false);
 
-        _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
-        _ = await Assert.That(GetMessage(diagnostics[0]).Contains(StaleDetail, StringComparison.Ordinal)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(diagnostics.Length).IsEqualTo(1);
+            _ = await Assert.That(GetMessage(diagnostics[0]).Contains(StaleDetail, StringComparison.Ordinal)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -779,10 +798,15 @@ public class MixedFrameworkTestSurfaceTests
             );
         }
 
-        _ = await Assert.That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal)).IsFalse();
-        _ = await Assert
-            .That(reported.Contains(DiagnosticIds.InvalidTestSurfaceManifest, StringComparer.Ordinal))
-            .IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(reported.Contains(AnalyzerRunner.AnalyzerFailureId, StringComparer.Ordinal))
+                .IsFalse();
+            _ = await Assert
+                .That(reported.Contains(DiagnosticIds.InvalidTestSurfaceManifest, StringComparer.Ordinal))
+                .IsTrue();
+        }
     }
 
     /// <summary>

@@ -360,20 +360,23 @@ public class ArithmeticOperatorMutatorTests
     {
         var mutator = new ArithmeticOperatorMutator();
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("arithmetic");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.ArithmeticOperator);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(
-                new[]
-                {
-                    SyntaxKind.AddExpression,
-                    SyntaxKind.SubtractExpression,
-                    SyntaxKind.MultiplyExpression,
-                    SyntaxKind.DivideExpression,
-                    SyntaxKind.ModuloExpression,
-                }
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("arithmetic");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.ArithmeticOperator);
+            _ = await Assert
+                .That(mutator.SupportedSyntaxKinds)
+                .IsEquivalentTo(
+                    new[]
+                    {
+                        SyntaxKind.AddExpression,
+                        SyntaxKind.SubtractExpression,
+                        SyntaxKind.MultiplyExpression,
+                        SyntaxKind.DivideExpression,
+                        SyntaxKind.ModuloExpression,
+                    }
+                );
+        }
     }
 
     [Test]
@@ -401,15 +404,18 @@ public class ArithmeticOperatorMutatorTests
         var targets = SplitValues(targetNames);
         var result = Mutate(BinaryFixture(symbol));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(Sorted(targets.Select(target => $"arithmetic.{originalName}-to-{target}")));
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(Sorted(targets.Select(target => $"{symbol} => {SymbolOf(target)}")));
-        _ = await Assert
-            .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.ArithmeticOperator });
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(Sorted(targets.Select(target => $"arithmetic.{originalName}-to-{target}")));
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(Sorted(targets.Select(target => $"{symbol} => {SymbolOf(target)}")));
+            _ = await Assert
+                .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
+                .IsEquivalentTo(new[] { MutationKind.ArithmeticOperator });
+        }
     }
 
     [Test]
@@ -423,9 +429,12 @@ public class ArithmeticOperatorMutatorTests
         var mutator = new ArithmeticOperatorMutator();
         var result = Mutate(BinaryFixture(symbol));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
-        _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
-        _ = await Assert.That(result.Mutations).Count().IsEqualTo(4);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
+            _ = await Assert.That(result.Mutations).Count().IsEqualTo(4);
+        }
     }
 
     [Test]
@@ -446,9 +455,12 @@ public class ArithmeticOperatorMutatorTests
         var result = Mutate(BinaryFixture("+"));
         var mutation = Single(result.Mutations, "arithmetic.add-to-subtract");
 
-        _ = await Assert.That(mutation.Original).IsEqualTo(result.Node);
-        _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("left - right");
-        _ = await Assert.That(mutation.Location).IsEqualTo(result.Node.GetLocation());
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutation.Original).IsEqualTo(result.Node);
+            _ = await Assert.That(mutation.Replacement.ToString()).IsEqualTo("left - right");
+            _ = await Assert.That(mutation.Location).IsEqualTo(result.Node.GetLocation());
+        }
     }
 
     [Test]
@@ -459,12 +471,15 @@ public class ArithmeticOperatorMutatorTests
 
         var mutated = mutation.ApplyTo(result.Tree).ToString();
 
-        _ = await Assert
-            .That(mutated)
-            .IsEqualTo(TriviaSource.Replace("+ /* after */", "* /* after */", StringComparison.Ordinal));
-        _ = await Assert.That(mutated).Contains("// Combines two numbers.");
-        _ = await Assert.That(mutated).Contains("/* leading */");
-        _ = await Assert.That(mutated).Contains("left /* inner */ * /* after */ right; // tail");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(TriviaSource.Replace("+ /* after */", "* /* after */", StringComparison.Ordinal));
+            _ = await Assert.That(mutated).Contains("// Combines two numbers.");
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("left /* inner */ * /* after */ right; // tail");
+        }
     }
 
     [Test]
@@ -480,8 +495,11 @@ public class ArithmeticOperatorMutatorTests
     {
         var result = Mutate(StringOperandSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -489,8 +507,11 @@ public class ArithmeticOperatorMutatorTests
     {
         var result = Mutate(DelegateOperandSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -508,12 +529,15 @@ public class ArithmeticOperatorMutatorTests
         string[] expectedDisplayNames = ["+ => -"];
         var result = Mutate(AddAndSubtractOperatorSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(expectedDisplayNames);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(expectedDisplayNames);
+        }
     }
 
     [Test]
@@ -540,12 +564,15 @@ public class ArithmeticOperatorMutatorTests
         string[] expectedDisplayNames = ["+ => *"];
         var result = Mutate(GenericOperatorSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(expectedDisplayNames);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(expectedDisplayNames);
+        }
     }
 
     /// <summary>
@@ -577,11 +604,14 @@ public class ArithmeticOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.ContainingType.Name).IsEqualTo("Money");
-        _ = await Assert.That(semanticModel.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.ContainingType.Name).IsEqualTo("Money");
+            _ = await Assert.That(semanticModel.GetTypeInfo(binary.Right).Type?.Name).IsEqualTo("Cents");
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+        }
     }
 
     /// <summary>
@@ -600,8 +630,11 @@ public class ArithmeticOperatorMutatorTests
     {
         var result = Mutate(ConcatFixture(expression));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.AddExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -617,11 +650,14 @@ public class ArithmeticOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
-        _ = await Assert
-            .That(semanticModel.GetTypeInfo(binary.Left).ConvertedType?.SpecialType)
-            .IsEqualTo(SpecialType.System_String);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
+            _ = await Assert
+                .That(semanticModel.GetTypeInfo(binary.Left).ConvertedType?.SpecialType)
+                .IsEqualTo(SpecialType.System_String);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -675,11 +711,14 @@ public class ArithmeticOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.BuiltinOperator);
-        _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("dynamic.operator +(dynamic, dynamic)");
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(AllCounterparts("add"));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.BuiltinOperator);
+            _ = await Assert.That(bound?.ToDisplayString()).IsEqualTo("dynamic.operator +(dynamic, dynamic)");
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(AllCounterparts("add"));
+        }
     }
 
     /// <summary>
@@ -711,10 +750,13 @@ public class ArithmeticOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.MetadataName).IsEqualTo("op_CheckedAddition");
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.MetadataName).IsEqualTo("op_CheckedAddition");
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+        }
     }
 
     /// <summary>
@@ -751,8 +793,11 @@ public class ArithmeticOperatorMutatorTests
         var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
         var bound = semanticModel.GetSymbolInfo(binary).Symbol as IMethodSymbol;
 
-        _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 #endif
 
@@ -765,9 +810,12 @@ public class ArithmeticOperatorMutatorTests
     {
         var result = MutateWithoutFixtureCheck(PointerOperandSource);
 
-        _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_pointerErrorIds);
-        _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Pointer);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_pointerErrorIds);
+            _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Pointer);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -779,9 +827,12 @@ public class ArithmeticOperatorMutatorTests
     {
         var result = MutateWithoutFixtureCheck(ErrorTypeOperandSource);
 
-        _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_errorTypeErrorIds);
-        _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Error);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.ErrorIds).IsEquivalentTo(_errorTypeErrorIds);
+            _ = await Assert.That(result.LeftType?.TypeKind).IsEqualTo(TypeKind.Error);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -817,9 +868,12 @@ public class ArithmeticOperatorMutatorTests
     {
         var exception = InvokeMapper(mapperName, SyntaxKind.BitwiseAndExpression);
 
-        _ = await Assert.That(exception.ParamName).IsEqualTo("expressionKind");
-        _ = await Assert.That(exception.ActualValue).IsEqualTo(SyntaxKind.BitwiseAndExpression);
-        _ = await Assert.That(exception.Message).Contains("The syntax kind is not a binary arithmetic expression.");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exception.ParamName).IsEqualTo("expressionKind");
+            _ = await Assert.That(exception.ActualValue).IsEqualTo(SyntaxKind.BitwiseAndExpression);
+            _ = await Assert.That(exception.Message).Contains("The syntax kind is not a binary arithmetic expression.");
+        }
     }
 
     /// <summary>
@@ -837,10 +891,13 @@ public class ArithmeticOperatorMutatorTests
         var unaryMinus = money.GetMembers("op_UnaryNegation").OfType<IMethodSymbol>().Single();
         var binaryMinus = money.GetMembers("op_Subtraction").OfType<IMethodSymbol>().Single();
 
-        _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
-        _ = await Assert.That(unaryMinus.Parameters.Length).IsEqualTo(1);
-        _ = await Assert.That(InvokeHasCounterpart(unaryMinus, "op_Subtraction")).IsFalse();
-        _ = await Assert.That(InvokeHasCounterpart(binaryMinus, "op_Addition")).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+            _ = await Assert.That(unaryMinus.Parameters.Length).IsEqualTo(1);
+            _ = await Assert.That(InvokeHasCounterpart(unaryMinus, "op_Subtraction")).IsFalse();
+            _ = await Assert.That(InvokeHasCounterpart(binaryMinus, "op_Addition")).IsTrue();
+        }
     }
 
     private static string BinaryFixture(string symbol) =>

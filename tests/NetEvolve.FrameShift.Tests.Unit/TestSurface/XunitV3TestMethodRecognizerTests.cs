@@ -674,9 +674,12 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var attributeType = XunitV3TestFrameworkProbe.GetTestAttributeType(compilation);
         var markerInterface = XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation);
 
-        _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsTrue();
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CreateRecognizer(compilation).IsTestMethod(method)).IsTrue();
+            _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
+            _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -697,8 +700,11 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var attributeType = XunitV3TestFrameworkProbe.GetTestAttributeType(compilation);
         var markerInterface = XunitV3TestFrameworkProbe.GetTestMarkerInterfaceType(compilation);
 
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsTrue();
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(new XunitV3TestMethodRecognizer(attributeType, null).IsTestMethod(method)).IsTrue();
+            _ = await Assert.That(new XunitV3TestMethodRecognizer(null, markerInterface).IsTestMethod(method)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -733,8 +739,11 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var recognizer = CreateRecognizer(compilation);
         var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
 
-        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new XunitV3TestMethodRecognizer(null, null).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+            _ = await Assert.That(new XunitV3TestMethodRecognizer(null, null).IsTestMethod(method)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -768,11 +777,14 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var markerInterface = FindMethod(compilation, CasesTypeName, "MarkerInterfaceTest");
         var plain = FindMethod(compilation, CasesTypeName, "PlainMethod");
 
-        _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(theory)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(markerInterface)).IsFalse();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(fact)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(theory)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(derived)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(markerInterface)).IsFalse();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -790,10 +802,13 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var versionThreeTest = FindMethod(compilation, MixedCasesTypeName, "VersionThreeTest");
         var versionTwoTest = FindMethod(compilation, MixedCasesTypeName, "VersionTwoTest");
 
-        _ = await Assert.That(versionThree.IsTestMethod(versionThreeTest)).IsTrue();
-        _ = await Assert.That(versionThree.IsTestMethod(versionTwoTest)).IsFalse();
-        _ = await Assert.That(versionTwo.IsTestMethod(versionTwoTest)).IsTrue();
-        _ = await Assert.That(versionTwo.IsTestMethod(versionThreeTest)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(versionThree.IsTestMethod(versionThreeTest)).IsTrue();
+            _ = await Assert.That(versionThree.IsTestMethod(versionTwoTest)).IsFalse();
+            _ = await Assert.That(versionTwo.IsTestMethod(versionTwoTest)).IsTrue();
+            _ = await Assert.That(versionTwo.IsTestMethod(versionThreeTest)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -899,10 +914,13 @@ internal sealed class XunitV3TestMethodRecognizerTests
         var exact = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "ThreeInlineData"));
         var bound = recognizer.GetTestCaseCount(FindMethod(compilation, CountCasesTypeName, "CulturedTheory"));
 
-        _ = await Assert.That(exact.Value).IsEqualTo(3);
-        _ = await Assert.That(exact.IsExact).IsTrue();
-        _ = await Assert.That(bound.Value).IsEqualTo(2);
-        _ = await Assert.That(bound.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exact.Value).IsEqualTo(3);
+            _ = await Assert.That(exact.IsExact).IsTrue();
+            _ = await Assert.That(bound.Value).IsEqualTo(2);
+            _ = await Assert.That(bound.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -924,8 +942,11 @@ internal sealed class XunitV3TestMethodRecognizerTests
             FindMethod(compilation, CountCasesTypeName, "TheoryWithoutData")
         );
 
-        _ = await Assert.That(withSource.ToString()).IsEqualTo("1+");
-        _ = await Assert.That(withoutSource.ToString()).IsEqualTo("0");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(withSource.ToString()).IsEqualTo("1+");
+            _ = await Assert.That(withoutSource.ToString()).IsEqualTo("0");
+        }
     }
 
     /// <summary>

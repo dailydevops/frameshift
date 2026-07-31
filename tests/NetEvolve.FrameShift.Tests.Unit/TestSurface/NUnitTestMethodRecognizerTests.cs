@@ -826,8 +826,11 @@ public class NUnitTestMethodRecognizerTests
         var recognizer = CreateRecognizer(compilation);
         var method = FindMethod(compilation, "Fixture.UnrelatedCases", "LooksLikeATest");
 
-        _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
-        _ = await Assert.That(new NUnitTestMethodRecognizer([]).IsTestMethod(method)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(method)).IsFalse();
+            _ = await Assert.That(new NUnitTestMethodRecognizer([]).IsTestMethod(method)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -853,9 +856,12 @@ public class NUnitTestMethodRecognizerTests
         var builder = FindMethod(compilation, LookAlikeCasesTypeName, "BuilderMarked");
         var plain = FindMethod(compilation, LookAlikeCasesTypeName, "Undecorated");
 
-        _ = await Assert.That(recognizer.IsTestMethod(simple)).IsEqualTo(expected);
-        _ = await Assert.That(recognizer.IsTestMethod(builder)).IsEqualTo(expected);
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(simple)).IsEqualTo(expected);
+            _ = await Assert.That(recognizer.IsTestMethod(builder)).IsEqualTo(expected);
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -871,8 +877,11 @@ public class NUnitTestMethodRecognizerTests
         var test = FindMethod(compilation, CasesTypeName, "PlainTest");
         var plain = FindMethod(compilation, CasesTypeName, "PlainMethod");
 
-        _ = await Assert.That(recognizer.IsTestMethod(test)).IsTrue();
-        _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(recognizer.IsTestMethod(test)).IsTrue();
+            _ = await Assert.That(recognizer.IsTestMethod(plain)).IsFalse();
+        }
     }
 
     /// <summary>
@@ -955,8 +964,11 @@ public class NUnitTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     /// <summary>
@@ -988,8 +1000,11 @@ public class NUnitTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(expected);
-        _ = await Assert.That(count.IsExact).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(expected);
+            _ = await Assert.That(count.IsExact).IsFalse();
+        }
     }
 
     /// <summary>
@@ -1034,8 +1049,11 @@ public class NUnitTestMethodRecognizerTests
 
         var count = recognizer.GetTestCaseCount(method);
 
-        _ = await Assert.That(count.Value).IsEqualTo(1);
-        _ = await Assert.That(count.IsExact).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(count.Value).IsEqualTo(1);
+            _ = await Assert.That(count.IsExact).IsTrue();
+        }
     }
 
     [Test]

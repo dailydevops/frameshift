@@ -264,10 +264,13 @@ public class MutantGeneratorTests
     {
         var prefixes = Prefixes(Generate(MixedSource));
 
-        _ = await Assert.That(prefixes).Contains("numeric-literal");
-        _ = await Assert.That(prefixes).Contains("conditional-expression");
-        _ = await Assert.That(prefixes).Contains("null-coalescing");
-        _ = await Assert.That(prefixes).Contains("string-literal");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(prefixes).Contains("numeric-literal");
+            _ = await Assert.That(prefixes).Contains("conditional-expression");
+            _ = await Assert.That(prefixes).Contains("null-coalescing");
+            _ = await Assert.That(prefixes).Contains("string-literal");
+        }
     }
 
     [Test]
@@ -283,10 +286,13 @@ public class MutantGeneratorTests
             .Where(mutation => !span.Contains(mutation.Location.SourceSpan))
             .Select(mutation => mutation.OperatorId);
 
-        _ = await Assert.That(mutations.Length).IsGreaterThan(4);
-        _ = await Assert.That(malformed).IsEmpty();
-        _ = await Assert.That(unnamed).IsEmpty();
-        _ = await Assert.That(outside).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations.Length).IsGreaterThan(4);
+            _ = await Assert.That(malformed).IsEmpty();
+            _ = await Assert.That(unnamed).IsEmpty();
+            _ = await Assert.That(outside).IsEmpty();
+        }
     }
 
     [Test]
@@ -358,8 +364,11 @@ public class MutantGeneratorTests
         var withBanner = Snippets(BannerCommentSource);
         var withoutBanner = Snippets(MixedSource);
 
-        _ = await Assert.That(withoutBanner.Length).IsGreaterThan(0);
-        _ = await Assert.That(withBanner).IsEquivalentTo(withoutBanner);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(withoutBanner.Length).IsGreaterThan(0);
+            _ = await Assert.That(withBanner).IsEquivalentTo(withoutBanner);
+        }
     }
 
     /// <summary>
@@ -373,8 +382,11 @@ public class MutantGeneratorTests
         var withAttribute = Snippets(AssemblyAttributeSource);
         var withoutAttribute = Snippets(IncludedSource);
 
-        _ = await Assert.That(withoutAttribute.Length).IsGreaterThan(0);
-        _ = await Assert.That(withAttribute).IsEquivalentTo(withoutAttribute);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(withoutAttribute.Length).IsGreaterThan(0);
+            _ = await Assert.That(withAttribute).IsEquivalentTo(withoutAttribute);
+        }
     }
 
     /// <summary>
@@ -449,8 +461,11 @@ public class MutantGeneratorTests
         var excluded = Generate(ExcludedTypeSource);
         var included = Generate(IncludedSource);
 
-        _ = await Assert.That(included.Length).IsGreaterThan(0);
-        _ = await Assert.That(excluded).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(included.Length).IsGreaterThan(0);
+            _ = await Assert.That(excluded).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -463,10 +478,13 @@ public class MutantGeneratorTests
         var excluded = Snippets(ExcludedAccessorSource);
         var included = Snippets(IncludedAccessorSource);
 
-        _ = await Assert.That(included).Contains("_field + 1");
-        _ = await Assert.That(included).Contains("value + 2");
-        _ = await Assert.That(excluded).Contains("value + 2");
-        _ = await Assert.That(excluded.Contains("_field + 1", StringComparer.Ordinal)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(included).Contains("_field + 1");
+            _ = await Assert.That(included).Contains("value + 2");
+            _ = await Assert.That(excluded).Contains("value + 2");
+            _ = await Assert.That(excluded.Contains("_field + 1", StringComparer.Ordinal)).IsFalse();
+        }
     }
 
     [Test]
@@ -475,8 +493,11 @@ public class MutantGeneratorTests
         var excluded = Snippets(ExcludedLocalFunctionSource);
         var included = Snippets(IncludedLocalFunctionSource);
 
-        _ = await Assert.That(included).Contains("inner + 1");
-        _ = await Assert.That(excluded.Contains("inner + 1", StringComparer.Ordinal)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(included).Contains("inner + 1");
+            _ = await Assert.That(excluded.Contains("inner + 1", StringComparer.Ordinal)).IsFalse();
+        }
     }
 
     [Test]
@@ -524,8 +545,11 @@ public class MutantGeneratorTests
             }
         });
 
-        _ = await Assert.That(exception).IsNotNull();
-        _ = await Assert.That(taken).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(exception).IsNotNull();
+            _ = await Assert.That(taken).IsEmpty();
+        }
     }
 
     [Test]

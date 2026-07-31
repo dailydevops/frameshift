@@ -271,19 +271,22 @@ public class IncrementDecrementMutatorTests
     {
         var mutator = new IncrementDecrementMutator();
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("increment-decrement");
-        _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.Increment);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(
-                new[]
-                {
-                    SyntaxKind.PreIncrementExpression,
-                    SyntaxKind.PreDecrementExpression,
-                    SyntaxKind.PostIncrementExpression,
-                    SyntaxKind.PostDecrementExpression,
-                }
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutator.Id).IsEqualTo("increment-decrement");
+            _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.Increment);
+            _ = await Assert
+                .That(mutator.SupportedSyntaxKinds)
+                .IsEquivalentTo(
+                    new[]
+                    {
+                        SyntaxKind.PreIncrementExpression,
+                        SyntaxKind.PreDecrementExpression,
+                        SyntaxKind.PostIncrementExpression,
+                        SyntaxKind.PostDecrementExpression,
+                    }
+                );
+        }
     }
 
     [Test]
@@ -308,14 +311,17 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(new[] { expectedId });
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-            .IsEquivalentTo(new[] { expectedDisplayName });
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
-        _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(new[] { expectedId });
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
+                .IsEquivalentTo(new[] { expectedDisplayName });
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+            _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        }
     }
 
     [Test]
@@ -340,9 +346,12 @@ public class IncrementDecrementMutatorTests
         var mutator = new IncrementDecrementMutator();
         var result = Mutate(Fixture(expression));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
-        _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
-        _ = await Assert.That(result.Mutations).Count().IsEqualTo(1);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(kind);
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).Contains(kind);
+            _ = await Assert.That(result.Mutations).Count().IsEqualTo(1);
+        }
     }
 
     [Test]
@@ -365,12 +374,15 @@ public class IncrementDecrementMutatorTests
 
         var mutated = mutation.ApplyTo(result.Tree).ToString();
 
-        _ = await Assert
-            .That(mutated)
-            .IsEqualTo(TriviaSource.Replace("++ /* after */", "-- /* after */", StringComparison.Ordinal));
-        _ = await Assert.That(mutated).Contains("// Advances a value.");
-        _ = await Assert.That(mutated).Contains("/* leading */");
-        _ = await Assert.That(mutated).Contains("value /* inner */ -- /* after */; // tail");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(TriviaSource.Replace("++ /* after */", "-- /* after */", StringComparison.Ordinal));
+            _ = await Assert.That(mutated).Contains("// Advances a value.");
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("value /* inner */ -- /* after */; // tail");
+        }
     }
 
     [Test]
@@ -378,8 +390,11 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(IncrementOnlyOperatorSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -387,8 +402,11 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(DecrementOnlyOperatorSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostDecrementExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostDecrementExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]
@@ -397,10 +415,13 @@ public class IncrementDecrementMutatorTests
         string[] expectedIds = ["increment-decrement.postfix-increment-to-decrement"];
         var result = Mutate(BothOperatorsSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("current--");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("current--");
+        }
     }
 
     [Test]
@@ -409,10 +430,13 @@ public class IncrementDecrementMutatorTests
         string[] expectedIds = ["increment-decrement.prefix-increment-to-decrement"];
         var result = Mutate(GenericBothOperatorsSource);
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("--current");
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("--current");
+        }
     }
 
     [Test]
@@ -420,8 +444,11 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(GenericIncrementOnlySource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PreIncrementExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PreIncrementExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -444,8 +471,11 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(NullableLiftedIncrementOnlySource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     /// <summary>
@@ -468,11 +498,14 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(CreateSource(MemberTemplate, expression, ExpressionPlaceholder));
 
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(new[] { expectedId });
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
-        _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(new[] { expectedId });
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
+            _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
+        }
     }
 
     /// <summary>
@@ -487,11 +520,14 @@ public class IncrementDecrementMutatorTests
         string[] expectedIds = ["increment-decrement.postfix-increment-to-decrement"];
         var result = Mutate(CreateSource(CheckedTemplate, keyword, KeywordPlaceholder));
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
-        _ = await Assert
-            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-            .IsEquivalentTo(expectedIds);
-        _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("value--");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+            _ = await Assert
+                .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+                .IsEquivalentTo(expectedIds);
+            _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo("value--");
+        }
     }
 
     /// <summary>
@@ -503,8 +539,11 @@ public class IncrementDecrementMutatorTests
     {
         var result = Mutate(BorrowedOperatorNameSource);
 
-        _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
-        _ = await Assert.That(result.Mutations).IsEmpty();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Node.Kind()).IsEqualTo(SyntaxKind.PostIncrementExpression);
+            _ = await Assert.That(result.Mutations).IsEmpty();
+        }
     }
 
     [Test]

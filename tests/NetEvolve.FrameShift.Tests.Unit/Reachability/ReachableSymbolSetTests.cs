@@ -78,8 +78,11 @@ public class ReachableSymbolSetTests
 
         var set = new ReachableSymbolSet([null!, untested, untested]);
 
-        _ = await Assert.That(set.Count).IsEqualTo(1);
-        _ = await Assert.That(set.Contains(untested)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.Count).IsEqualTo(1);
+            _ = await Assert.That(set.Contains(untested)).IsTrue();
+        }
     }
 
     [Test]
@@ -87,8 +90,11 @@ public class ReachableSymbolSetTests
     {
         var set = ReachableSymbolSet.Empty;
 
-        _ = await Assert.That(set.IsEmpty).IsTrue();
-        _ = await Assert.That(set.Count).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.IsEmpty).IsTrue();
+            _ = await Assert.That(set.Count).IsEqualTo(0);
+        }
     }
 
     [Test]
@@ -101,8 +107,11 @@ public class ReachableSymbolSetTests
             Method(compilation, "Production.Holder", "Nested"),
         ]);
 
-        _ = await Assert.That(set.IsEmpty).IsFalse();
-        _ = await Assert.That(set.Count).IsEqualTo(2);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.IsEmpty).IsFalse();
+            _ = await Assert.That(set.Count).IsEqualTo(2);
+        }
     }
 
     [Test]
@@ -126,8 +135,11 @@ public class ReachableSymbolSetTests
 
         var normalized = ReachableSymbolSet.NormalizeDefinition(reduced);
 
-        _ = await Assert.That(reduced.ReducedFrom).IsNotNull();
-        _ = await Assert.That(SymbolEqualityComparer.Default.Equals(normalized, declared)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reduced.ReducedFrom).IsNotNull();
+            _ = await Assert.That(SymbolEqualityComparer.Default.Equals(normalized, declared)).IsTrue();
+        }
     }
 
     [Test]
@@ -171,8 +183,11 @@ public class ReachableSymbolSetTests
         var property = Property(compilation, "Production.Holder", "Value");
         var set = new ReachableSymbolSet([property]);
 
-        _ = await Assert.That(set.Contains(property.GetMethod!)).IsTrue();
-        _ = await Assert.That(set.Contains(property.SetMethod!)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.Contains(property.GetMethod!)).IsTrue();
+            _ = await Assert.That(set.Contains(property.SetMethod!)).IsTrue();
+        }
     }
 
     [Test]
@@ -191,8 +206,11 @@ public class ReachableSymbolSetTests
         var compilation = CompilationFactory.Create(SetSource);
         var set = new ReachableSymbolSet([Method(compilation, "Production.Holder", "Nested")]);
 
-        _ = await Assert.That(set.IsEmpty).IsFalse();
-        _ = await Assert.That(set.ContainsEnclosing(null)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.IsEmpty).IsFalse();
+            _ = await Assert.That(set.ContainsEnclosing(null)).IsFalse();
+        }
     }
 
     [Test]
@@ -216,8 +234,11 @@ public class ReachableSymbolSetTests
         var inner = LocalFunction(semanticModel, tree, "Inner");
         var set = new ReachableSymbolSet([Method(compilation, "Production.Holder", "Nested")]);
 
-        _ = await Assert.That(set.Contains(inner)).IsFalse();
-        _ = await Assert.That(set.ContainsEnclosing(inner)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.Contains(inner)).IsFalse();
+            _ = await Assert.That(set.ContainsEnclosing(inner)).IsTrue();
+        }
     }
 
     [Test]

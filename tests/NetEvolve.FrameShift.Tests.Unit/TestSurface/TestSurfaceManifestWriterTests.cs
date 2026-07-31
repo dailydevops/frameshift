@@ -103,9 +103,12 @@ public class TestSurfaceManifestWriterTests
 
         var written = TestSurfaceManifestWriter.Write(manifest);
 
-        _ = await Assert.That(written.Contains('\r', StringComparison.Ordinal)).IsFalse();
-        _ = await Assert.That(written[^1]).IsEqualTo('\n');
-        _ = await Assert.That(written.Split('\n').Length).IsEqualTo(4);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(written.Contains('\r', StringComparison.Ordinal)).IsFalse();
+            _ = await Assert.That(written[^1]).IsEqualTo('\n');
+            _ = await Assert.That(written.Split('\n').Length).IsEqualTo(4);
+        }
     }
 
     /// <summary>
@@ -178,8 +181,11 @@ public class TestSurfaceManifestWriterTests
             out var error
         );
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
         _ = await AssertSameSurface(manifest, roundTripped).ConfigureAwait(false);
     }
 
@@ -194,8 +200,11 @@ public class TestSurfaceManifestWriterTests
             out var error
         );
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
         _ = await AssertSameSurface(manifest, roundTripped).ConfigureAwait(false);
         _ = await Assert.That(roundTripped.ReferencesByTest["M:Tests.A.First"]).IsEmpty();
     }
@@ -207,9 +216,12 @@ public class TestSurfaceManifestWriterTests
 
         var parsed = TestSurfaceManifestReader.TryRead(SourceText.From(written), out var roundTripped, out var error);
 
-        _ = await Assert.That(parsed).IsTrue();
-        _ = await Assert.That(error).IsNull();
-        _ = await Assert.That(roundTripped.IsEmpty).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(roundTripped.IsEmpty).IsTrue();
+        }
         _ = await AssertSameSurface(TestSurfaceManifest.Empty, roundTripped).ConfigureAwait(false);
     }
 
@@ -233,9 +245,12 @@ public class TestSurfaceManifestWriterTests
 
     private static async Task<bool> AssertSameSurface(TestSurfaceManifest expected, TestSurfaceManifest actual)
     {
-        _ = await Assert.That(Join(actual.TestMethodIds)).IsEqualTo(Join(expected.TestMethodIds));
-        _ = await Assert.That(Join(actual.ReferencedMemberIds)).IsEqualTo(Join(expected.ReferencedMemberIds));
-        _ = await Assert.That(Describe(actual)).IsEqualTo(Describe(expected));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(actual.TestMethodIds)).IsEqualTo(Join(expected.TestMethodIds));
+            _ = await Assert.That(Join(actual.ReferencedMemberIds)).IsEqualTo(Join(expected.ReferencedMemberIds));
+            _ = await Assert.That(Describe(actual)).IsEqualTo(Describe(expected));
+        }
 
         return true;
     }

@@ -288,12 +288,15 @@ public class TestSurfaceManifestGeneratorTests
     {
         var output = Run(CreateProduction());
 
-        _ = await Assert.That(output.HintNames).IsEqualTo(string.Empty);
-        _ = await Assert.That(output.Sources.Length).IsEqualTo(0);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(output.HintNames).IsEqualTo(string.Empty);
+            _ = await Assert.That(output.Sources.Length).IsEqualTo(0);
 
-        var diagnostics = DiagnosticAssertions.Describe(output.Diagnostics);
+            var diagnostics = DiagnosticAssertions.Describe(output.Diagnostics);
 
-        _ = await Assert.That(diagnostics).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(diagnostics).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>
@@ -304,9 +307,12 @@ public class TestSurfaceManifestGeneratorTests
     {
         var output = Run(CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction()));
 
-        _ = await Assert.That(output.Sources.Length).IsEqualTo(1);
-        _ = await Assert.That(output.HintNames).IsEqualTo("TestSurfaceManifest.g.cs");
-        _ = await Assert.That(TestSurfaceManifestGenerator.HintName).IsEqualTo("TestSurfaceManifest.g.cs");
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(output.Sources.Length).IsEqualTo(1);
+            _ = await Assert.That(output.HintNames).IsEqualTo("TestSurfaceManifest.g.cs");
+            _ = await Assert.That(TestSurfaceManifestGenerator.HintName).IsEqualTo("TestSurfaceManifest.g.cs");
+        }
     }
 
     /// <summary>
@@ -319,12 +325,15 @@ public class TestSurfaceManifestGeneratorTests
         var text = Generate(CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction()));
         var lines = Lines(text);
 
-        _ = await Assert.That(lines[0]).IsEqualTo(CommentStart);
-        _ = await Assert.That(lines[^1]).IsEqualTo(CommentEnd);
-        _ = await Assert.That(lines[1]).IsEqualTo(Header);
-        _ = await Assert.That(Occurrences(text, CommentStart)).IsEqualTo(1);
-        _ = await Assert.That(Occurrences(text, CommentEnd)).IsEqualTo(1);
-        _ = await Assert.That(text.EndsWith(CommentEnd + LineFeed, StringComparison.Ordinal)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(lines[0]).IsEqualTo(CommentStart);
+            _ = await Assert.That(lines[^1]).IsEqualTo(CommentEnd);
+            _ = await Assert.That(lines[1]).IsEqualTo(Header);
+            _ = await Assert.That(Occurrences(text, CommentStart)).IsEqualTo(1);
+            _ = await Assert.That(Occurrences(text, CommentEnd)).IsEqualTo(1);
+            _ = await Assert.That(text.EndsWith(CommentEnd + LineFeed, StringComparison.Ordinal)).IsTrue();
+        }
     }
 
     /// <summary>
@@ -394,8 +403,11 @@ public class TestSurfaceManifestGeneratorTests
         var disabled = Run(test, options);
         var enabled = Run(test);
 
-        _ = await Assert.That(disabled.Sources.Length).IsEqualTo(0);
-        _ = await Assert.That(enabled.Sources.Length).IsEqualTo(1);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(disabled.Sources.Length).IsEqualTo(0);
+            _ = await Assert.That(enabled.Sources.Length).IsEqualTo(1);
+        }
     }
 
     /// <summary>
@@ -410,11 +422,16 @@ public class TestSurfaceManifestGeneratorTests
         var text = Generate(test);
         var (success, error, manifest) = Read(text);
 
-        _ = await Assert.That(string.Join("|", Lines(text))).IsEqualTo(CommentStart + "|" + Header + "|" + CommentEnd);
-        _ = await Assert.That(success).IsTrue();
-        _ = await Assert.That(error).IsEqualTo(string.Empty);
-        _ = await Assert.That(manifest.IsEmpty).IsTrue();
-        _ = await Assert.That(Canonical(manifest)).IsEqualTo(Header + LineFeed);
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(string.Join("|", Lines(text)))
+                .IsEqualTo(CommentStart + "|" + Header + "|" + CommentEnd);
+            _ = await Assert.That(success).IsTrue();
+            _ = await Assert.That(error).IsEqualTo(string.Empty);
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(Canonical(manifest)).IsEqualTo(Header + LineFeed);
+        }
     }
 
     /// <summary>
@@ -431,9 +448,12 @@ public class TestSurfaceManifestGeneratorTests
         var second = Generate(test);
         var third = Generate(CreateTest(TestFramework.TUnit, TwoTestsSource, CreateProduction()));
 
-        _ = await Assert.That(second).IsEqualTo(first);
-        _ = await Assert.That(third).IsEqualTo(first);
-        _ = await Assert.That(first.Length).IsGreaterThan(Header.Length);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(second).IsEqualTo(first);
+            _ = await Assert.That(third).IsEqualTo(first);
+            _ = await Assert.That(first.Length).IsGreaterThan(Header.Length);
+        }
     }
 
     /// <summary>
@@ -462,10 +482,13 @@ public class TestSurfaceManifestGeneratorTests
 
         var expectedEntries = testIds.SelectMany(id => BlockOf(manifest, id));
 
-        _ = await Assert.That(manifest.TestMethodIds.Count).IsEqualTo(2);
-        _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsGreaterThan(2);
-        _ = await Assert.That(markers).IsEqualTo(expectedMarkers);
-        _ = await Assert.That(string.Join("|", entries)).IsEqualTo(string.Join("|", expectedEntries));
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(manifest.TestMethodIds.Count).IsEqualTo(2);
+            _ = await Assert.That(manifest.ReferencedMemberIds.Count).IsGreaterThan(2);
+            _ = await Assert.That(markers).IsEqualTo(expectedMarkers);
+            _ = await Assert.That(string.Join("|", entries)).IsEqualTo(string.Join("|", expectedEntries));
+        }
     }
 
     /// <summary>
@@ -481,12 +504,15 @@ public class TestSurfaceManifestGeneratorTests
         var ids = manifest.TestMethodIds.Union(manifest.ReferencedMemberIds);
         var unresolved = ids.Where(id => !Resolves(id, test)).OrderBy(id => id, StringComparer.Ordinal);
 
-        _ = await Assert.That(string.Join("|", unresolved)).IsEqualTo(string.Empty);
-        _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.op_Addition")).IsTrue();
-        _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.Convert``1")).IsTrue();
-        _ = await Assert.That(Contains(ids, "P:Fixture.Box`1.Item(System.Int32)")).IsTrue();
-        _ = await Assert.That(Contains(ids, "P:Fixture.IShape.Corners")).IsTrue();
-        _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.Nested.Depth")).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(string.Join("|", unresolved)).IsEqualTo(string.Empty);
+            _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.op_Addition")).IsTrue();
+            _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.Convert``1")).IsTrue();
+            _ = await Assert.That(Contains(ids, "P:Fixture.Box`1.Item(System.Int32)")).IsTrue();
+            _ = await Assert.That(Contains(ids, "P:Fixture.IShape.Corners")).IsTrue();
+            _ = await Assert.That(Contains(ids, "M:Fixture.Box`1.Nested.Depth")).IsTrue();
+        }
     }
 
     /// <summary>
@@ -524,9 +550,12 @@ public class TestSurfaceManifestGeneratorTests
         var inner = Lines(text).Skip(1).SkipLast(1);
         var offenders = inner.Where(line => line.Contains(CommentEnd, StringComparison.Ordinal));
 
-        _ = await Assert.That(string.Join("|", offenders)).IsEqualTo(string.Empty);
-        _ = await Assert.That(Occurrences(text, CommentEnd)).IsEqualTo(1);
-        _ = await Assert.That(Describe(output.Compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(string.Join("|", offenders)).IsEqualTo(string.Empty);
+            _ = await Assert.That(Occurrences(text, CommentEnd)).IsEqualTo(1);
+            _ = await Assert.That(Describe(output.Compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        }
     }
 
     /// <summary>

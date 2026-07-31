@@ -155,8 +155,11 @@ public class MutantCompilerTests
 
         var viability = compiler.Verify(CreateViableMutation(tree), tree, CancellationToken.None);
 
-        _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.Viable);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.Viable);
+        }
     }
 
     [Test]
@@ -167,8 +170,11 @@ public class MutantCompilerTests
 
         var viability = compiler.Verify(CreateBrokenMutation(tree), tree, CancellationToken.None);
 
-        _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     [Test]
@@ -192,8 +198,11 @@ public class MutantCompilerTests
 
         var verdicts = Repeat(() => compiler.Verify(mutation, tree, CancellationToken.None), repetitions: 5);
 
-        _ = await Assert.That(verdicts.Distinct()).Count().IsEqualTo(1);
-        _ = await Assert.That(verdicts[0]).IsEqualTo(MutantViability.Viable);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdicts.Distinct()).Count().IsEqualTo(1);
+            _ = await Assert.That(verdicts[0]).IsEqualTo(MutantViability.Viable);
+        }
     }
 
     [Test]
@@ -205,8 +214,11 @@ public class MutantCompilerTests
 
         var verdicts = Repeat(() => compiler.Verify(mutation, tree, CancellationToken.None), repetitions: 5);
 
-        _ = await Assert.That(verdicts.Distinct()).Count().IsEqualTo(1);
-        _ = await Assert.That(verdicts[0]).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(verdicts.Distinct()).Count().IsEqualTo(1);
+            _ = await Assert.That(verdicts[0]).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     [Test]
@@ -220,10 +232,13 @@ public class MutantCompilerTests
         _ = compiler.Verify(CreateViableMutation(tree), tree, CancellationToken.None);
         _ = compiler.Verify(CreateBrokenMutation(tree), tree, CancellationToken.None);
 
-        _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
-        _ = await Assert.That(compilation.SyntaxTrees.Length).IsEqualTo(treesBefore.Length);
-        _ = await Assert.That(ReferenceEquals(compilation.SyntaxTrees[0], tree)).IsTrue();
-        _ = await Assert.That(tree.ToString()).IsEqualTo(textBefore);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(compilation)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+            _ = await Assert.That(compilation.SyntaxTrees.Length).IsEqualTo(treesBefore.Length);
+            _ = await Assert.That(ReferenceEquals(compilation.SyntaxTrees[0], tree)).IsTrue();
+            _ = await Assert.That(tree.ToString()).IsEqualTo(textBefore);
+        }
     }
 
     [Test]
@@ -267,10 +282,13 @@ public class MutantCompilerTests
             }
         );
 
-        _ = await Assert.That(mutations.Length).IsEqualTo(3);
-        _ = await Assert.That(results).Count().IsEqualTo(32 * mutations.Length);
-        _ = await Assert.That(results.Distinct()).Count().IsEqualTo(1);
-        _ = await Assert.That(results.First()).IsEqualTo(MutantViability.Viable);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations.Length).IsEqualTo(3);
+            _ = await Assert.That(results).Count().IsEqualTo(32 * mutations.Length);
+            _ = await Assert.That(results.Distinct()).Count().IsEqualTo(1);
+            _ = await Assert.That(results.First()).IsEqualTo(MutantViability.Viable);
+        }
     }
 
     [Test]
@@ -291,10 +309,15 @@ public class MutantCompilerTests
             }
         );
 
-        _ = await Assert.That(VerdictsOf(results, ViableOperatorId)).IsEquivalentTo(new[] { MutantViability.Viable });
-        _ = await Assert
-            .That(VerdictsOf(results, BrokenOperatorId))
-            .IsEquivalentTo(new[] { MutantViability.DoesNotCompile });
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(VerdictsOf(results, ViableOperatorId))
+                .IsEquivalentTo(new[] { MutantViability.Viable });
+            _ = await Assert
+                .That(VerdictsOf(results, BrokenOperatorId))
+                .IsEquivalentTo(new[] { MutantViability.DoesNotCompile });
+        }
     }
 
     [Test]
@@ -346,8 +369,11 @@ public class MutantCompilerTests
 
         var viability = compiler.Verify(CreateViableMutation(foreignTree), foreignTree, CancellationToken.None);
 
-        _ = await Assert.That(compilation.SyntaxTrees.Contains(foreignTree)).IsFalse();
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(compilation.SyntaxTrees.Contains(foreignTree)).IsFalse();
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     [Test]
@@ -367,8 +393,11 @@ public class MutantCompilerTests
 
         var viability = compiler.Verify(mutation, tree, CancellationToken.None);
 
-        _ = await Assert.That(syntaxErrors.Length).IsGreaterThan(0);
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(syntaxErrors.Length).IsGreaterThan(0);
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     /// <summary>
@@ -392,8 +421,11 @@ public class MutantCompilerTests
         var mutation = CreateSubtractionMutation(tree, ViableOperatorId);
         var viability = compiler.Verify(mutation, tree, CancellationToken.None);
 
-        _ = await Assert.That(warningIds).Contains("CS0618");
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.Viable);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(warningIds).Contains("CS0618");
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.Viable);
+        }
     }
 
     /// <summary>
@@ -411,9 +443,12 @@ public class MutantCompilerTests
         var first = compiler.Verify(viable, tree, CancellationToken.None);
         var second = compiler.Verify(broken, tree, CancellationToken.None);
 
-        _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
-        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
-        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
+            _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+            _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     /// <summary>
@@ -431,9 +466,12 @@ public class MutantCompilerTests
         var first = compiler.Verify(viable, tree, CancellationToken.None);
         var second = compiler.Verify(broken, tree, CancellationToken.None);
 
-        _ = await Assert.That(broken.Location.SourceSpan).IsNotEqualTo(viable.Location.SourceSpan);
-        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
-        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(broken.Location.SourceSpan).IsNotEqualTo(viable.Location.SourceSpan);
+            _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+            _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     /// <summary>
@@ -453,10 +491,13 @@ public class MutantCompilerTests
         var first = compiler.Verify(viable, treeA, CancellationToken.None);
         var second = compiler.Verify(broken, treeB, CancellationToken.None);
 
-        _ = await Assert.That(treeB.FilePath).IsNotEqualTo(treeA.FilePath);
-        _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
-        _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
-        _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(treeB.FilePath).IsNotEqualTo(treeA.FilePath);
+            _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
+            _ = await Assert.That(first).IsEqualTo(MutantViability.Viable);
+            _ = await Assert.That(second).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     /// <summary>
@@ -474,9 +515,12 @@ public class MutantCompilerTests
 
         var viability = compiler.Verify(mutation, tree, CancellationToken.None);
 
-        _ = await Assert.That(HasError(mutation.Replacement.GetDiagnostics())).IsFalse();
-        _ = await Assert.That(HasError(tree.GetDiagnostics())).IsTrue();
-        _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(HasError(mutation.Replacement.GetDiagnostics())).IsFalse();
+            _ = await Assert.That(HasError(tree.GetDiagnostics())).IsTrue();
+            _ = await Assert.That(viability).IsEqualTo(MutantViability.DoesNotCompile);
+        }
     }
 
     /// <summary>
@@ -500,18 +544,21 @@ public class MutantCompilerTests
             compiler.Verify(broken, tree, CancellationToken.None),
         };
 
-        _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
-        _ = await Assert
-            .That(verdicts)
-            .IsEquivalentTo(
-                new[]
-                {
-                    MutantViability.Viable,
-                    MutantViability.DoesNotCompile,
-                    MutantViability.Viable,
-                    MutantViability.DoesNotCompile,
-                }
-            );
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
+            _ = await Assert
+                .That(verdicts)
+                .IsEquivalentTo(
+                    new[]
+                    {
+                        MutantViability.Viable,
+                        MutantViability.DoesNotCompile,
+                        MutantViability.Viable,
+                        MutantViability.DoesNotCompile,
+                    }
+                );
+        }
     }
 
     [Test]
@@ -520,11 +567,14 @@ public class MutantCompilerTests
         var left = CreateKey(ViableOperatorId, TwinPathA, CreateSpan());
         var right = CreateKey(ViableOperatorId, TwinPathA, CreateSpan());
 
-        _ = await Assert.That(TypedEquals(left, right)).IsTrue();
-        _ = await Assert.That(left.Equals(right)).IsTrue();
-        _ = await Assert.That(OperatorEquals(left, right)).IsTrue();
-        _ = await Assert.That(OperatorNotEquals(left, right)).IsFalse();
-        _ = await Assert.That(left.GetHashCode()).IsEqualTo(right.GetHashCode());
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TypedEquals(left, right)).IsTrue();
+            _ = await Assert.That(left.Equals(right)).IsTrue();
+            _ = await Assert.That(OperatorEquals(left, right)).IsTrue();
+            _ = await Assert.That(OperatorNotEquals(left, right)).IsFalse();
+            _ = await Assert.That(left.GetHashCode()).IsEqualTo(right.GetHashCode());
+        }
     }
 
     /// <summary>
@@ -550,10 +600,13 @@ public class MutantCompilerTests
         var key = CreateKey(ViableOperatorId, TwinPathA, CreateSpan());
         var other = CreateKey(operatorId, filePath, new TextSpan(start, length));
 
-        _ = await Assert.That(TypedEquals(key, other)).IsFalse();
-        _ = await Assert.That(key.Equals(other)).IsFalse();
-        _ = await Assert.That(OperatorEquals(key, other)).IsFalse();
-        _ = await Assert.That(OperatorNotEquals(key, other)).IsTrue();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TypedEquals(key, other)).IsFalse();
+            _ = await Assert.That(key.Equals(other)).IsFalse();
+            _ = await Assert.That(OperatorEquals(key, other)).IsFalse();
+            _ = await Assert.That(OperatorNotEquals(key, other)).IsTrue();
+        }
     }
 
     [Test]
@@ -561,9 +614,12 @@ public class MutantCompilerTests
     {
         var key = CreateKey(ViableOperatorId, TwinPathA, CreateSpan());
 
-        _ = await Assert.That(ObjectEquals(key, null)).IsFalse();
-        _ = await Assert.That(ObjectEquals(key, TwinPathA)).IsFalse();
-        _ = await Assert.That(ObjectEquals(key, CreateSpan())).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(ObjectEquals(key, null)).IsFalse();
+            _ = await Assert.That(ObjectEquals(key, TwinPathA)).IsFalse();
+            _ = await Assert.That(ObjectEquals(key, CreateSpan())).IsFalse();
+        }
     }
 
     [Test]
@@ -588,9 +644,12 @@ public class MutantCompilerTests
         var withEmptyPath = CreateKey(ViableOperatorId, string.Empty, CreateSpan());
         var withPath = CreateKey(ViableOperatorId, TwinPathA, CreateSpan());
 
-        _ = await Assert.That(TypedEquals(withoutPath, withEmptyPath)).IsTrue();
-        _ = await Assert.That(withoutPath.GetHashCode()).IsEqualTo(withEmptyPath.GetHashCode());
-        _ = await Assert.That(TypedEquals(withoutPath, withPath)).IsFalse();
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(TypedEquals(withoutPath, withEmptyPath)).IsTrue();
+            _ = await Assert.That(withoutPath.GetHashCode()).IsEqualTo(withEmptyPath.GetHashCode());
+            _ = await Assert.That(TypedEquals(withoutPath, withPath)).IsFalse();
+        }
     }
 
     private static TextSpan CreateSpan() => new TextSpan(KeySpanStart, KeySpanLength);
