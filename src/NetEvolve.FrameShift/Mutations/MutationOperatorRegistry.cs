@@ -51,7 +51,7 @@ internal static class MutationOperatorRegistry
         yield return new Operators.IncrementDecrementMutator();
         yield return new Operators.LogicalNegationMutator();
         yield return new Operators.LogicalOperatorMutator();
-        yield return new Operators.NullableBooleanMutator();
+        yield return new Operators.NullableBooleanLiteralMutator();
         yield return new Operators.NullCoalescingMutator();
         yield return new Operators.NumericLiteralMutator();
         yield return new Operators.RegexOptionsMutator();

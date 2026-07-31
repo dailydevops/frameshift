@@ -33,7 +33,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// dereference is guarded rather than on the three valued logic this operator targets.
 /// </para>
 /// </remarks>
-internal sealed class NullableBooleanMutator : MutationOperatorBase
+internal sealed class NullableBooleanLiteralMutator : MutationOperatorBase
 {
     private static readonly ImmutableArray<SyntaxKind> _supportedSyntaxKinds =
     [
@@ -43,10 +43,10 @@ internal sealed class NullableBooleanMutator : MutationOperatorBase
     ];
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="NullableBooleanMutator" /> class.
+    /// Initializes a new instance of the <see cref="NullableBooleanLiteralMutator" /> class.
     /// </summary>
-    public NullableBooleanMutator()
-        : base("nullable-boolean", MutationKind.NullableBooleanLiteral, _supportedSyntaxKinds) { }
+    public NullableBooleanLiteralMutator()
+        : base("nullable-boolean-literal", MutationKind.NullableBooleanLiteral, _supportedSyntaxKinds) { }
 
     /// <inheritdoc />
     protected override IEnumerable<Mutation> CreateMutationsCore(

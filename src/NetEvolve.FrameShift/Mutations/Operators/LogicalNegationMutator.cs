@@ -20,7 +20,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// never compile.
 /// </para>
 /// <para>
-/// The three states of a <c>bool?</c> are reached by <see cref="NullableBooleanMutator" /> instead.
+/// The three states of a <c>bool?</c> are reached by <see cref="NullableBooleanLiteralMutator" /> instead.
 /// </para>
 /// </remarks>
 internal sealed class LogicalNegationMutator : MutationOperatorBase

@@ -16,7 +16,7 @@ using TUnit.Core;
 /// <see langword="null" /> on a reference type and a <see langword="default" /> written in place of a
 /// literal.
 /// </summary>
-public class NullableBooleanMutatorTests
+public class NullableBooleanLiteralMutatorTests
 {
     private const string TrueSource = "public class Sample { public bool? Get() => true; }";
     private const string FalseSource = "public class Sample { public bool? Get() => false; }";
@@ -44,10 +44,10 @@ public class NullableBooleanMutatorTests
     [Test]
     public async Task Metadata_Operator_DescribesNullableBooleanLiteralFamily()
     {
-        var mutator = new NullableBooleanMutator();
+        var mutator = new NullableBooleanLiteralMutator();
         SyntaxKind[] supported = [.. mutator.SupportedSyntaxKinds];
 
-        _ = await Assert.That(mutator.Id).IsEqualTo("nullable-boolean");
+        _ = await Assert.That(mutator.Id).IsEqualTo("nullable-boolean-literal");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
         _ = await Assert.That(supported).Count().IsEqualTo(3);
         _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
@@ -62,7 +62,7 @@ public class NullableBooleanMutatorTests
 
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
         _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.NullableBooleanLiteral);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean.true-to-null");
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
         _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("true => null");
         _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
@@ -74,7 +74,7 @@ public class NullableBooleanMutatorTests
         var (tree, mutations) = Run(FalseSource);
 
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean.false-to-null");
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
         _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("false => null");
         _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.NullLiteralExpression)).IsTrue();
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(NullSource);
@@ -86,11 +86,11 @@ public class NullableBooleanMutatorTests
         var (tree, mutations) = Run(NullSource);
 
         _ = await Assert.That(mutations).Count().IsEqualTo(2);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean.null-to-true");
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-true");
         _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => true");
         _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(TrueSource);
-        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-boolean.null-to-false");
+        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-boolean-literal.null-to-false");
         _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("null => false");
         _ = await Assert.That(mutations[1].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
         _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(FalseSource);
@@ -103,7 +103,7 @@ public class NullableBooleanMutatorTests
         var (tree, mutations) = Run(FieldInitializerSource);
 
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean.false-to-null");
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.false-to-null");
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
     }
 
@@ -119,7 +119,7 @@ public class NullableBooleanMutatorTests
         var (tree, mutations) = Run(LiftedComparisonSource);
 
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
-        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean.true-to-null");
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-boolean-literal.true-to-null");
         _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
     }
 
@@ -193,7 +193,7 @@ public class NullableBooleanMutatorTests
     public async Task CreateMutations_NodeNull_ThrowsArgumentNullException()
     {
         var (_, semanticModel, _) = CompilationFactory.CreateWithModel(TrueSource);
-        var mutator = new NullableBooleanMutator();
+        var mutator = new NullableBooleanLiteralMutator();
 
         var exception = Assert.Throws<ArgumentNullException>(() =>
             mutator.CreateMutations(null!, semanticModel, CancellationToken.None)
@@ -206,7 +206,7 @@ public class NullableBooleanMutatorTests
     public async Task CreateMutations_SemanticModelNull_ThrowsArgumentNullException()
     {
         var (_, _, tree) = CompilationFactory.CreateWithModel(TrueSource);
-        var mutator = new NullableBooleanMutator();
+        var mutator = new NullableBooleanLiteralMutator();
         var node = FindNullableBooleanLiteral(tree);
 
         var exception = Assert.Throws<ArgumentNullException>(() =>
@@ -220,7 +220,7 @@ public class NullableBooleanMutatorTests
     public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
     {
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(TrueSource);
-        var mutator = new NullableBooleanMutator();
+        var mutator = new NullableBooleanLiteralMutator();
         var node = FindNullableBooleanLiteral(tree);
         using var cancellation = new CancellationTokenSource();
         await cancellation.CancelAsyncCompat().ConfigureAwait(false);
@@ -238,7 +238,7 @@ public class NullableBooleanMutatorTests
     private static (SyntaxTree Tree, Mutation[] Mutations) Run(string source, Func<SyntaxTree, SyntaxNode> select)
     {
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(source);
-        var mutator = new NullableBooleanMutator();
+        var mutator = new NullableBooleanLiteralMutator();
 
         return (tree, [.. mutator.CreateMutations(select(tree), semanticModel, CancellationToken.None)]);
     }

@@ -36,7 +36,7 @@ public class MutationOperatorRegistryTests
         "logical",
         "negation",
         "null-coalescing",
-        "nullable-boolean",
+        "nullable-boolean-literal",
         "numeric-literal",
         "relational",
         "string-literal",
@@ -121,7 +121,7 @@ public class MutationOperatorRegistryTests
 
         _ = await Assert
             .That(Join(Sort(booleanOperators.Select(item => item.Id))))
-            .IsEqualTo("boolean-literal, nullable-boolean");
+            .IsEqualTo("boolean-literal, nullable-boolean-literal");
         _ = await Assert
             .That(Join(Sort(conditionalOperators.Select(item => item.Id))))
             .IsEqualTo("conditional-expression, negation");
