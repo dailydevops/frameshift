@@ -11,10 +11,16 @@ using TUnit.Core;
 /// <summary>
 /// Covers which methods <see cref="MSTestTestMethodRecognizer" /> calls a test. Everything downstream —
 /// the recorded test surface, <c>FSH0004</c>, and ultimately which mutants are considered covered —
-/// rests on this single decision, so both directions are asserted: the specialisations MSTest and its
-/// users derive from <c>TestMethodAttribute</c> have to be accepted, and anything that merely carries
-/// the same name has to be refused.
+/// rests on this single decision, so both directions are asserted: every specialisation MSTest and its
+/// users derive from <c>TestMethodAttribute</c> has to be accepted, and everything else has to be refused
+/// — an attribute that merely carries the same name, the data sources that feed an existing test, the
+/// fixture attributes that sit on a method without being one, and the class-level attribute.
 /// </summary>
+/// <remarks>
+/// The marker really is the base type here, which is why <c>[STATestMethod]</c> is accepted without being
+/// named anywhere in production code, while <c>[DataRow]</c> and <c>[DynamicData]</c> are refused on their
+/// own however test-like they look.
+/// </remarks>
 public class MSTestMethodRecognizerTests
 {
     private const string FrameworkAssemblyName = "Microsoft.VisualStudio.TestPlatform.TestFramework.Satellite";
@@ -35,6 +41,7 @@ public class MSTestMethodRecognizerTests
     private const string CasesSource = """
         namespace Fixture;
 
+        using System.Collections.Generic;
         using Microsoft.VisualStudio.TestTools.UnitTesting;
 
         public class CustomTestMethodAttribute : TestMethodAttribute
@@ -55,6 +62,11 @@ public class MSTestMethodRecognizerTests
             {
             }
 
+            [STATestMethod]
+            public void SingleThreadedApartmentTest()
+            {
+            }
+
             [CustomTestMethod]
             public void DerivedAttributeTest()
             {
@@ -65,8 +77,38 @@ public class MSTestMethodRecognizerTests
             {
             }
 
+            [DataRow(1)]
+            public void DataRowOnlyMethod(int value)
+            {
+            }
+
+            [DynamicData(nameof(Values))]
+            public void DynamicDataOnlyMethod(int value)
+            {
+            }
+
+            [TestInitialize]
+            public void InitializeOnlyMethod()
+            {
+            }
+
+            [TestCleanup]
+            public void CleanupOnlyMethod()
+            {
+            }
+
+            [TestCategory("slow")]
+            public void CategoryOnlyMethod()
+            {
+            }
+
             public void UndecoratedMethod()
             {
+            }
+
+            public static IEnumerable<object[]> Values
+            {
+                get { yield return new object[] { 1 }; }
             }
         }
         """;
@@ -154,18 +196,28 @@ public class MSTestMethodRecognizerTests
     }
 
     /// <summary>
-    /// <c>DataTestMethodAttribute</c> and any user-written specialisation derive from
-    /// <c>TestMethodAttribute</c> and are therefore found by walking the attribute base chain, while
-    /// <c>TestClassAttribute</c> is not in that chain and an unrelated <c>TestMethodAttribute</c> is
-    /// declared outside the framework.
+    /// Every marker of the framework derives from <c>TestMethodAttribute</c> — <c>DataTestMethodAttribute</c>
+    /// and <c>STATestMethodAttribute</c> do, and so does any user-written specialisation — and each is
+    /// therefore found by walking the attribute base chain. Nothing else is a marker: the data sources
+    /// <c>DataRowAttribute</c> and <c>DynamicDataAttribute</c> only feed an existing test, the fixture
+    /// attributes <c>TestInitializeAttribute</c> and <c>TestCleanupAttribute</c> and the descriptive
+    /// <c>TestCategoryAttribute</c> derive straight from <see cref="Attribute" />, <c>TestClassAttribute</c>
+    /// marks the class this fixture is, and the unrelated <c>TestMethodAttribute</c> is declared outside the
+    /// framework.
     /// </summary>
     /// <param name="methodName">The name of the method under judgement.</param>
     /// <param name="expected">Whether the method is an MSTest test.</param>
     [Test]
     [Arguments("PlainTest", true)]
     [Arguments("DataDrivenTest", true)]
+    [Arguments("SingleThreadedApartmentTest", true)]
     [Arguments("DerivedAttributeTest", true)]
     [Arguments("ForeignAttributeTest", false)]
+    [Arguments("DataRowOnlyMethod", false)]
+    [Arguments("DynamicDataOnlyMethod", false)]
+    [Arguments("InitializeOnlyMethod", false)]
+    [Arguments("CleanupOnlyMethod", false)]
+    [Arguments("CategoryOnlyMethod", false)]
     [Arguments("UndecoratedMethod", false)]
     public async Task IsTestMethod_MethodOfTheFixture_IsClassifiedByItsAttribute(string methodName, bool expected)
     {

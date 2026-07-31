@@ -24,7 +24,7 @@ public class TUnitTestFrameworkProbeTests
         using System;
 
         [AttributeUsage(AttributeTargets.Method)]
-        public class TestAttribute : Attribute
+        public class BaseTestAttribute : Attribute
         {
         }
         """;
@@ -34,7 +34,7 @@ public class TUnitTestFrameworkProbeTests
 
         public class Cases
         {
-            [Satellite.Test]
+            [Satellite.BaseTest]
             public void DecoratedTest()
             {
             }
@@ -65,6 +65,16 @@ public class TUnitTestFrameworkProbeTests
         {
             [Test]
             public void DecoratedTest()
+            {
+            }
+
+            [DynamicTestBuilder]
+            public void DynamicBuilderTest()
+            {
+            }
+
+            [Category("Fast")]
+            public void CategoryOnly()
             {
             }
 
@@ -140,8 +150,33 @@ public class TUnitTestFrameworkProbeTests
     }
 
     /// <summary>
-    /// A recogniser that was created without the well-known attribute type still has to recognise a test
-    /// attribute declared in a framework assembly, which is the only rule available in that state.
+    /// The probe threads the marker base type into the recogniser, which is what makes the second marker of
+    /// the framework a test. A method carrying only a configuration attribute stays no test.
+    /// </summary>
+    /// <param name="methodName">The method to classify.</param>
+    /// <param name="expected">The expected classification.</param>
+    [Test]
+    [Arguments("DecoratedTest", true)]
+    [Arguments("DynamicBuilderTest", true)]
+    [Arguments("CategoryOnly", false)]
+    [Arguments("PlainMethod", false)]
+    public async Task IsTestMethod_RecognizerOfTheProbe_ClassifiesEveryMarkerOfTheFramework(
+        string methodName,
+        bool expected
+    )
+    {
+        var compilation = CompilationFactory.Create(TUnitSource, includeTUnit: true);
+        var recognizer = TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(compilation)!;
+
+        var method = FindMethod(compilation, methodName);
+
+        _ = await Assert.That(recognizer.IsTestMethod(method)).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// A recogniser that was created without any well-known type still has to recognise an attribute whose
+    /// base chain reaches a <c>BaseTestAttribute</c> declared in a framework assembly, which is the only rule
+    /// available in that state.
     /// </summary>
     [Test]
     public async Task IsTestMethod_RecognizerWithoutTheWellKnownType_UsesTheNameRule()
@@ -176,7 +211,7 @@ public class TUnitTestFrameworkProbeTests
     }
 
     /// <summary>
-    /// The name rule is what recognises a specialised test attribute of the framework, so it has to say
+    /// The name fallback is what recognises a marker base type the probe could not resolve, so it has to say
     /// yes to the framework assemblies and no to everything else, including to no assembly at all.
     /// </summary>
     [Test]
@@ -202,6 +237,29 @@ public class TUnitTestFrameworkProbeTests
         var compilation = CompilationFactory.Create(PlainSource);
 
         _ = await Assert.That(TUnitTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+    }
+
+    /// <summary>
+    /// The marker base type is the hook the recogniser is built on, so the probe has to resolve exactly it -
+    /// the abstract base of every marker, not one of the concrete markers.
+    /// </summary>
+    [Test]
+    public async Task GetBaseTestAttributeType_WithFrameworkReference_ResolvesTheMarkerBaseType()
+    {
+        var compilation = CompilationFactory.Create(TUnitSource, includeTUnit: true);
+
+        var resolved = TUnitTestFrameworkProbe.GetBaseTestAttributeType(compilation);
+
+        _ = await Assert.That(resolved?.ToDisplayString()).IsEqualTo("TUnit.Core.BaseTestAttribute");
+        _ = await Assert.That(resolved!.IsAbstract).IsTrue();
+    }
+
+    [Test]
+    public async Task GetBaseTestAttributeType_WithoutTheFramework_ReturnsNull()
+    {
+        var compilation = CompilationFactory.Create(PlainSource);
+
+        _ = await Assert.That(TUnitTestFrameworkProbe.GetBaseTestAttributeType(compilation)).IsNull();
     }
 
     [Test]

@@ -14,6 +14,19 @@ using Microsoft.CodeAnalysis;
 /// discovery. Matching only the exact type would drop every one of them from the test surface.
 /// </para>
 /// <para>
+/// Deriving from that attribute is the only way to mark a test in version 2, which is why the base chain is
+/// the whole rule here. The v2 <c>Xunit.FactAttribute</c> implements no interface at all, and discovery
+/// accepts only attributes assignable to the class itself — unlike version 3, where the marker is the
+/// interface <c>Xunit.v3.IFactAttribute</c> and an attribute may carry it without sharing any base type;
+/// see <see cref="XunitV3TestMethodRecognizer" />.
+/// </para>
+/// <para>
+/// A data source is not a marker. <c>Xunit.InlineDataAttribute</c>, <c>Xunit.MemberDataAttribute</c> and
+/// <c>Xunit.ClassDataAttribute</c> all derive from <c>Xunit.Sdk.DataAttribute</c>, never from
+/// <c>Xunit.FactAttribute</c>, so a method carrying them without <c>[Theory]</c> is correctly not a test —
+/// and version 2 would not run it either.
+/// </para>
+/// <para>
 /// There is deliberately no rule matching an attribute by its simple name. The type this recogniser
 /// compares against is resolved inside <c>xunit.core</c> by
 /// <see cref="XunitV2TestFrameworkProbe" />, so it is exact even in a compilation that references xUnit
