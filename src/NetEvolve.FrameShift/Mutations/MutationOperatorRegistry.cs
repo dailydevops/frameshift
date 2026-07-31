@@ -43,14 +43,20 @@ internal static class MutationOperatorRegistry
         yield return new Operators.ArithmeticOperatorMutator();
         yield return new Operators.BitwiseOperatorMutator();
         yield return new Operators.BooleanLiteralMutator();
+        yield return new Operators.CaseConversionMutator();
         yield return new Operators.ConditionalExpressionMutator();
+        yield return new Operators.CultureInfoMutator();
         yield return new Operators.EqualityOperatorMutator();
+        yield return new Operators.FormatProviderArgumentMutator();
         yield return new Operators.IncrementDecrementMutator();
         yield return new Operators.LogicalNegationMutator();
         yield return new Operators.LogicalOperatorMutator();
         yield return new Operators.NullCoalescingMutator();
         yield return new Operators.NumericLiteralMutator();
+        yield return new Operators.RegexOptionsMutator();
         yield return new Operators.RelationalOperatorMutator();
+        yield return new Operators.StringComparerMutator();
+        yield return new Operators.StringComparisonMutator();
         yield return new Operators.StringLiteralMutator();
         yield return new Operators.UnaryOperatorMutator();
         // <<< operator registrations

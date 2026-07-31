@@ -84,4 +84,46 @@ internal enum MutationKind
     /// Shift operators, such as <c>&lt;&lt;</c> and <c>&gt;&gt;</c>.
     /// </summary>
     ShiftOperator,
+
+    /// <summary>
+    /// <c>System.StringComparison</c> arguments, replaced by a different member of the same enumeration,
+    /// for example <c>Ordinal</c> by <c>OrdinalIgnoreCase</c>. A test suite that never distinguishes the
+    /// members cannot tell a case sensitive comparison from a case insensitive or culture aware one.
+    /// </summary>
+    StringComparison,
+
+    /// <summary>
+    /// <c>System.StringComparer</c> instances, replaced by a different well known comparer, for example
+    /// <c>StringComparer.Ordinal</c> by <c>StringComparer.OrdinalIgnoreCase</c>. Dictionaries, sets and
+    /// sorts silently change their notion of key equality and ordering when the wrong comparer is used.
+    /// </summary>
+    StringComparer,
+
+    /// <summary>
+    /// <c>System.Globalization.CultureInfo</c> references, replaced by a different culture, for example
+    /// <c>CultureInfo.InvariantCulture</c> by <c>CultureInfo.CurrentCulture</c>. Culture dependent parsing
+    /// and comparison is a classic source of defects that only surface on a machine with another locale.
+    /// </summary>
+    CultureInfo,
+
+    /// <summary>
+    /// <c>System.IFormatProvider</c> arguments of formatting and parsing calls, replaced by another
+    /// provider or omitted. Formatting without an explicit provider makes numbers, dates and money
+    /// depend on ambient state, so the produced text differs between environments.
+    /// </summary>
+    FormatProvider,
+
+    /// <summary>
+    /// Case conversion calls, such as <c>ToUpper</c>, <c>ToLower</c>, <c>ToUpperInvariant</c> and
+    /// <c>ToLowerInvariant</c>, replaced by their counterpart or by their invariant and culture aware
+    /// form. Normalising with the wrong case or the wrong culture breaks lookups for specific inputs.
+    /// </summary>
+    CaseConversion,
+
+    /// <summary>
+    /// <c>System.Text.RegularExpressions.RegexOptions</c> arguments, with a flag such as
+    /// <c>IgnoreCase</c>, <c>Multiline</c> or <c>Singleline</c> added or removed. The flags change the
+    /// pattern grammar and the matching semantics, so an untested flag hides matches the code relies on.
+    /// </summary>
+    RegexOptions,
 }
