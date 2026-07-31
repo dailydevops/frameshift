@@ -38,10 +38,20 @@ using Microsoft.CodeAnalysis;
 /// A recogniser whose attribute type could not be resolved finds no tests at all instead of throwing:
 /// judging a method fails closed, and a compilation whose tests cannot be seen must never be judged.
 /// </para>
+/// <para>
+/// Counting the test cases of a recognised method is delegated to <see cref="XunitTestCaseCounter" />,
+/// which both major versions share because they describe their data sources identically — the same
+/// <c>Xunit.InlineDataAttribute</c>, the same <c>[MemberData]</c> and <c>[ClassData]</c> shapes, only
+/// rooted in a differently named base type and, in version 3, additionally reachable through an
+/// interface. Sharing the rules is what keeps the two recognisers from drifting apart while they stay
+/// separate types.
+/// </para>
 /// </remarks>
 internal sealed class XunitV2TestMethodRecognizer : ITestMethodRecognizer
 {
     private readonly INamedTypeSymbol? _testAttributeType;
+    private readonly XunitTestCaseCounter _caseCounter;
+    private readonly Func<INamedTypeSymbol?, bool> _isTestAttribute;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="XunitV2TestMethodRecognizer" /> class.
@@ -50,7 +60,12 @@ internal sealed class XunitV2TestMethodRecognizer : ITestMethodRecognizer
     /// The <c>Xunit.FactAttribute</c> type resolved inside <c>xunit.core</c>, or <see langword="null" />
     /// when it could not be resolved, in which case no method is recognised as a test.
     /// </param>
-    public XunitV2TestMethodRecognizer(INamedTypeSymbol? testAttributeType) => _testAttributeType = testAttributeType;
+    public XunitV2TestMethodRecognizer(INamedTypeSymbol? testAttributeType)
+    {
+        _testAttributeType = testAttributeType;
+        _caseCounter = XunitTestCaseCounter.ForVersionTwo(testAttributeType?.ContainingAssembly);
+        _isTestAttribute = IsTestAttribute;
+    }
 
     /// <inheritdoc />
     public string FrameworkName => XunitV2TestFrameworkProbe.Name;
@@ -70,6 +85,32 @@ internal sealed class XunitV2TestMethodRecognizer : ITestMethodRecognizer
         }
 
         return method.GetAttributes().Any(attribute => IsTestAttribute(attribute.AttributeClass));
+    }
+
+    /// <summary>
+    /// Counts the test cases <paramref name="method" /> contributes, following the shared xUnit.net rules of
+    /// <see cref="XunitTestCaseCounter" />: one case per <c>[InlineData]</c>, the literal length of a member
+    /// data source that is written out in the compilation, a lower bound of one for every other data source,
+    /// exactly one for a <c>[Fact]</c>, no case at all for a <c>[Theory]</c> without any data source, and a
+    /// lower bound whenever a marker other than the shipped <c>[Fact]</c> and <c>[Theory]</c> may multiply
+    /// the cases.
+    /// </summary>
+    /// <param name="method">The test method to count the cases of.</param>
+    /// <returns>The number of test cases, exact or as a lower bound.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="method" /> is <see langword="null" />.</exception>
+    /// <remarks>
+    /// A recogniser whose attribute type could not be resolved cannot see the data sources either and
+    /// answers the lower bound of one, which suppresses every finding built on the count instead of
+    /// inventing exactness.
+    /// </remarks>
+    public TestCaseCount GetTestCaseCount(IMethodSymbol method)
+    {
+        if (method is null)
+        {
+            throw new ArgumentNullException(nameof(method));
+        }
+
+        return _caseCounter.Count(method, _isTestAttribute);
     }
 
     private bool IsTestAttribute(INamedTypeSymbol? attributeClass)

@@ -140,9 +140,7 @@ public sealed class TestSurfaceManifestGenerator : IIncrementalGenerator
     /// </remarks>
     private static TestSurfaceManifest? TryCollect(Compilation compilation, CancellationToken cancellationToken)
     {
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var matched = false;
+        var collected = ImmutableArray.CreateBuilder<TestSurfaceManifest>();
 
         foreach (var probe in TestFrameworkProbeRegistry.Matching(compilation))
         {
@@ -155,15 +153,10 @@ public sealed class TestSurfaceManifestGenerator : IIncrementalGenerator
                 continue;
             }
 
-            matched = true;
-
-            var collected = TestSurfaceCollector.Collect(compilation, recognizer, cancellationToken);
-
-            testMethodIds.UnionWith(collected.TestMethodIds);
-            referencedMemberIds.UnionWith(collected.ReferencedMemberIds);
+            collected.Add(TestSurfaceCollector.Collect(compilation, recognizer, cancellationToken));
         }
 
-        return matched ? new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable()) : null;
+        return collected.Count == 0 ? null : TestSurfaceManifest.Merge(collected.ToImmutable());
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace NetEvolve.FrameShift.TestSurface;
+namespace NetEvolve.FrameShift.TestSurface;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
@@ -7,6 +7,11 @@ using Microsoft.CodeAnalysis.Text;
 /// Parses the plain text representation of a test-surface manifest, as produced by
 /// <see cref="TestSurfaceManifestWriter" />.
 /// </summary>
+/// <remarks>
+/// The manifest is a sequence of blocks: a <c>T</c> line names a test method and its test case count,
+/// and every following <c>R</c> line names a production member that this very test method references.
+/// A line carrying an unknown marker is ignored, so that a future manifest version stays readable.
+/// </remarks>
 internal static class TestSurfaceManifestReader
 {
     /// <summary>
@@ -36,8 +41,7 @@ internal static class TestSurfaceManifestReader
         manifest = TestSurfaceManifest.Empty;
         error = null;
 
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var blocks = new BlockBuilder();
         var headerFound = false;
 
         foreach (var line in text.Lines)
@@ -61,7 +65,7 @@ internal static class TestSurfaceManifestReader
                 continue;
             }
 
-            if (!TryReadEntry(content, lineNumber, testMethodIds, referencedMemberIds, out error))
+            if (!TryReadEntry(content, lineNumber, blocks, out error))
             {
                 return false;
             }
@@ -76,7 +80,7 @@ internal static class TestSurfaceManifestReader
             return false;
         }
 
-        manifest = new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
+        manifest = blocks.Build();
 
         return true;
     }
@@ -87,7 +91,9 @@ internal static class TestSurfaceManifestReader
     /// <param name="content">The trimmed content of the line.</param>
     /// <param name="lineNumber">The 1-based number of the line.</param>
     /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
-    /// <returns><see langword="true" /> if the line is the expected header; otherwise <see langword="false" />.</returns>
+    /// <returns>
+    /// <see langword="true" /> if the line is the expected header; otherwise <see langword="false" />.
+    /// </returns>
     private static bool TryReadHeader(string content, int lineNumber, out string? error)
     {
         if (string.Equals(content, TestSurfaceManifestFormat.Header, StringComparison.Ordinal))
@@ -105,22 +111,15 @@ internal static class TestSurfaceManifestReader
     }
 
     /// <summary>
-    /// Reads a single entry line and adds its documentation comment id to the matching builder.
-    /// Lines with an unknown marker are ignored, so that future manifest versions stay readable.
+    /// Reads a single entry line and adds it to <paramref name="blocks" />. Lines with an unknown
+    /// marker are ignored, so that future manifest versions stay readable.
     /// </summary>
     /// <param name="content">The trimmed content of the line.</param>
     /// <param name="lineNumber">The 1-based number of the line.</param>
-    /// <param name="testMethodIds">The builder collecting the test method ids.</param>
-    /// <param name="referencedMemberIds">The builder collecting the referenced production member ids.</param>
+    /// <param name="blocks">The builder collecting the per-test blocks.</param>
     /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
     /// <returns><see langword="true" /> if the line is well-formed; otherwise <see langword="false" />.</returns>
-    private static bool TryReadEntry(
-        string content,
-        int lineNumber,
-        ImmutableHashSet<string>.Builder testMethodIds,
-        ImmutableHashSet<string>.Builder referencedMemberIds,
-        out string? error
-    )
+    private static bool TryReadEntry(string content, int lineNumber, BlockBuilder blocks, out string? error)
     {
         error = null;
 
@@ -140,23 +139,85 @@ internal static class TestSurfaceManifestReader
             return true;
         }
 
-        var id = separatorIndex < 0 ? string.Empty : content.Substring(separatorIndex + 1).Trim();
+        var arguments = separatorIndex < 0 ? string.Empty : content.Substring(separatorIndex + 1).Trim();
 
-        if (id.Length == 0)
+        if (arguments.Length == 0)
         {
             error = $"Line {lineNumber}: the '{marker[0]}' entry does not specify a documentation " + "comment id.";
 
             return false;
         }
 
-        if (isTestLine)
+        return isTestLine
+            ? TryReadTest(arguments, lineNumber, blocks, out error)
+            : TryReadReference(arguments, lineNumber, blocks, out error);
+    }
+
+    /// <summary>
+    /// Reads a <c>T</c> line, which opens the block of a test method and carries its test case count.
+    /// </summary>
+    /// <param name="arguments">The trimmed part of the line following the marker.</param>
+    /// <param name="lineNumber">The 1-based number of the line.</param>
+    /// <param name="blocks">The builder collecting the per-test blocks.</param>
+    /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> if the line is well-formed; otherwise <see langword="false" />.</returns>
+    private static bool TryReadTest(string arguments, int lineNumber, BlockBuilder blocks, out string? error)
+    {
+        var separatorIndex = IndexOfWhiteSpace(arguments);
+
+        if (separatorIndex < 0)
         {
-            _ = testMethodIds.Add(id);
+            error =
+                $"Line {lineNumber}: the '{TestSurfaceManifestFormat.TestPrefix}' entry for "
+                + $"'{arguments}' does not specify a test case count.";
+
+            return false;
         }
-        else
+
+        var testMethodId = arguments.Substring(0, separatorIndex);
+        var countText = arguments.Substring(separatorIndex + 1).Trim();
+
+        if (!TestCaseCount.TryParse(countText, out var count))
         {
-            _ = referencedMemberIds.Add(id);
+            error = $"Line {lineNumber}: '{countText}' is not a valid test case count.";
+
+            return false;
         }
+
+        if (!blocks.TryOpen(testMethodId, count))
+        {
+            error =
+                $"Line {lineNumber}: the '{TestSurfaceManifestFormat.TestPrefix}' entry for "
+                + $"'{testMethodId}' is declared more than once.";
+
+            return false;
+        }
+
+        error = null;
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an <c>R</c> line, which adds a referenced production member to the enclosing block.
+    /// </summary>
+    /// <param name="arguments">The trimmed part of the line following the marker.</param>
+    /// <param name="lineNumber">The 1-based number of the line.</param>
+    /// <param name="blocks">The builder collecting the per-test blocks.</param>
+    /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> if the line is well-formed; otherwise <see langword="false" />.</returns>
+    private static bool TryReadReference(string arguments, int lineNumber, BlockBuilder blocks, out string? error)
+    {
+        if (!blocks.TryAddReference(arguments))
+        {
+            error =
+                $"Line {lineNumber}: the '{TestSurfaceManifestFormat.ReferencePrefix}' entry appears "
+                + $"before any '{TestSurfaceManifestFormat.TestPrefix}' entry.";
+
+            return false;
+        }
+
+        error = null;
 
         return true;
     }
@@ -172,5 +233,86 @@ internal static class TestSurfaceManifestReader
         }
 
         return -1;
+    }
+
+    /// <summary>
+    /// Collects the per-test blocks of a manifest while it is parsed. The instance lives for the
+    /// duration of a single <see cref="TryRead" /> call and is therefore not shared between threads.
+    /// </summary>
+    private sealed class BlockBuilder
+    {
+        private readonly ImmutableDictionary<string, TestCaseCount>.Builder _counts;
+        private readonly Dictionary<string, ImmutableHashSet<string>.Builder> _references;
+        private ImmutableHashSet<string>.Builder? _current;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="BlockBuilder" /> class.
+        /// </summary>
+        public BlockBuilder()
+        {
+            _counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+            _references = new Dictionary<string, ImmutableHashSet<string>.Builder>(StringComparer.Ordinal);
+        }
+
+        /// <summary>
+        /// Opens the block of the test method <paramref name="testMethodId" />.
+        /// </summary>
+        /// <param name="testMethodId">The documentation comment id of the test method.</param>
+        /// <param name="count">The test case count of the test method.</param>
+        /// <returns>
+        /// <see langword="true" /> if the block was opened; <see langword="false" /> if the same test
+        /// method was already declared, which is malformed.
+        /// </returns>
+        public bool TryOpen(string testMethodId, TestCaseCount count)
+        {
+            if (_counts.ContainsKey(testMethodId))
+            {
+                return false;
+            }
+
+            _counts[testMethodId] = count;
+            _current = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            _references[testMethodId] = _current;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Adds a referenced production member to the currently open block.
+        /// </summary>
+        /// <param name="referencedMemberId">The documentation comment id of the production member.</param>
+        /// <returns>
+        /// <see langword="true" /> if the member was added; <see langword="false" /> if no block is open
+        /// yet, which is malformed.
+        /// </returns>
+        public bool TryAddReference(string referencedMemberId)
+        {
+            if (_current is null)
+            {
+                return false;
+            }
+
+            _ = _current.Add(referencedMemberId);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Builds the parsed manifest from the collected blocks.
+        /// </summary>
+        /// <returns>The parsed manifest.</returns>
+        public TestSurfaceManifest Build()
+        {
+            var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+                StringComparer.Ordinal
+            );
+
+            foreach (var entry in _references)
+            {
+                references[entry.Key] = entry.Value.ToImmutable();
+            }
+
+            return new TestSurfaceManifest(_counts.ToImmutable(), references.ToImmutable());
+        }
     }
 }

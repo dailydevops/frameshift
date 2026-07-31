@@ -385,6 +385,9 @@ public class ReachabilityClosurePolymorphismTests
 
     private const string ExternalAssemblyName = "ExternalAssembly";
 
+    private const string BaseTestId = "M:Tests.LayerTests.EntersAtTheBase";
+    private const string MiddleTestId = "M:Tests.LayerTests.EntersInTheMiddle";
+
     [Test]
     [Arguments(VirtualSource)]
     [Arguments(OverrideChainSource)]
@@ -775,8 +778,114 @@ public class ReachabilityClosurePolymorphismTests
         return MetadataReference.CreateFromImage(stream.ToArray());
     }
 
+    /// <summary>
+    /// One test enters the chain at the base declaration and one enters it at the middle override. The
+    /// leaf override is a dispatch target of both, so it belongs to both tests, while the base
+    /// declaration keeps the one test that can actually reach it.
+    /// </summary>
+    [Test]
+    public async Task ComputeFromReferences_ChainEnteredAtTwoLevels_UnionsTheAttributionOfTheSharedOverride()
+    {
+        var compilation = CompilationFactory.Create(OverrideChainSource);
+        var references = References(
+            (BaseTestId, ["M:Production.LayerConsumer.UseBase(Production.LayerBase)"]),
+            (MiddleTestId, ["M:Production.LayerConsumer.UseMiddle(Production.MiddleLayer)"])
+        );
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Describe")))
+            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.MiddleLayer", "Describe")))
+            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+    }
+
+    /// <summary>
+    /// The counterpart of the union: the base declaration is above the entry point of the second test,
+    /// so attributing it to that test would invent a path that does not exist.
+    /// </summary>
+    [Test]
+    public async Task ComputeFromReferences_ChainEnteredAtTwoLevels_KeepsTheBaseDeclarationWithItsOwnTest()
+    {
+        var compilation = CompilationFactory.Create(OverrideChainSource);
+        var references = References(
+            (BaseTestId, ["M:Production.LayerConsumer.UseBase(Production.LayerBase)"]),
+            (MiddleTestId, ["M:Production.LayerConsumer.UseMiddle(Production.MiddleLayer)"])
+        );
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.LayerBase", "Describe")))
+            .IsEqualTo(BaseTestId);
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.LeafLayer", "Detail")))
+            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+    }
+
+    /// <summary>
+    /// The dispatch expansion of a seeded abstraction has to carry the attribution of the seed, or every
+    /// member behind an interface a test calls directly would look reachable without a single test.
+    /// </summary>
+    [Test]
+    public async Task ComputeFromReferences_SeededInterfaceMember_AttributesTheImplementationsToTheSeedingTest()
+    {
+        var compilation = CompilationFactory.Create(InterfaceSource);
+        var references = References((BaseTestId, ["M:Production.IHandler.Handle"]));
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Handle")))
+            .IsEqualTo(BaseTestId);
+        _ = await Assert.That(Describe(reachable, ExplicitImplementation(compilation, "Handle"))).IsEqualTo(BaseTestId);
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.ImplicitHandler", "Log")))
+            .IsEqualTo(BaseTestId);
+    }
+
+    [Test]
+    public async Task ComputeFromReferences_AbstractMemberReachedByTwoTests_AttributesBothImplementationsToBoth()
+    {
+        var compilation = CompilationFactory.Create(AbstractSource);
+        var references = References(
+            (BaseTestId, ["M:Production.AbstractConsumer.UseValidator(Production.ValidatorBase)"]),
+            (MiddleTestId, ["M:Production.AbstractConsumer.UseValidator(Production.ValidatorBase)"])
+        );
+
+        var reachable = ReachabilityClosure.ComputeFromReferences(compilation, references, CancellationToken.None);
+
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.AlwaysValid", "Accept")))
+            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+        _ = await Assert
+            .That(Describe(reachable, Member(compilation, "Production.NeverValid", "Reject")))
+            .IsEqualTo($"{BaseTestId}, {MiddleTestId}");
+    }
+
     private static TestSurfaceManifest Manifest(params string[] referencedMemberIds) =>
         new TestSurfaceManifest([], ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds));
+
+    private static ImmutableDictionary<string, ImmutableHashSet<string>> References(
+        params (string TestId, string[] ReferencedMemberIds)[] tests
+    )
+    {
+        var builder = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+
+        foreach (var (testId, referencedMemberIds) in tests)
+        {
+            builder[testId] = ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds);
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private static string Describe(ReachableSymbolSet reachable, ISymbol symbol) =>
+        reachable.GetTestIds(symbol) is { IsEmpty: false } testIds
+            ? string.Join(", ", testIds.OrderBy(testId => testId, StringComparer.Ordinal))
+            : "<none>";
 
     private static ISymbol Member(Compilation compilation, string typeName, string memberName) =>
         compilation.GetTypeByMetadataName(typeName)!.GetMembers(memberName)[0];

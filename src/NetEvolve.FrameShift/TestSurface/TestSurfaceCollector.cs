@@ -10,10 +10,20 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// i.e. from the production assemblies under test.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Only executable code is inspected: method bodies, expression bodies, constructor initializers and
 /// member initializers. Attribute usages and signatures are deliberately skipped, because they
 /// describe the test itself instead of the production code it exercises. The collector keeps no
 /// state between calls and is therefore safe to use from concurrent analyzer callbacks.
+/// </para>
+/// <para>
+/// The result is attributed per test: every walked production member is recorded under the test method
+/// that reaches it, together with the number of test cases that method declares. Each test is walked
+/// from its own entry point with its own visited set, so a helper of the test assembly that two tests
+/// share contributes its production members to <em>both</em> of them. Attributing such a member to only
+/// the test that happened to be walked first would understate the number of input combinations the
+/// member is exercised with, which is exactly the judgement the single-test-case heuristic rests on.
+/// </para>
 /// </remarks>
 internal static class TestSurfaceCollector
 {
@@ -25,7 +35,8 @@ internal static class TestSurfaceCollector
     /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
     /// <param name="cancellationToken">A token to observe while collecting.</param>
     /// <returns>
-    /// The manifest describing all discovered test methods and the production members they reference.
+    /// The manifest describing all discovered test methods, their test-case counts and the production
+    /// members each of them references.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="compilation" /> or <paramref name="recognizer" /> is <see langword="null" />.
@@ -34,42 +45,7 @@ internal static class TestSurfaceCollector
         Compilation compilation,
         ITestMethodRecognizer recognizer,
         CancellationToken cancellationToken
-    ) =>
-        Collect(
-            compilation,
-            TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken),
-            cancellationToken
-        );
-
-    private static TestSurfaceManifest Collect(
-        Compilation compilation,
-        ImmutableArray<IMethodSymbol> testMethods,
-        CancellationToken cancellationToken
-    )
-    {
-        var results = Analyze(compilation, testMethods, cancellationToken);
-        var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-        var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
-
-        foreach (var (testMethod, memberIds) in results)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var testMethodId = DocumentationCommentId.CreateDeclarationId(testMethod);
-
-            if (!string.IsNullOrEmpty(testMethodId))
-            {
-                _ = testMethodIds.Add(testMethodId!);
-            }
-
-            foreach (var memberId in memberIds)
-            {
-                _ = referencedMemberIds.Add(memberId);
-            }
-        }
-
-        return new TestSurfaceManifest(testMethodIds.ToImmutable(), referencedMemberIds.ToImmutable());
-    }
+    ) => Build(Analyze(compilation, recognizer, cancellationToken), cancellationToken);
 
     /// <summary>
     /// Finds the test methods <paramref name="recognizer" /> recognises that do not reference a single
@@ -87,41 +63,71 @@ internal static class TestSurfaceCollector
         ITestMethodRecognizer recognizer,
         CancellationToken cancellationToken
     ) =>
-        FindTestsWithoutProductionReference(
-            compilation,
-            TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken),
-            cancellationToken
-        );
-
-    private static ImmutableArray<IMethodSymbol> FindTestsWithoutProductionReference(
-        Compilation compilation,
-        ImmutableArray<IMethodSymbol> testMethods,
-        CancellationToken cancellationToken
-    ) =>
-        Analyze(compilation, testMethods, cancellationToken)
-            .Where(result => result.ReferencedMemberIds.IsEmpty)
-            .Select(result => result.TestMethod)
+        Analyze(compilation, recognizer, cancellationToken)
+            .Where(entry => entry.ReferencedMemberIds.IsEmpty)
+            .Select(entry => entry.TestMethod)
             .ToImmutableArray();
 
     /// <summary>
-    /// Walks the code reachable from every test method and records the production members it references.
+    /// Turns the per-test analysis result into a manifest, keyed by the documentation comment id of each
+    /// test method.
+    /// </summary>
+    /// <param name="entries">The analysed test methods, in discovery order.</param>
+    /// <param name="cancellationToken">A token to observe while building.</param>
+    /// <returns>The manifest describing the analysed compilation.</returns>
+    /// <remarks>
+    /// A test method whose declaration id cannot be created is dropped altogether: the production side
+    /// addresses everything by that id, so an entry without one could never be matched up again. Every
+    /// remaining test contributes to both maps, even when it references no production member at all, so
+    /// that the derived <see cref="TestSurfaceManifest.TestMethodIds" /> stays the complete set of tests.
+    /// </remarks>
+    private static TestSurfaceManifest Build(List<TestSurfaceEntry> entries, CancellationToken cancellationToken)
+    {
+        var testCaseCounts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+        var referencesByTest = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+
+        foreach (var entry in entries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var testMethodId = DocumentationCommentId.CreateDeclarationId(entry.TestMethod);
+
+            if (string.IsNullOrEmpty(testMethodId))
+            {
+                continue;
+            }
+
+            testCaseCounts[testMethodId!] = entry.CaseCount;
+            referencesByTest[testMethodId!] = referencesByTest.TryGetValue(testMethodId!, out var known)
+                ? known.Union(entry.ReferencedMemberIds)
+                : entry.ReferencedMemberIds;
+        }
+
+        return new TestSurfaceManifest(testCaseCounts.ToImmutable(), referencesByTest.ToImmutable());
+    }
+
+    /// <summary>
+    /// Walks the code reachable from every test method and records the production members it references,
+    /// together with the number of test cases the method declares.
     /// </summary>
     /// <param name="compilation">The test compilation to inspect.</param>
-    /// <param name="testMethods">The discovered test methods.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods.</param>
     /// <param name="cancellationToken">A token to observe while collecting.</param>
     /// <returns>One entry per test method, in discovery order.</returns>
     /// <remarks>
-    /// <paramref name="compilation" /> needs no null check here: every public overload passes it to the
-    /// test-method discovery first, which rejects a <see langword="null" /> compilation under the very
-    /// same parameter name before this method is entered.
+    /// Neither argument needs a null check here: both are passed to the test-method discovery first,
+    /// which rejects a <see langword="null" /> argument under the very same parameter name.
     /// </remarks>
-    private static List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)> Analyze(
+    private static List<TestSurfaceEntry> Analyze(
         Compilation compilation,
-        ImmutableArray<IMethodSymbol> testMethods,
+        ITestMethodRecognizer recognizer,
         CancellationToken cancellationToken
     )
     {
-        var results = new List<(IMethodSymbol TestMethod, ImmutableHashSet<string> ReferencedMemberIds)>();
+        var testMethods = TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken);
+        var entries = new List<TestSurfaceEntry>(testMethods.Length);
         var semanticModels = new Dictionary<SyntaxTree, SemanticModel>();
 
         foreach (var testMethod in testMethods)
@@ -132,10 +138,16 @@ internal static class TestSurfaceCollector
 
             WalkReachableCode(compilation, testMethod, semanticModels, referencedMemberIds, cancellationToken);
 
-            results.Add((testMethod, referencedMemberIds.ToImmutable()));
+            entries.Add(
+                new TestSurfaceEntry(
+                    testMethod,
+                    recognizer.GetTestCaseCount(testMethod),
+                    referencedMemberIds.ToImmutable()
+                )
+            );
         }
 
-        return results;
+        return entries;
     }
 
     private static void WalkReachableCode(
@@ -411,5 +423,46 @@ internal static class TestSurfaceCollector
         }
 
         return semanticModel;
+    }
+
+    /// <summary>
+    /// The analysis result of a single test method: the method itself, the number of test cases it
+    /// declares and the production members reachable from it.
+    /// </summary>
+    private readonly struct TestSurfaceEntry
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="TestSurfaceEntry" /> struct.
+        /// </summary>
+        /// <param name="testMethod">The analysed test method.</param>
+        /// <param name="caseCount">The number of test cases the method declares.</param>
+        /// <param name="referencedMemberIds">
+        /// The documentation comment ids of the production members reachable from the method.
+        /// </param>
+        public TestSurfaceEntry(
+            IMethodSymbol testMethod,
+            TestCaseCount caseCount,
+            ImmutableHashSet<string> referencedMemberIds
+        )
+        {
+            TestMethod = testMethod;
+            CaseCount = caseCount;
+            ReferencedMemberIds = referencedMemberIds;
+        }
+
+        /// <summary>
+        /// Gets the analysed test method.
+        /// </summary>
+        public IMethodSymbol TestMethod { get; }
+
+        /// <summary>
+        /// Gets the number of test cases the method declares.
+        /// </summary>
+        public TestCaseCount CaseCount { get; }
+
+        /// <summary>
+        /// Gets the documentation comment ids of the production members reachable from the method.
+        /// </summary>
+        public ImmutableHashSet<string> ReferencedMemberIds { get; }
     }
 }

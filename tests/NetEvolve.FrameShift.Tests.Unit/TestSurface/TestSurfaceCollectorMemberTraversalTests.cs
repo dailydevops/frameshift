@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Tests.Unit;
 
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NetEvolve.FrameShift.Tests.Infrastructure;
@@ -76,6 +77,8 @@ public class TestSurfaceCollectorMemberTraversalTests
         """;
 
     private const string InaccessibleProductionAssemblyName = "InaccessibleProductionAssembly";
+
+    private const string TestMethodIdPrefix = "M:Tests.MemberShapeTests.";
 
     private const string UnreducedExtensionId = "M:Production.Extras.FromReducedExtension(System.Int32)~System.Int32";
 
@@ -479,6 +482,83 @@ public class TestSurfaceCollectorMemberTraversalTests
         _ = await Assert.That(Join(unresolved)).IsEqualTo(string.Empty);
     }
 
+    /// <summary>
+    /// Every hop the traversal takes has to end up attributed to the test it started from, otherwise the
+    /// production side knows the member is reached but not by how many input combinations.
+    /// </summary>
+    [Test]
+    [Arguments("ReadsExpressionBodiedProperty", "M:Production.Signals.FromExpressionProperty~System.Int32")]
+    [Arguments("ReadsBlockBodiedProperty", "M:Production.Signals.FromBlockProperty~System.Int32")]
+    [Arguments("WritesSetOnlyProperty", "M:Production.Signals.FromPropertySetter~System.Int32")]
+    [Arguments("ReadsPropertyWithInitializer", "M:Production.Signals.FromPropertyInitializer~System.Int32")]
+    [Arguments("ReadsStaticField", "M:Production.Signals.FromStaticFieldInitializer~System.Int32")]
+    [Arguments("ReadsExpressionBodiedIndexer", "M:Production.Signals.FromExpressionIndexer~System.Int32")]
+    [Arguments("SubscribesToCustomEvent", "M:Production.Signals.FromEventAdd~System.Int32")]
+    [Arguments("SubscribesToCustomEvent", "M:Production.Signals.FromEventRemove~System.Int32")]
+    [Arguments("SubscribesToFieldEventWithInitializer", "M:Production.Signals.FromFieldEventInitializer~System.Int32")]
+    [Arguments("SubscribesToFieldEventWithHandler", "M:Production.Signals.FromEventHandler~System.Int32")]
+    [Arguments("CreatesTypeWithThisInitializer", "M:Production.Signals.FromThisInitializer~System.Int32")]
+    [Arguments("CallsLocalFunction", "M:Production.Signals.FromLocalFunction~System.Int32")]
+    [Arguments("CallsLambda", "M:Production.Signals.FromLambda~System.Int32")]
+    public async Task Collect_MemberReachedThroughAMemberShape_IsAttributedToTheReachingTest(
+        string testMethodName,
+        string expectedId
+    )
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(ReferencesOf(manifest, testMethodName).Contains(expectedId)).IsTrue();
+    }
+
+    /// <summary>
+    /// The member shapes stay apart from each other: the signal of one property must not appear under the
+    /// test that reads a different property, however similar the two declarations look.
+    /// </summary>
+    [Test]
+    public async Task Collect_MemberReachedByAnotherTest_IsNotAttributed()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        var references = ReferencesOf(manifest, "ReadsExpressionBodiedProperty");
+
+        _ = await Assert.That(references.Contains("M:Production.Signals.FromBlockProperty~System.Int32")).IsFalse();
+        _ = await Assert.That(references.Contains("M:Production.Signals.FromEventAdd~System.Int32")).IsFalse();
+    }
+
+    [Test]
+    public async Task Collect_TestTouchingOnlyAutoProperties_IsAttributedAnEmptySet()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(Join(ReferencesOf(manifest, "OnlyTouchesAutoProperties"))).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// Both maps are keyed by the same set of tests, so that the production side can look a test up in
+    /// either one without ever missing an entry.
+    /// </summary>
+    [Test]
+    public async Task Collect_BothMaps_AreKeyedByEveryDiscoveredTest()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        _ = await Assert.That(Join(manifest.ReferencesByTest.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
+        _ = await Assert.That(Join(manifest.TestCaseCounts.Keys)).IsEqualTo(Join(manifest.TestMethodIds));
+    }
+
+    /// <summary>
+    /// Every test of this fixture is a parameterless one, which is exactly one case each.
+    /// </summary>
+    [Test]
+    public async Task Collect_ParameterlessTests_AreCountedAsExactlyOneCase()
+    {
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
+
+        var counts = manifest.TestCaseCounts.Values.Select(count => count.ToString()).Distinct(StringComparer.Ordinal);
+
+        _ = await Assert.That(Join(counts)).IsEqualTo("1");
+    }
+
     private static async Task AssertRecorded(string expectedId)
     {
         var manifest = CollectSurface(CreateTest(CreateProduction()));
@@ -494,6 +574,15 @@ public class TestSurfaceCollectorMemberTraversalTests
     /// <returns>The collected manifest.</returns>
     private static TestSurfaceManifest CollectSurface(Compilation test) =>
         TestSurfaceCollector.Collect(test, CreateRecognizer(test), CancellationToken.None);
+
+    /// <summary>
+    /// Looks the attribution of the test <paramref name="testMethodName" /> of the fixture up.
+    /// </summary>
+    /// <param name="manifest">The collected manifest.</param>
+    /// <param name="testMethodName">The simple name of the test method.</param>
+    /// <returns>The production members attributed to that test.</returns>
+    private static ImmutableHashSet<string> ReferencesOf(TestSurfaceManifest manifest, string testMethodName) =>
+        manifest.ReferencesByTest[TestMethodIdPrefix + testMethodName];
 
     private static TUnitTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
         new TUnitTestMethodRecognizer(TUnitTestFrameworkProbe.GetTestAttributeType(compilation));
