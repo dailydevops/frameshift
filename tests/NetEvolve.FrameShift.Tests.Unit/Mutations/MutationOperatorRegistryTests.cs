@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit.Mutations;
+﻿namespace NetEvolve.FrameShift.Tests.Unit.Mutations;
 
 using Microsoft.CodeAnalysis.CSharp;
 using NetEvolve.FrameShift.Mutations;
@@ -12,6 +12,12 @@ using TUnit.Core;
 /// </summary>
 public class MutationOperatorRegistryTests
 {
+    /// <summary>
+    /// The number of operators the registry must expose: the fourteen expression operators plus the six
+    /// operators of the culture sensitivity family.
+    /// </summary>
+    private const int ExpectedOperatorCount = 20;
+
     private static readonly string[] _expectedOperatorIds =
     [
         "arithmetic",
@@ -19,6 +25,12 @@ public class MutationOperatorRegistryTests
         "bitwise",
         "boolean-literal",
         "conditional-expression",
+        "culture.case-conversion",
+        "culture.culture-info",
+        "culture.format-provider",
+        "culture.regex-options",
+        "culture.string-comparer",
+        "culture.string-comparison",
         "equality",
         "increment-decrement",
         "logical",
@@ -35,8 +47,24 @@ public class MutationOperatorRegistryTests
     {
         var actual = MutationOperatorRegistry.All.Select(mutationOperator => mutationOperator.Id);
 
-        _ = await Assert.That(MutationOperatorRegistry.All.Length).IsEqualTo(_expectedOperatorIds.Length);
+        _ = await Assert.That(_expectedOperatorIds.Length).IsEqualTo(ExpectedOperatorCount);
+        _ = await Assert.That(MutationOperatorRegistry.All.Length).IsEqualTo(ExpectedOperatorCount);
         _ = await Assert.That(Join(Sort(actual))).IsEqualTo(Join(_expectedOperatorIds));
+    }
+
+    [Test]
+    public async Task All_Registry_ListsTheOperatorIdsInAscendingOrdinalOrder() =>
+        _ = await Assert.That(Join(_expectedOperatorIds)).IsEqualTo(Join(Sort(_expectedOperatorIds)));
+
+    [Test]
+    public async Task All_EveryOperator_ReportsAKnownMutationKind()
+    {
+        var kinds = Enum.GetValues<MutationKind>();
+        var offenders = MutationOperatorRegistry
+            .All.Where(mutationOperator => !kinds.Contains(mutationOperator.Kind))
+            .Select(mutationOperator => mutationOperator.Id);
+
+        _ = await Assert.That(offenders).IsEmpty();
     }
 
     [Test]
@@ -94,6 +122,34 @@ public class MutationOperatorRegistryTests
         _ = await Assert
             .That(Join(Sort(conditionalOperators.Select(item => item.Id))))
             .IsEqualTo("conditional-expression, negation");
+    }
+
+    [Test]
+    public async Task ForSyntaxKind_SharedSyntaxKind_ReturnsEveryClaimingOperator()
+    {
+        var memberAccessOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression);
+        var invocationOperators = MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.InvocationExpression);
+
+        _ = await Assert
+            .That(Join(Sort(memberAccessOperators.Select(item => item.Id))))
+            .IsEqualTo(
+                "culture.culture-info, culture.regex-options, culture.string-comparer, culture.string-comparison"
+            );
+        _ = await Assert
+            .That(Join(Sort(invocationOperators.Select(item => item.Id))))
+            .IsEqualTo("culture.case-conversion, culture.format-provider");
+    }
+
+    [Test]
+    public async Task SupportedSyntaxKinds_SharedSyntaxKind_IsListedExactlyOnce()
+    {
+        var kinds = MutationOperatorRegistry.SupportedSyntaxKinds;
+
+        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.SimpleMemberAccessExpression)).IsEqualTo(1);
+        _ = await Assert.That(kinds.Count(kind => kind == SyntaxKind.InvocationExpression)).IsEqualTo(1);
+        _ = await Assert
+            .That(MutationOperatorRegistry.ForSyntaxKind(SyntaxKind.SimpleMemberAccessExpression).Length)
+            .IsGreaterThan(1);
     }
 
     [Test]
