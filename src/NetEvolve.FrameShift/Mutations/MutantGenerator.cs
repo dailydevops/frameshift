@@ -3,6 +3,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NetEvolve.FrameShift.Configuration;
 
 /// <summary>
 /// Walks a syntax tree exactly once and asks every registered <see cref="IMutationOperator" /> for
@@ -51,6 +52,42 @@ internal static class MutantGenerator
         SyntaxNode root,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
+    ) => CreateMutations(root, semanticModel, FrameShiftOptions.Default, cancellationToken);
+
+    /// <summary>
+    /// Creates all candidate mutations reachable from <paramref name="root" /> that
+    /// <paramref name="options" /> allows.
+    /// </summary>
+    /// <param name="root">The root node to walk, usually the root of a single syntax tree.</param>
+    /// <param name="semanticModel">
+    /// The semantic model of the tree <paramref name="root" /> belongs to. It is handed to the
+    /// operators unchanged.
+    /// </param>
+    /// <param name="options">
+    /// The configuration of the current compilation, which decides whether an operator family that has a
+    /// switch of its own is asked at all.
+    /// </param>
+    /// <param name="cancellationToken">A token observed on every visited node.</param>
+    /// <returns>
+    /// The lazily evaluated candidate mutations. The sequence is empty for generated trees and for
+    /// trees without any mutable node.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="root" />, <paramref name="semanticModel" /> or <paramref name="options" /> is
+    /// <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    /// <remarks>
+    /// A disabled family is skipped before its operators are asked, not after their mutations were
+    /// produced. That is the whole point of the switch: the operators of the regular expression pattern
+    /// family tokenize and validate patterns, which is work a project that switched them off must not
+    /// pay for.
+    /// </remarks>
+    public static IEnumerable<Mutation> CreateMutations(
+        SyntaxNode root,
+        SemanticModel semanticModel,
+        FrameShiftOptions options,
+        CancellationToken cancellationToken
     )
     {
         if (root is null)
@@ -63,17 +100,23 @@ internal static class MutantGenerator
             throw new ArgumentNullException(nameof(semanticModel));
         }
 
+        if (options is null)
+        {
+            throw new ArgumentNullException(nameof(options));
+        }
+
         if (_supportedKindLookup.Length == 0 || IsGeneratedTree(root, cancellationToken))
         {
             return [];
         }
 
-        return CreateMutationsCore(root, semanticModel, cancellationToken);
+        return CreateMutationsCore(root, semanticModel, options, cancellationToken);
     }
 
     private static IEnumerable<Mutation> CreateMutationsCore(
         SyntaxNode root,
         SemanticModel semanticModel,
+        FrameShiftOptions options,
         CancellationToken cancellationToken
     )
     {
@@ -88,6 +131,11 @@ internal static class MutantGenerator
 
             foreach (var mutationOperator in MutationOperatorRegistry.ForSyntaxKind(node.Kind()))
             {
+                if (!options.IsKindEnabled(mutationOperator.Kind))
+                {
+                    continue;
+                }
+
                 foreach (var mutation in mutationOperator.CreateMutations(node, semanticModel, cancellationToken))
                 {
                     yield return mutation;

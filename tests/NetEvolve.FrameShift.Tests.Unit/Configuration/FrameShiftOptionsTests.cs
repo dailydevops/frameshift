@@ -2,6 +2,7 @@ namespace NetEvolve.FrameShift.Tests.Unit.Configuration;
 
 using System.Globalization;
 using NetEvolve.FrameShift.Configuration;
+using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -14,12 +15,20 @@ using TUnit.Core;
 /// </summary>
 public class FrameShiftOptionsTests
 {
+    /// <summary>
+    /// The mutation kinds the regular expression pattern switch governs, ordered ordinally.
+    /// <c>MutationKind.RegexOptions</c> is deliberately not among them: it belongs to the culture
+    /// sensitivity family.
+    /// </summary>
+    private const string PatternKindNames = "RegexAlternation, RegexAnchor, RegexGroup, RegexQuantifier";
+
     private static string DocumentedDefaults =>
         Describe(
             FrameShiftOptions.DefaultIsEnabled,
             FrameShiftOptions.DefaultVerifyMutantCompilation,
             FrameShiftOptions.DefaultMaxMutantsPerMember,
-            FrameShiftOptions.DefaultReportTrivialMutants
+            FrameShiftOptions.DefaultReportTrivialMutants,
+            FrameShiftOptions.DefaultEnableRegexPatternMutations
         );
 
     [Test]
@@ -76,6 +85,50 @@ public class FrameShiftOptionsTests
         var options = Read(FrameShiftOptionKeys.ReportTrivialMutants, value);
 
         _ = await Assert.That(options.ReportTrivialMutants).IsEqualTo(expected);
+    }
+
+    [Test]
+    [Arguments("false", false)]
+    [Arguments("FALSE", false)]
+    [Arguments("True", true)]
+    [Arguments("  false  ", false)]
+    [Arguments("off", FrameShiftOptions.DefaultEnableRegexPatternMutations)]
+    [Arguments("", FrameShiftOptions.DefaultEnableRegexPatternMutations)]
+    public async Task Read_EnableRegexPatternMutations_IsParsedOrFallsBack(string value, bool expected)
+    {
+        var options = Read(FrameShiftOptionKeys.EnableRegexPatternMutations, value);
+
+        _ = await Assert.That(options.EnableRegexPatternMutations).IsEqualTo(expected);
+    }
+
+    /// <summary>
+    /// The regular expression pattern family is the only one with a switch of its own, so with the switch
+    /// on nothing at all is disabled - including every kind a future release adds, which is why the kinds
+    /// are taken from the enumeration instead of being listed here.
+    /// </summary>
+    [Test]
+    public async Task IsKindEnabled_PatternFamilyEnabled_EnablesEveryKind()
+    {
+        var configured = Read(FrameShiftOptionKeys.EnableRegexPatternMutations, "true");
+
+        _ = await Assert.That(DisabledKinds(FrameShiftOptions.Default)).IsEqualTo(string.Empty);
+        _ = await Assert.That(DisabledKinds(configured)).IsEqualTo(string.Empty);
+    }
+
+    /// <summary>
+    /// Switching the pattern family off must cost exactly the four pattern kinds. Above all it must not
+    /// touch <c>MutationKind.RegexOptions</c>, which mutates the option flags a call passes and belongs to
+    /// the culture sensitivity family.
+    /// </summary>
+    [Test]
+    public async Task IsKindEnabled_PatternFamilyDisabled_DisablesExactlyThePatternKinds()
+    {
+        var options = Read(FrameShiftOptionKeys.EnableRegexPatternMutations, "false");
+
+        _ = await Assert.That(options.EnableRegexPatternMutations).IsFalse();
+        _ = await Assert.That(DisabledKinds(options)).IsEqualTo(PatternKindNames);
+        _ = await Assert.That(options.IsKindEnabled(MutationKind.RegexOptions)).IsTrue();
+        _ = await Assert.That(options.IsKindEnabled(MutationKind.StringLiteral)).IsTrue();
     }
 
     [Test]
@@ -153,6 +206,7 @@ public class FrameShiftOptionsTests
                     [FrameShiftOptionKeys.VerifyMutantCompilation] = "false",
                     [FrameShiftOptionKeys.MaxMutantsPerMember] = "9",
                     [FrameShiftOptionKeys.ReportTrivialMutants] = "false",
+                    [FrameShiftOptionKeys.EnableRegexPatternMutations] = "false",
                 }
             )
         );
@@ -161,6 +215,7 @@ public class FrameShiftOptionsTests
         _ = await Assert.That(options.VerifyMutantCompilation).IsFalse();
         _ = await Assert.That(options.MaxMutantsPerMember).IsEqualTo(9);
         _ = await Assert.That(options.ReportTrivialMutants).IsFalse();
+        _ = await Assert.That(options.EnableRegexPatternMutations).IsFalse();
     }
 
     [Test]
@@ -187,6 +242,7 @@ public class FrameShiftOptionsTests
                     [FrameShiftOptionKeys.VerifyMutantCompilation] = null!,
                     [FrameShiftOptionKeys.MaxMutantsPerMember] = null!,
                     [FrameShiftOptionKeys.ReportTrivialMutants] = null!,
+                    [FrameShiftOptionKeys.EnableRegexPatternMutations] = null!,
                 }
             )
         );
@@ -204,15 +260,38 @@ public class FrameShiftOptionsTests
             options.IsEnabled,
             options.VerifyMutantCompilation,
             options.MaxMutantsPerMember,
-            options.ReportTrivialMutants
+            options.ReportTrivialMutants,
+            options.EnableRegexPatternMutations
         );
 
-    private static string Describe(bool isEnabled, bool verifyCompilation, int maxMutants, bool reportTrivial) =>
+    private static string Describe(
+        bool isEnabled,
+        bool verifyCompilation,
+        int maxMutants,
+        bool reportTrivial,
+        bool enableRegexPatterns
+    ) =>
         string.Join(
             "|",
             isEnabled.ToString(CultureInfo.InvariantCulture),
             verifyCompilation.ToString(CultureInfo.InvariantCulture),
             maxMutants.ToString(CultureInfo.InvariantCulture),
-            reportTrivial.ToString(CultureInfo.InvariantCulture)
+            reportTrivial.ToString(CultureInfo.InvariantCulture),
+            enableRegexPatterns.ToString(CultureInfo.InvariantCulture)
+        );
+
+    /// <summary>
+    /// Names the mutation kinds <paramref name="options" /> switched off, ordered ordinally so that the
+    /// result is a single string a test can compare in one go.
+    /// </summary>
+    /// <param name="options">The configuration to ask.</param>
+    /// <returns>The disabled kinds, comma separated, or an empty string when none is disabled.</returns>
+    private static string DisabledKinds(FrameShiftOptions options) =>
+        string.Join(
+            ", ",
+            Enum.GetValues<MutationKind>()
+                .Where(kind => !options.IsKindEnabled(kind))
+                .Select(kind => kind.ToString())
+                .OrderBy(name => name, StringComparer.Ordinal)
         );
 }
