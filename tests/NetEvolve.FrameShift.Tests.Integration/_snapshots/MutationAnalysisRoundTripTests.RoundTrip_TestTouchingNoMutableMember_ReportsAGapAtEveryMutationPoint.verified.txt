@@ -1,6 +1,6 @@
 ﻿--- manifest ---
 frameshift-test-surface/1
-T M:Tests.CalculatorTests.Construction_DoesNotExerciseAnyBehaviour
+T M:Tests.CalculatorTests.Construction_DoesNotExerciseAnyBehaviour 1
 R M:Fixture.Calculator.#ctor
 R T:Fixture.Calculator
 

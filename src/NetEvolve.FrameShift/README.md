@@ -37,6 +37,13 @@ next to every other compiler diagnostic.
   time is analysed by both and every test is attributed to the version that actually marks it.
 - A self-maintaining test-surface manifest: a source generator produces it from the test project and
   a packaged MSBuild target writes it next to the project file, so it never has to be edited by hand.
+  It records the referenced members *per test method*, together with the number of test cases that
+  method contributes.
+- Thin coverage is reported too, not only missing coverage (`FSH0006`): a mutation point that is
+  reached, but reached by tests contributing exactly one input combination in total, is flagged as
+  information. Case counts are derived statically from the declaration - inline data attributes are
+  counted, a data source that cannot be enumerated without executing it yields a lower bound, and a
+  lower bound anywhere suppresses the finding.
 - Reachability is closed transitively over the production call graph, including an approximation of
   virtual and interface dispatch, so a member that is only reached indirectly still counts as tested.
 - Configurable through plain MSBuild properties and, like every analyzer, through
@@ -132,17 +139,23 @@ public sealed class RatesTests
 ```
 
 Building the test project writes `tests/Calculator.Tests/Calculator.Tests.frameshift-tests`. The
-format is plain text: a mandatory header line, then one line per discovered test method prefixed
-with `T`, then one line per referenced member prefixed with `R`. Both groups are sorted ordinally,
-the ids are documentation comment ids, and lines starting with `#` are comments:
+format is plain text and grouped per test: a mandatory header line, then one block per discovered test
+method - a `T` line naming the method and its test-case count, followed by one `R` line per member
+*that* test references. The ids are documentation comment ids, the blocks and the lines within a block
+are sorted ordinally, and lines starting with `#` are comments:
 
 ```text
 frameshift-test-surface/1
-T M:Calculator.Tests.RatesTests.WithTax_AddsNineteenPercent
+T M:Calculator.Tests.RatesTests.WithTax_AddsNineteenPercent 1
 R M:Calculator.Rates.#ctor
 R M:Calculator.Rates.WithTax(System.Decimal)
 R T:Calculator.Rates
 ```
+
+The count after the test id is either an exact integer or a lower bound with a trailing `+` - `1` for
+this parameterless test, `3` for a test with three `[Arguments]` rows, `1+` for a test fed by a data
+source whose length cannot be determined without executing it. An `R` line always belongs to the
+closest `T` line above it, so an `R` line before the first `T` line makes the manifest malformed.
 
 This is an excerpt. The real file also records the members the test touched in every *other*
 referenced assembly - the test framework, the base class library - because the collector records
@@ -178,6 +191,11 @@ is generated rather than hand-written, it stays correct as the tests change - an
 the test-side analyzer compares it against the surface it just collected and reports `FSH0003` when
 the two no longer match.
 
+The manifest keeps the two sides of that bridge separated per test method, because reachability is not
+the only question worth asking. The union of all recorded members drives `FSH0001`; the per-test
+grouping and the case count on each `T` line let the production side ask the finer question `FSH0006`
+answers - how many input combinations reach this mutation point in total.
+
 The reachability closure runs on the production side, and it has to: the manifest only transports the
 *seed*, the members a test touches directly. Expanding that seed into everything those members call
 requires the production call graph, which only the production compilation can see. The expansion is a
@@ -188,7 +206,7 @@ approximated by adding the overrides and implementations declared here.
 flowchart TD
     subgraph pass1["Pass 1 - test project"]
         A["Test methods discovered<br/>TUnit / xUnit v2 / xUnit v3 / NUnit / MSTest"] --> B["Walk code reachable<br/>inside the test assembly"]
-        B --> C["Record referenced<br/>production members"]
+        B --> C["Record referenced production<br/>members per test, with its case count"]
         C --> D["Source generator emits<br/>the manifest"]
         D --> E["MSBuild target writes<br/>ProjectName.frameshift-tests"]
     end
@@ -201,7 +219,8 @@ flowchart TD
         H --> I["Generate mutants by<br/>rewriting the syntax tree"]
         I --> J["Verify each mutant<br/>still compiles"]
         J --> K["Classify trivial mutants"]
-        K --> L["FSH0001 / FSH0002 / FSH0003"]
+        K --> M["Aggregate the case counts of<br/>the tests reaching the member"]
+        M --> L["FSH0001 / FSH0002 / FSH0003 / FSH0006"]
     end
 ```
 
@@ -238,6 +257,9 @@ dotnet_diagnostic.FSH0001.severity = error
 
 # Hide the informational mutants.
 dotnet_diagnostic.FSH0002.severity = none
+
+# Treat a mutation point that only one test case reaches as a warning.
+dotnet_diagnostic.FSH0006.severity = warning
 ```
 
 ## Diagnostics
@@ -249,6 +271,7 @@ dotnet_diagnostic.FSH0002.severity = none
 | [FSH0003](../../docs/rules/FSH0003.md) | Warning | The test-surface manifest is missing, malformed or stale. |
 | [FSH0004](../../docs/rules/FSH0004.md) | Info | A test method does not reference any production member. |
 | [FSH0005](../../docs/rules/FSH0005.md) | MSBuild warning | The project has no test-surface manifest, so the analysis cannot do anything. |
+| [FSH0006](../../docs/rules/FSH0006.md) | Info | A mutation point is reached, but by tests contributing a single input combination in total. |
 
 ## Limitations
 
@@ -277,7 +300,13 @@ dotnet_diagnostic.FSH0002.severity = none
 - The culture-sensitivity family mutates the *arguments and flags* a call passes, never the contents
   of a regular expression pattern: the `RegexOptions` operator flips option flags, and no operator
   rewrites pattern text. A pattern that is only exercised by one input therefore still looks fully
-  covered.
+  covered - `FSH0006` is what makes that thinness visible, by counting the input combinations rather
+  than the coverage.
+- `FSH0006` counts test cases, it does not evaluate them. It cannot know whether the single
+  combination it found happens to sit exactly where the mutation matters, which is why it is
+  informational. And it stays silent whenever a contributing count is only a lower bound - a data
+  source whose length would require executing the data method, which an analyzer must not do - so a
+  data-driven test that really does supply one row is not reported.
 - C# only, and reachability never leaves the analysed compilation: overrides in other assemblies are
   outside what a single compilation can observe.
 

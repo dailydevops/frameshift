@@ -1,6 +1,6 @@
 ﻿--- manifest ---
 frameshift-test-surface/1
-T M:Tests.CalculatorTests.Subtract_ReturnsTheDifference
+T M:Tests.CalculatorTests.Subtract_ReturnsTheDifference 1
 R M:Fixture.Calculator.#ctor
 R M:Fixture.Calculator.Subtract(System.Int32,System.Int32)~System.Int32
 R T:Fixture.Calculator
@@ -10,6 +10,10 @@ FSH0001 Production.cs(7,16): Mutation '+ => %' at this location is not reachable
 FSH0001 Production.cs(7,16): Mutation '+ => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Production.cs(7,16): Mutation '+ => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Production.cs(7,16): Mutation '+ => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0006 Production.cs(12,16): Mutation '- => %' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Subtract_ReturnsTheDifference'; a mutant that only differs for other inputs would survive
+FSH0006 Production.cs(12,16): Mutation '- => *' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Subtract_ReturnsTheDifference'; a mutant that only differs for other inputs would survive
+FSH0006 Production.cs(12,16): Mutation '- => +' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Subtract_ReturnsTheDifference'; a mutant that only differs for other inputs would survive
+FSH0006 Production.cs(12,16): Mutation '- => /' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Subtract_ReturnsTheDifference'; a mutant that only differs for other inputs would survive
 FSH0001 Production.cs(20,16): Mutation '+ => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Production.cs(20,16): Mutation '+ => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Production.cs(20,16): Mutation '+ => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
