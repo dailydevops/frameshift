@@ -2,18 +2,44 @@
   <PropertyGroup>
     <TargetFrameworks>$(_TestTargetFrameworks)</TargetFrameworks>
     <OutputType>Exe</OutputType>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <!--
+      TUnit injects its own `Polyfill` reference on `netstandard2.0` and .NET Framework. This project
+      references the package explicitly, with the content files TUnit's injection excludes, so the
+      automatic one would only duplicate the item and fail the restore with NU1504.
+    -->
+    <EnableTUnitPolyfills>false</EnableTUnitPolyfills>
+    <!--
+      `ArgumentNullException.ThrowIfNull` is .NET 6+, and the harness uses it in every public entry point.
+      `Polyfill` ships the replacement in an opt-in folder, so the switch is what makes the classic targets
+      compile; on net6.0 and later the package deliberately contributes nothing, so there is no ambiguity.
+    -->
+    <PolyArgumentExceptions>true</PolyArgumentExceptions>
+  </PropertyGroup>
+  <PropertyGroup Label="xUnit v3 availability">
+    <!--
+      `xunit.v3.core` ships no assets for net6.0 and net7.0, so the reference and every test that
+      touches an xUnit v3 type are compiled only where the package actually resolves.
+    -->
+    <_HasXunitV3>true</_HasXunitV3>
+    <_HasXunitV3 Condition=" '$(TargetFramework)' == 'net6.0' or '$(TargetFramework)' == 'net7.0' ">false</_HasXunitV3>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(_HasXunitV3)' == 'true' ">
+    <DefineConstants>$(DefineConstants);FRAMESHIFT_XUNIT_V3</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="NetEvolve.Extensions.TUnit" />
+    <PackageReference Include="Polyfill" PrivateAssets="all" />
     <PackageReference Include="TUnit" />
+    <PackageReference Include="Verify.TUnit" />
   </ItemGroup>
   <ItemGroup Label="Test framework metadata, compile-time only">
     <PackageReference Include="MSTest.TestFramework" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
     <PackageReference Include="NUnit" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
     <PackageReference Include="xunit.core" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
-    <PackageReference Include="xunit.v3.core" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
+    <PackageReference Include="xunit.v3.core" Condition=" '$(_HasXunitV3)' == 'true' " PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />

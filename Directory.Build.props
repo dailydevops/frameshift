@@ -5,16 +5,20 @@
     <RepositoryUrl>https://github.com/dailydevops/frameshift</RepositoryUrl>
     <PackageProjectUrl>https://github.com/dailydevops/frameshift</PackageProjectUrl>
     <PackageReleaseNotes>$(PackageProjectUrl)/releases</PackageReleaseNotes>
-    <PackageTags>analyzers;mutation-testing;roslyn;tunit;xunit;nunit;mstest</PackageTags>
+    <PackageTags>$(_PackageTags);analyzers;mutation-testing;roslyn;tunit;xunit;nunit;mstest</PackageTags>
     <CopyrightYearStart>2026</CopyrightYearStart>
   </PropertyGroup>
   <PropertyGroup Label="Target frameworks">
     <!--
-      `net6.0` and `net7.0` are deliberately absent: xunit.v3.core ships no assets for them, so a
-      restore silently falls back to its .NET Framework assets (NU1701) and the xUnit adapter cannot
-      be tested there.
+      The full modern matrix. `net6.0` and `net7.0` are included: the only package without assets for
+      them is `xunit.v3.core`, so that single reference is conditional in the test projects and the
+      xUnit v3 tests are guarded by the `FRAMESHIFT_XUNIT_V3` compilation symbol.
     -->
-    <_NetTargetFrameworks>net8.0;net9.0;net10.0</_NetTargetFrameworks>
+    <_NetTargetFrameworks>net6.0;net7.0;net8.0;net9.0;net10.0</_NetTargetFrameworks>
+    <!--
+      The classic frameworks build on Windows only, because the .NET Framework reference assemblies
+      and targeting packs are not available on other hosts.
+    -->
     <_ClassicTargetFrameworks>net472;net48;net481</_ClassicTargetFrameworks>
     <!--
       Available for a future runtime library. Nothing in this repository targets it today: the analyzer
@@ -24,13 +28,14 @@
     <_ProjectTargetFrameworks>netstandard2.0;$(_NetTargetFrameworks)</_ProjectTargetFrameworks>
     <_ProjectTargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(_ProjectTargetFrameworks);$(_ClassicTargetFrameworks)</_ProjectTargetFrameworks>
     <!--
-      The classic frameworks are excluded from the test matrix: the test harness builds its synthetic
-      compilations from `AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")`, which only CoreCLR
-      publishes, and TUnit's generated infrastructure needs `ModuleInitializerAttribute`. Covering them
-      would mean a second reference-assembly resolver and a set of polyfills, for a component that
-      Roslyn only ever loads on modern .NET.
+      The tests cover every framework a consumer can build for, including the classic ones on Windows.
+      TUnit, NUnit, MSTest and `Microsoft.Testing.Platform` all ship .NET Framework or
+      `netstandard2.0` assets, `Polyfill` supplies the compiler-required attributes that .NET
+      Framework lacks, and the harness resolves reference assemblies without relying on the
+      CoreCLR-only `TRUSTED_PLATFORM_ASSEMBLIES` application-context key.
     -->
     <_TestTargetFrameworks>$(_NetTargetFrameworks)</_TestTargetFrameworks>
+    <_TestTargetFrameworks Condition=" '$(OS)' == 'Windows_NT' ">$(_TestTargetFrameworks);$(_ClassicTargetFrameworks)</_TestTargetFrameworks>
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
   <PropertyGroup>
