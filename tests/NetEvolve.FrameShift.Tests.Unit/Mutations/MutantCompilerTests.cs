@@ -233,7 +233,7 @@ public class MutantCompilerTests
         var compiler = new MutantCompiler(compilation);
         var mutation = CreateViableMutation(tree);
         using var source = new CancellationTokenSource();
-        await source.CancelAsync().ConfigureAwait(false);
+        await source.CancelAsyncCompat().ConfigureAwait(false);
 
         OperationCanceledException? caught = null;
         try

@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
 using System.Collections.Immutable;
 using System.Reflection;
@@ -305,6 +305,7 @@ public class ArithmeticOperatorMutatorTests
         }
         """;
 
+#if NET7_0_OR_GREATER
     private const string ConstrainedGenericSource = """
         namespace Fixtures;
 
@@ -314,6 +315,7 @@ public class ArithmeticOperatorMutatorTests
                 where TValue : System.Numerics.INumber<TValue> => /*!*/left + right;
         }
         """;
+#endif
 
     private const string PointerOperandSource = """
         namespace Fixtures;
@@ -629,7 +631,9 @@ public class ArithmeticOperatorMutatorTests
     [Arguments("double", "double", "/*!*/left * right", "multiply")]
     [Arguments("int", "int", "checked(/*!*/left % right)", "modulo")]
     [Arguments("int", "int", "unchecked(/*!*/left - right)", "subtract")]
+#if NET7_0_OR_GREATER
     [Arguments("System.IntPtr", "System.IntPtr", "/*!*/left / right", "divide")]
+#endif
     public async Task CreateMutations_ArithmeticOperandType_ProducesEveryCounterpart(
         string operandType,
         string resultType,
@@ -728,10 +732,17 @@ public class ArithmeticOperatorMutatorTests
             .IsEquivalentTo(expectedIds);
     }
 
+#if NET7_0_OR_GREATER
     /// <summary>
     /// The operator is declared on the constraint interface, and that interface declares nothing but its
     /// own operator, so no counterpart is found. The expression stays unmutated.
     /// </summary>
+    /// <remarks>
+    /// The fixture is compiled against the reference assemblies of the framework the test run itself
+    /// executes on, and generic math — <c>System.Numerics.INumber&lt;TSelf&gt;</c> — was introduced with
+    /// .NET 7. On net6.0 and on the classic frameworks the fixture therefore cannot be expressed at all;
+    /// a hand-written stand-in would declare the very operator whose absence the expectation is about.
+    /// </remarks>
     [Test]
     public async Task CreateMutations_OperatorOfAConstraintInterface_ReturnsEmpty()
     {
@@ -743,6 +754,7 @@ public class ArithmeticOperatorMutatorTests
         _ = await Assert.That(bound?.MethodKind).IsEqualTo(MethodKind.UserDefinedOperator);
         _ = await Assert.That(result.Mutations).IsEmpty();
     }
+#endif
 
     /// <summary>
     /// A pointer operand is not arithmetic here, because pointer arithmetic scales by the element size
@@ -780,7 +792,7 @@ public class ArithmeticOperatorMutatorTests
         var mutator = new ArithmeticOperatorMutator();
         using var cancellation = new CancellationTokenSource();
 
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToArray()

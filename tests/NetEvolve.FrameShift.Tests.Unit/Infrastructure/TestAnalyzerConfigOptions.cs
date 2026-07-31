@@ -37,6 +37,14 @@ internal sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
     public override IEnumerable<string> Keys => _options.Keys;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// The annotation repeats the one of the base declaration and must not be dropped, because dropping it
+    /// would widen the contract of the override. .NET Framework has no public
+    /// <c>NotNullWhenAttribute</c> of its own, so the attribute comes from the polyfill sources there; the
+    /// compiler matches a nullability attribute by name and treats that one exactly like the built-in
+    /// attribute of the modern frameworks. The name is spelled out instead of referenced, because more
+    /// than one declaration of it is in scope and a <c>cref</c> to it is therefore ambiguous.
+    /// </remarks>
     public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
         _options.TryGetValue(key, out value);
 

@@ -390,6 +390,27 @@ public class NumericLiteralMutatorTests
         _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("255 => 254");
     }
 
+    /// <summary>
+    /// A converted type that is no named type at all has no underlying type to unwrap and no integral range
+    /// either, so the range of the literal's own type decides. <see langword="dynamic" /> is the simplest
+    /// such type: it is an <c>IDynamicTypeSymbol</c> and never an <c>INamedTypeSymbol</c>.
+    /// </summary>
+    /// <returns>A task representing the test.</returns>
+    [Test]
+    public async Task CreateMutations_DynamicTargetType_OffersBothNeighbours()
+    {
+        var (tree, mutations) = Run("public class Sample { public dynamic Get() => 42; }");
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(2);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+        _ = await Assert
+            .That(Rewrite(tree, mutations[0]))
+            .IsEqualTo("public class Sample { public dynamic Get() => 43; }");
+    }
+
     [Test]
     public async Task CreateMutations_ArgumentConvertedToByte_OffersOnlyTheDecrement()
     {
@@ -444,6 +465,27 @@ public class NumericLiteralMutatorTests
     }
 
     /// <summary>
+    /// An array size written into the type of a field is parsed as a numeric literal expression, but it sits
+    /// in a type context outside every member body, so the semantic model never binds it: the literal has no
+    /// constant value at all and no mutation can be derived from it. The fixture deliberately does not
+    /// compile, because C# has no legal position for an unbound numeric literal.
+    /// </summary>
+    /// <returns>A task representing the test.</returns>
+    [Test]
+    public async Task CreateMutations_LiteralWithoutAConstantValue_ReturnsEmpty()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(
+            "public class Sample { private int[42] _values; }"
+        );
+        var literal = FindNumericLiteral(tree);
+        var mutator = new NumericLiteralMutator();
+        Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];
+
+        _ = await Assert.That(semanticModel.GetConstantValue(literal).HasValue).IsFalse();
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
     /// A field declaration without the <see langword="const" /> modifier is an ordinary initializer, so the
     /// walk up the parent chain has to continue past it instead of treating it as a constant context.
     /// </summary>
@@ -460,6 +502,26 @@ public class NumericLiteralMutatorTests
         _ = await Assert
             .That(Rewrite(tree, mutations[0]))
             .IsEqualTo("public class Sample { private int _value = 43; }");
+    }
+
+    /// <summary>
+    /// A local declaration without the <see langword="const" /> modifier is an ordinary initializer as well,
+    /// which is the other half of the <see langword="const" /> guard on the walk up the parent chain.
+    /// </summary>
+    /// <returns>A task representing the test.</returns>
+    [Test]
+    public async Task CreateMutations_NonConstantLocalDeclaration_IsMutated()
+    {
+        var (tree, mutations) = Run("public class Sample { public int Get() { int value = 42; return value; } }");
+
+        _ = await Assert.That(mutations).Count().IsEqualTo(2);
+        _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("numeric-literal.increment");
+        _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("42 => 43");
+        _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("numeric-literal.decrement");
+        _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("42 => 41");
+        _ = await Assert
+            .That(Rewrite(tree, mutations[0]))
+            .IsEqualTo("public class Sample { public int Get() { int value = 43; return value; } }");
     }
 
     /// <summary>
@@ -734,7 +796,7 @@ public class NumericLiteralMutatorTests
         var mutator = new NumericLiteralMutator();
         var node = FindNumericLiteral(tree);
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = mutator.CreateMutations(node, semanticModel, cancellation.Token).ToList()

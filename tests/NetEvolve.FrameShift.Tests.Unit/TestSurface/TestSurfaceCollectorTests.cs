@@ -110,7 +110,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_TestMethods_AreRecordedByDeclarationId()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(Join(manifest.TestMethodIds))
@@ -132,7 +132,7 @@ public class TestSurfaceCollectorTests
     [Arguments("T:Production.Helpers")]
     public async Task Collect_MemberTouchedByATest_IsRecorded(string expectedId)
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert.That(manifest.ReferencedMemberIds.Contains(expectedId)).IsTrue();
     }
@@ -140,7 +140,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_MemberReachedOnlyThroughATestHelper_IsRecorded()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(manifest.ReferencedMemberIds.Contains("M:Production.Helpers.Double(System.Int32)~System.Int32"))
@@ -150,7 +150,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_MutuallyRecursiveTestHelpers_TerminateAndAreWalked()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(manifest.ReferencedMemberIds.Contains("M:Production.Calculator.Self~Production.Calculator"))
@@ -160,7 +160,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_MemberNoTestTouches_IsNotRecorded()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(manifest.ReferencedMemberIds.Contains("M:Production.Calculator.Untouched(System.Int32)~System.Int32"))
@@ -170,7 +170,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_MembersOfTheTestAssembly_AreNotRecordedAsProduction()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         var ownMembers = manifest.ReferencedMemberIds.Where(id =>
             id.Contains("Tests.", StringComparison.Ordinal) || id.Contains("TUnit.", StringComparison.Ordinal)
@@ -182,7 +182,7 @@ public class TestSurfaceCollectorTests
     [Test]
     public async Task Collect_ReferencedMemberIds_AreExactlyTheProductionSurface()
     {
-        var manifest = TestSurfaceCollector.Collect(CreateTest(CreateProduction()), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(CreateProduction()));
 
         _ = await Assert
             .That(Join(manifest.ReferencedMemberIds))
@@ -208,7 +208,7 @@ public class TestSurfaceCollectorTests
     public async Task Collect_RecordedIds_ResolveBackToProductionSymbols()
     {
         var production = CreateProduction();
-        var manifest = TestSurfaceCollector.Collect(CreateTest(production), CancellationToken.None);
+        var manifest = CollectSurface(CreateTest(production));
 
         var unresolved = manifest.ReferencedMemberIds.Where(id =>
             DocumentationCommentId.GetSymbolsForDeclarationId(id, production).IsEmpty
@@ -222,7 +222,7 @@ public class TestSurfaceCollectorTests
     public async Task Collect_RecordedTestIds_ResolveBackToTestSymbols()
     {
         var test = CreateTest(CreateProduction());
-        var manifest = TestSurfaceCollector.Collect(test, CancellationToken.None);
+        var manifest = CollectSurface(test);
 
         var unresolved = manifest.TestMethodIds.Where(id =>
             DocumentationCommentId.GetSymbolsForDeclarationId(id, test).IsEmpty
@@ -236,43 +236,32 @@ public class TestSurfaceCollectorTests
     {
         var test = CreateTest(CreateProduction());
 
-        var withoutReference = TestSurfaceCollector.FindTestsWithoutProductionReference(test, CancellationToken.None);
+        var withoutReference = TestSurfaceCollector.FindTestsWithoutProductionReference(
+            test,
+            CreateRecognizer(test),
+            CancellationToken.None
+        );
 
         _ = await Assert.That(Join(withoutReference.Select(method => method.Name))).IsEqualTo("OnlyTouchesLocalState");
     }
 
+    /// <summary>
+    /// A compilation the recogniser accepts nothing in produces an empty manifest instead of an error:
+    /// absence of tests is a normal outcome, and every caller treats it as a reason to stay silent.
+    /// </summary>
     [Test]
     public async Task Collect_CompilationWithoutTests_ReturnsAnEmptyManifest()
     {
         var production = CreateProduction();
 
-        var manifest = TestSurfaceCollector.Collect(production, CancellationToken.None);
+        var manifest = CollectSurface(production);
 
         _ = await Assert.That(manifest.IsEmpty).IsTrue();
     }
 
-    [Test]
-    public async Task Collect_CompilationIsNull_ThrowsArgumentNullException()
-    {
-        var threw = ThrowsArgumentNull(() => _ = TestSurfaceCollector.Collect(null!, CancellationToken.None));
-
-        _ = await Assert.That(threw).IsTrue();
-    }
-
-    [Test]
-    public async Task FindTestsWithoutProductionReference_CompilationIsNull_ThrowsArgumentNullException()
-    {
-        var threw = ThrowsArgumentNull(() =>
-            _ = TestSurfaceCollector.FindTestsWithoutProductionReference(null!, CancellationToken.None)
-        );
-
-        _ = await Assert.That(threw).IsTrue();
-    }
-
     /// <summary>
-    /// The overloads taking a recogniser reject a <see langword="null" /> compilation as well. They do so
-    /// through the test-method discovery they evaluate first, which is the reason the shared analysis
-    /// carries no null check of its own.
+    /// A <see langword="null" /> compilation is rejected through the test-method discovery the collector
+    /// evaluates first, which is the reason the shared analysis carries no null check of its own.
     /// </summary>
     [Test]
     public async Task Collect_CompilationIsNullWithARecognizer_ThrowsArgumentNullException()
@@ -298,6 +287,18 @@ public class TestSurfaceCollectorTests
 
         _ = await Assert.That(threw).IsTrue();
     }
+
+    /// <summary>
+    /// Collects the test surface of <paramref name="test" /> with a TUnit recogniser, which is how every
+    /// production caller reaches the collector.
+    /// </summary>
+    /// <param name="test">The compilation to inspect.</param>
+    /// <returns>The collected manifest.</returns>
+    private static TestSurfaceManifest CollectSurface(Compilation test) =>
+        TestSurfaceCollector.Collect(test, CreateRecognizer(test), CancellationToken.None);
+
+    private static TUnitTestMethodRecognizer CreateRecognizer(Compilation compilation) =>
+        new TUnitTestMethodRecognizer(TUnitTestFrameworkProbe.GetTestAttributeType(compilation));
 
     private static CSharpCompilation CreateProduction() =>
         CompilationFactory.Create(ProductionSource, ProductionAssemblyName, filePath: "Production.cs");

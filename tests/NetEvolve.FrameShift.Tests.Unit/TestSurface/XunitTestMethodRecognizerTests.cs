@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+﻿namespace NetEvolve.FrameShift.Tests.Unit;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -22,7 +22,9 @@ using TUnit.Core;
 public class XunitTestMethodRecognizerTests
 {
     private const string XunitV2Scenario = "xUnit v2";
+#if FRAMESHIFT_XUNIT_V3
     private const string XunitV3Scenario = "xUnit v3";
+#endif
 
     private const string CasesTypeName = "Fixture.Cases";
 
@@ -125,7 +127,9 @@ public class XunitTestMethodRecognizerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task Fixtures_EveryCompilation_CompilesWithoutErrors(string version)
     {
         var errors = new[]
@@ -142,7 +146,9 @@ public class XunitTestMethodRecognizerTests
 
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task FrameworkName_Recognizer_NamesTheFramework(string version)
     {
         var recognizer = CreateRecognizer(CreateXunitFixture(version));
@@ -158,7 +164,9 @@ public class XunitTestMethodRecognizerTests
     /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task FindTestMethods_EveryTestShape_IsDiscoveredInDeclarationOrder(string version)
     {
         var compilation = CreateXunitFixture(version);
@@ -180,6 +188,7 @@ public class XunitTestMethodRecognizerTests
     [Arguments(XunitV2Scenario, "GenericTest", true)]
     [Arguments(XunitV2Scenario, "PrivateTest", true)]
     [Arguments(XunitV2Scenario, "PlainMethod", false)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario, "FactTest", true)]
     [Arguments(XunitV3Scenario, "TheoryTest", true)]
     [Arguments(XunitV3Scenario, "DerivedAttributeTest", true)]
@@ -187,6 +196,7 @@ public class XunitTestMethodRecognizerTests
     [Arguments(XunitV3Scenario, "GenericTest", true)]
     [Arguments(XunitV3Scenario, "PrivateTest", true)]
     [Arguments(XunitV3Scenario, "PlainMethod", false)]
+#endif
     public async Task IsTestMethod_Method_IsClassifiedByItsAttributes(string version, string methodName, bool expected)
     {
         var compilation = CreateXunitFixture(version);
@@ -199,8 +209,10 @@ public class XunitTestMethodRecognizerTests
     [Test]
     [Arguments(XunitV2Scenario, "AbstractTest")]
     [Arguments(XunitV2Scenario, "InheritedTest")]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario, "AbstractTest")]
     [Arguments(XunitV3Scenario, "InheritedTest")]
+#endif
     public async Task IsTestMethod_AbstractAndInheritedMethod_IsClassifiedAsATest(string version, string methodName)
     {
         var compilation = CreateXunitFixture(version);
@@ -217,7 +229,9 @@ public class XunitTestMethodRecognizerTests
     /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task IsTestMethod_FactAttributeFromAnUnrelatedNamespace_IsNotClassifiedAsATest(string version)
     {
         var compilation = CompilationFactory.Create(UnrelatedFixtureSource, ToFramework(version));
@@ -236,7 +250,9 @@ public class XunitTestMethodRecognizerTests
     /// <param name="version">The version of the framework the compilation references.</param>
     [Test]
     [Arguments(XunitV2Scenario)]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(XunitV3Scenario)]
+#endif
     public async Task IsTestMethod_RecognizerWithoutAnAttributeType_FallsBackToTheNameRule(string version)
     {
         var compilation = CreateXunitFixture(version);
@@ -278,7 +294,9 @@ public class XunitTestMethodRecognizerTests
         version switch
         {
             XunitV2Scenario => TestFramework.XunitV2,
+#if FRAMESHIFT_XUNIT_V3
             XunitV3Scenario => TestFramework.XunitV3,
+#endif
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unknown version."),
         };
 

@@ -59,7 +59,7 @@ public class TestSurfaceManifestWriterTests
         var written = TestSurfaceManifestWriter.Write(Create(["M:Tests.A.First"], ["M:Production.A.Alpha"]));
 
         _ = await Assert.That(written.Contains('\r', StringComparison.Ordinal)).IsFalse();
-        _ = await Assert.That(written.EndsWith('\n')).IsTrue();
+        _ = await Assert.That(written[^1]).IsEqualTo('\n');
         _ = await Assert.That(written.Split('\n').Length).IsEqualTo(4);
     }
 

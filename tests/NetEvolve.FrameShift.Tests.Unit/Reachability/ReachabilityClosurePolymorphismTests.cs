@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+﻿namespace NetEvolve.FrameShift.Tests.Unit;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -246,6 +246,12 @@ public class ReachabilityClosurePolymorphismTests
         }
         """;
 
+#if !NETFRAMEWORK
+    /// <summary>
+    /// A default interface implementation, which the compiler only accepts when the referenced runtime
+    /// declares support for it. The reference assemblies of .NET Framework do not, so this fixture and the
+    /// expectation built on it exist on the modern targets only.
+    /// </summary>
     private const string DefaultImplementationSource = """
         namespace Production;
 
@@ -270,6 +276,7 @@ public class ReachabilityClosurePolymorphismTests
             public static void Use(IPinger pinger) => pinger.Ping();
         }
         """;
+#endif
 
     private const string GenericSource = """
         namespace Production;
@@ -384,7 +391,9 @@ public class ReachabilityClosurePolymorphismTests
     [Arguments(AccessorSource)]
     [Arguments(AbstractSource)]
     [Arguments(InterfaceSource)]
+#if !NETFRAMEWORK
     [Arguments(DefaultImplementationSource)]
+#endif
     [Arguments(GenericSource)]
     [Arguments(BaseConstructorSource)]
     [Arguments(TypeReferenceSource)]
@@ -594,6 +603,7 @@ public class ReachabilityClosurePolymorphismTests
         _ = await Assert.That(reachable.Contains(Member(compilation, "Production.StarterBase", "Prepare"))).IsTrue();
     }
 
+#if !NETFRAMEWORK
     [Test]
     public async Task Compute_InterfaceMemberWithADefaultImplementation_ReachesTheDefaultBody()
     {
@@ -607,6 +617,7 @@ public class ReachabilityClosurePolymorphismTests
         _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Pong"))).IsTrue();
         _ = await Assert.That(reachable.Contains(Member(compilation, "Production.Pinger", "Track"))).IsTrue();
     }
+#endif
 
     [Test]
     public async Task Compute_ConstructedGenericInterface_ReachesTheMatchingImplementation()

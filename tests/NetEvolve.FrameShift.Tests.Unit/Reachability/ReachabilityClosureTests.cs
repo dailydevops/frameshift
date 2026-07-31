@@ -282,7 +282,7 @@ public class ReachabilityClosureTests
         var compilation = CompilationFactory.Create(ChainSource);
         var manifest = Manifest("M:Production.Chain.A");
 
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
         var threw = ThrowsCancellation(() =>
             _ = ReachabilityClosure.Compute(compilation, manifest, cancellation.Token)
         );

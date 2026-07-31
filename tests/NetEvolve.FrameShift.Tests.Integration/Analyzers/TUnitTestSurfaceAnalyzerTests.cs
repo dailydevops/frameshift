@@ -45,6 +45,9 @@ public class TUnitTestSurfaceAnalyzerTests
     private const string CoveringTestName = "Add_ExercisesProduction";
     private const string LocalOnlyTestName = "LocalStateOnly_TouchesNoProduction";
 
+    private const string PartialTestPath = "PartialCalculatorTests.cs";
+    private const string PartialLocalOnlyTestName = "PartialLocalStateOnly_TouchesNoProduction";
+
     private const string NoTestsScenario = "framework referenced, no test method";
     private const string ForeignAttributeScenario = "test attribute of an unrelated framework";
     private const string FrameworkLikeAssemblyScenario = "framework-like assembly name, no test method";
@@ -56,6 +59,14 @@ public class TUnitTestSurfaceAnalyzerTests
     private const string MalformedHeaderDetail =
         "Line 1: expected the test-surface manifest header 'frameshift-test-surface/1', "
         + "but found 'not-a-test-surface-manifest'.";
+
+    /// <summary>
+    /// A manifest whose header is fine and whose only entry names no id at all, so that the problem is
+    /// found by the entry rule rather than by the header rule.
+    /// </summary>
+    private const string EntryWithoutIdManifest = "frameshift-test-surface/1\nT\n";
+
+    private const string EntryWithoutIdDetail = "Line 2: the 'T' entry does not specify a documentation comment id.";
 
     private const string GhostReferenceId = "M:Fixture.Ghost.Vanished";
     private const string ReferencePrefix = "R ";
@@ -108,6 +119,31 @@ public class TUnitTestSurfaceAnalyzerTests
 
             [Test]
             public void LocalStateOnly_TouchesNoProduction() => Verify(Compute());
+
+            private static int Compute() => 41;
+
+            private static void Verify(int value)
+            {
+            }
+        }
+        """;
+
+    /// <summary>
+    /// A test method written as a partial one: the attribute sits on the defining declaration and the
+    /// body on the implementing one. Both parts report the merged attributes, so a project written this
+    /// way is exactly the shape in which the very same test could be named twice.
+    /// </summary>
+    private const string PartialTestSource = """
+        namespace Tests;
+
+        using TUnit.Core;
+
+        public partial class PartialCalculatorTests
+        {
+            [Test]
+            public partial void PartialLocalStateOnly_TouchesNoProduction();
+
+            public partial void PartialLocalStateOnly_TouchesNoProduction() => Verify(Compute());
 
             private static int Compute() => 41;
 
@@ -266,6 +302,46 @@ public class TUnitTestSurfaceAnalyzerTests
         _ = await Assert
             .That(DiagnosticAssertions.Describe(diagnostics))
             .IsEqualTo(DescribeManifestProblem(MalformedHeaderDetail));
+    }
+
+    /// <summary>
+    /// A manifest that fails on one of its entries is reported with that entry's line and reason, not
+    /// with a generic complaint about the file. The reader names a reason for every rejection it makes,
+    /// which is why the analyzer's own fallback wording never reaches a developer.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_ManifestEntryWithoutAnId_ReportsTheOffendingLine()
+    {
+        var diagnostics = await RunAsync(CreateTest(), DiagnosticIds.InvalidTestSurfaceManifest, EntryWithoutIdManifest)
+            .ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(diagnostics))
+            .IsEqualTo(DescribeManifestProblem(EntryWithoutIdDetail));
+    }
+
+    /// <summary>
+    /// A partial test method is one test, so it is named once and at the identifier of its defining
+    /// declaration - the declaration its symbol is bound to. Reporting it once per part would name the
+    /// same test twice, and falling back to another location would point the developer at the body
+    /// instead of at the test.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_PartialTestWithoutProductionReference_IsReportedOnceAtTheDefiningDeclaration()
+    {
+        var test = CreatePartialTest();
+        var identifier = FindMethod(test, PartialLocalOnlyTestName).Identifier;
+
+        var diagnostics = await RunAsync(test, DiagnosticIds.TestWithoutProductionReference).ConfigureAwait(false);
+
+        _ = await Assert
+            .That(DiagnosticAssertions.Describe(CompilationFactory.GetCompileErrors(test)))
+            .IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+        _ = await Assert.That(diagnostics).Count().IsEqualTo(1);
+        _ = await Assert.That(diagnostics[0].Location.SourceSpan).IsEqualTo(identifier.Span);
+        _ = await Assert
+            .That(GetMessage(diagnostics[0]).Contains(PartialLocalOnlyTestName, StringComparison.Ordinal))
+            .IsTrue();
     }
 
     [Test]
@@ -571,8 +647,21 @@ public class TUnitTestSurfaceAnalyzerTests
             filePath: TestPath
         );
 
-    private static string CreateManifest(Compilation test) =>
-        TestSurfaceManifestWriter.Write(TestSurfaceCollector.Collect(test, CancellationToken.None));
+    private static CSharpCompilation CreatePartialTest() =>
+        CompilationFactory.Create(
+            PartialTestSource,
+            TestAssemblyName,
+            includeTUnit: true,
+            additionalReferences: [CreateProduction().ToMetadataReference()],
+            filePath: PartialTestPath
+        );
+
+    private static string CreateManifest(Compilation test)
+    {
+        var recognizer = TUnitTestFrameworkProbe.Instance.TryCreateRecognizer(test)!;
+
+        return TestSurfaceManifestWriter.Write(TestSurfaceCollector.Collect(test, recognizer, CancellationToken.None));
+    }
 
     private static MethodDeclarationSyntax FindMethod(Compilation compilation, string name) =>
         SyntaxNodeLocator.FindFirst<MethodDeclarationSyntax>(

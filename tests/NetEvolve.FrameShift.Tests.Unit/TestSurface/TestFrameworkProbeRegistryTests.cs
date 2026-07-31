@@ -86,7 +86,9 @@ internal sealed class TestFrameworkProbeRegistryTests
     /// <param name="expected">The framework names the registry is expected to report.</param>
     [Test]
     [Arguments(TestFramework.TUnit, "TUnit")]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(TestFramework.XunitV3, "xUnit")]
+#endif
     [Arguments(TestFramework.XunitV2, "xUnit")]
     [Arguments(TestFramework.NUnit, "NUnit")]
     [Arguments(TestFramework.MSTest, "MSTest")]
@@ -109,7 +111,11 @@ internal sealed class TestFrameworkProbeRegistryTests
     /// <param name="expected">The framework names the registry is expected to report, in order.</param>
     [Test]
     [Arguments(TestFramework.NUnit, TestFramework.TUnit, "TUnit, NUnit")]
+#if FRAMESHIFT_XUNIT_V3
     [Arguments(TestFramework.MSTest, TestFramework.XunitV3, "xUnit, MSTest")]
+#else
+    [Arguments(TestFramework.MSTest, TestFramework.XunitV2, "xUnit, MSTest")]
+#endif
     [Arguments(TestFramework.MSTest, TestFramework.NUnit, "NUnit, MSTest")]
     [Arguments(TestFramework.XunitV2, TestFramework.TUnit, "TUnit, xUnit")]
     public async Task Matching_CompilationOfSeveralFrameworks_ReturnsThemInRegistryOrder(
@@ -158,7 +164,11 @@ internal sealed class TestFrameworkProbeRegistryTests
             Describe(CompilationFactory.Create(PlainSource)),
             Describe(CompilationFactory.Create(PlainSource, TestFramework.All)),
             Describe(Create(PlainSource, TestFramework.NUnit, TestFramework.TUnit)),
+#if FRAMESHIFT_XUNIT_V3
             Describe(Create(PlainSource, TestFramework.MSTest, TestFramework.XunitV3)),
+#else
+            Describe(Create(PlainSource, TestFramework.MSTest, TestFramework.XunitV2)),
+#endif
             Describe(Create(PlainSource, TestFramework.MSTest, TestFramework.NUnit)),
             Describe(Create(PlainSource, TestFramework.XunitV2, TestFramework.TUnit)),
         };

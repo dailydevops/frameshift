@@ -462,7 +462,7 @@ public class MutantGeneratorTests
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(MixedSource);
         var root = RootOf(tree);
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
             _ = MutantGenerator.CreateMutations(root, semanticModel, cancellation.Token).ToList()
@@ -483,7 +483,7 @@ public class MutantGeneratorTests
         using var cancellation = new CancellationTokenSource();
         var mutations = MutantGenerator.CreateMutations(root, semanticModel, cancellation.Token);
         var taken = new List<Mutation>();
-        await cancellation.CancelAsync().ConfigureAwait(false);
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
 
         var exception = Assert.Throws<OperationCanceledException>(() =>
         {
