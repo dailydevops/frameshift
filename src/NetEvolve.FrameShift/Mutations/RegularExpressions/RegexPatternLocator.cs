@@ -101,8 +101,9 @@ internal static class RegexPatternLocator
 
         // The token value is what separates a string literal from every other literal, and it does so for
         // the ordinary, the verbatim and the raw form alike, without naming a single syntax kind. A `u8`
-        // literal is no string either and is rejected further down, because it cannot bind to a string
-        // parameter.
+        // literal's token value is a string just the same - Roslyn only converts it to bytes when the
+        // literal is bound against a target type - so this guard lets it through; it is rejected further
+        // down instead, because it can only ever bind to a parameter that is no string.
         if (node is not LiteralExpressionSyntax literal || literal.Token.Value is not string)
         {
             return null;
