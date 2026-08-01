@@ -25,6 +25,7 @@ public class MSTestFrameworkProbeTests
     private const string FrameworkAssemblyName = "Microsoft.VisualStudio.TestPlatform.TestFramework.Satellite";
     private const string DifferentlyCasedAssemblyName = "microsoft.visualstudio.testplatform.testframework.ext";
     private const string ForeignAssemblyName = "Foreign.Satellite";
+    private const string LegacyQualityToolsAssemblyName = "Microsoft.VisualStudio.QualityTools.UnitTestFramework";
 
     private const string DecoratedTestName = "DecoratedTest";
     private const string PlainMethodName = "PlainMethod";
@@ -245,6 +246,40 @@ public class MSTestFrameworkProbeTests
         }
     }
 
+    /// <summary>
+    /// The legacy, pre-MSTestV2, in-box Visual Studio unit test framework assembly is a framework trace as
+    /// well: it declares the identical well-known attribute type, so a compilation that references only it
+    /// (and neither <c>MSTest.TestFramework</c> nor <c>Microsoft.VisualStudio.TestPlatform.TestFramework</c>)
+    /// must still be recognised through the assembly-name fallback.
+    /// </summary>
+    [Test]
+    public async Task TryCreateRecognizer_LegacyQualityToolsAssemblyWithoutTheAttributeType_FindsNoTests()
+    {
+        var compilation = CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, LegacyQualityToolsAssemblyName);
+
+        var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(compilation);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(MSTestTestFrameworkProbe.GetTestAttributeType(compilation)).IsNull();
+            _ = await Assert.That(recognizer?.FrameworkName).IsEqualTo("MSTest");
+            _ = await Assert.That(recognizer!.IsTestMethod(FindMethod(compilation, PlainMethodName))).IsFalse();
+        }
+    }
+
+    /// <summary>
+    /// The legacy assembly name is also classified positively by <see cref="MSTestTestFrameworkProbe.IsFrameworkAssembly" />.
+    /// </summary>
+    [Test]
+    public async Task IsFrameworkAssembly_LegacyQualityToolsAssemblyName_IsClassifiedAsTheFramework()
+    {
+        var consumer = CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, LegacyQualityToolsAssemblyName);
+
+        var assembly = SatelliteAssembly(consumer, LegacyQualityToolsAssemblyName);
+
+        _ = await Assert.That(MSTestTestFrameworkProbe.IsFrameworkAssembly(assembly)).IsTrue();
+    }
+
     [Test]
     public async Task TryCreateRecognizer_CompilationIsNull_ThrowsArgumentNullException()
     {
@@ -315,6 +350,7 @@ public class MSTestFrameworkProbeTests
             Describe(CreateSatelliteConsumer(LookAlikeConsumerSource, LookAlikeSatelliteSource, ForeignAssemblyName)),
             Describe(CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, FrameworkAssemblyName)),
             Describe(CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, DifferentlyCasedAssemblyName)),
+            Describe(CreateSatelliteConsumer(PlainSource, MarkerSatelliteSource, LegacyQualityToolsAssemblyName)),
             Describe(CreateAmbiguousConsumer()),
         };
 

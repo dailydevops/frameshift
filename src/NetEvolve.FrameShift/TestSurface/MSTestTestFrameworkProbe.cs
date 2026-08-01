@@ -9,10 +9,12 @@ using Microsoft.CodeAnalysis;
 /// <remarks>
 /// <para>
 /// MSTest is recognised by <c>Microsoft.VisualStudio.TestTools.UnitTesting.TestMethodAttribute</c>,
-/// which lives in the assembly <c>MSTest.TestFramework</c> since MSTest 4 and in
-/// <c>Microsoft.VisualStudio.TestPlatform.TestFramework</c> in MSTest 3 and earlier. Both identities are
-/// accepted, because the namespace of the attribute did not change with the rename and a project on
-/// either major version is equally an MSTest project.
+/// which lives in the assembly <c>MSTest.TestFramework</c> since MSTest 4, in
+/// <c>Microsoft.VisualStudio.TestPlatform.TestFramework</c> in MSTest 3 and earlier, and in
+/// <c>Microsoft.VisualStudio.QualityTools.UnitTestFramework</c> for the legacy, in-box Visual Studio unit
+/// test framework that predates MSTest V2 and NuGet packaging. All three identities are accepted, because
+/// the namespace of the attribute did not change across the rename, nor across MSTest V2's predecessor,
+/// and a project on any of them is equally an MSTest project.
 /// </para>
 /// <para>
 /// Either part is enough, exactly as in every other probe: the attribute type resolves, <em>or</em> the
@@ -67,6 +69,10 @@ internal sealed class MSTestTestFrameworkProbe : ITestFrameworkProbe
         "MSTest.TestFramework",
         // MSTest 3 and earlier.
         "Microsoft.VisualStudio.TestPlatform.TestFramework",
+        // The legacy, in-box Visual Studio unit test framework that predates MSTest V2 and NuGet
+        // packaging. It declares the identical well-known attribute type, so a classic project is
+        // recognised the same way.
+        "Microsoft.VisualStudio.QualityTools.UnitTestFramework",
     ];
 
     /// <summary>
