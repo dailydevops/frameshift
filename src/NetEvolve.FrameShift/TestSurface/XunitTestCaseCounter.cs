@@ -3,8 +3,6 @@ namespace NetEvolve.FrameShift.TestSurface;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Counts the test cases an xUnit.net test method contributes. The two major versions describe their data
@@ -260,8 +258,10 @@ internal sealed class XunitTestCaseCounter
             return TestCaseCount.AtLeast(1);
         }
 
-        var member = FindMember(GetMemberType(attribute) ?? method.ContainingType, memberName!);
-        var length = member is null ? null : GetLiteralSequenceLength(member);
+        var length = SequenceLengthReader.TryGetSequenceLength(
+            GetMemberType(attribute) ?? method.ContainingType,
+            memberName!
+        );
 
         return length.HasValue ? TestCaseCount.Exact(length.Value) : TestCaseCount.AtLeast(1);
     }
@@ -278,109 +278,6 @@ internal sealed class XunitTestCaseCounter
             )
             .Select(argument => argument.Value.Value as INamedTypeSymbol)
             .FirstOrDefault(type => type is not null);
-
-    /// <summary>
-    /// Finds the field, property or method of <paramref name="type" /> or one of its base types that a
-    /// member data source names.
-    /// </summary>
-    /// <param name="type">The type to search.</param>
-    /// <param name="memberName">The member name.</param>
-    /// <returns>The member, or <see langword="null" /> when the type declares none of that name.</returns>
-    private static ISymbol? FindMember(INamedTypeSymbol? type, string memberName)
-    {
-        for (var current = type; current is not null; current = current.BaseType)
-        {
-            var member = current
-                .GetMembers(memberName)
-                .FirstOrDefault(candidate => candidate is IFieldSymbol or IPropertySymbol or IMethodSymbol);
-
-            if (member is not null)
-            {
-                return member;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Reads the length of the literal sequence <paramref name="member" /> is initialized with, out of the
-    /// syntax of its declaration.
-    /// </summary>
-    /// <param name="member">The member a data source references.</param>
-    /// <returns>The length, or <see langword="null" /> when the member is no literal sequence.</returns>
-    private static int? GetLiteralSequenceLength(ISymbol member)
-    {
-        foreach (var reference in member.DeclaringSyntaxReferences)
-        {
-            var length = GetSequenceLength(GetSequenceExpression(reference.GetSyntax()));
-
-            if (length.HasValue)
-            {
-                return length;
-            }
-        }
-
-        return null;
-    }
-
-    /// <summary>
-    /// Picks the expression a member is initialized with: the expression body of a property or method, the
-    /// expression body of a property getter, or the initializer of a field. A block body is deliberately
-    /// not inspected — an iterator or a computed sequence is no literal one, and guessing its length is
-    /// exactly the kind of half-knowledge the lower bound exists for.
-    /// </summary>
-    /// <param name="node">The declaring syntax of the member.</param>
-    /// <returns>The initializing expression, or <see langword="null" />.</returns>
-    private static ExpressionSyntax? GetSequenceExpression(SyntaxNode node) =>
-        node switch
-        {
-            PropertyDeclarationSyntax property => property.ExpressionBody?.Expression ?? GetGetterExpression(property),
-            MethodDeclarationSyntax method => method.ExpressionBody?.Expression,
-            VariableDeclaratorSyntax variable => variable.Initializer?.Value,
-            _ => null,
-        };
-
-    /// <summary>
-    /// Picks the expression body of the getter of <paramref name="property" />.
-    /// </summary>
-    /// <param name="property">The property declaration.</param>
-    /// <returns>The expression, or <see langword="null" /> when the getter has a block body or none.</returns>
-    private static ExpressionSyntax? GetGetterExpression(PropertyDeclarationSyntax property) =>
-        property
-            .AccessorList?.Accessors.FirstOrDefault(accessor => accessor.IsKind(SyntaxKind.GetAccessorDeclaration))
-            ?.ExpressionBody?.Expression;
-
-    /// <summary>
-    /// Counts the elements of an expression that spells its sequence out: an array creation with an
-    /// initializer, a collection expression, or an object creation with a collection initializer, which is
-    /// the shape of a <c>TheoryData</c> member.
-    /// </summary>
-    /// <param name="expression">The initializing expression, which may be <see langword="null" />.</param>
-    /// <returns>The element count, or <see langword="null" /> when the expression is no literal sequence.</returns>
-    private static int? GetSequenceLength(ExpressionSyntax? expression) =>
-        expression switch
-        {
-            ImplicitArrayCreationExpressionSyntax array => array.Initializer.Expressions.Count,
-            ArrayCreationExpressionSyntax array => array.Initializer?.Expressions.Count,
-            BaseObjectCreationExpressionSyntax creation => GetCollectionInitializerLength(creation.Initializer),
-            CollectionExpressionSyntax collection => collection.Elements.Any(element => element is SpreadElementSyntax)
-                ? null
-                : collection.Elements.Count,
-            InitializerExpressionSyntax initializer => initializer.Expressions.Count,
-            _ => null,
-        };
-
-    /// <summary>
-    /// Counts the elements of a collection initializer, and of nothing else: the initializer of
-    /// <c>new Rows { Count = 1 }</c> assigns a property and says nothing about a length.
-    /// </summary>
-    /// <param name="initializer">The initializer of an object creation, which may be <see langword="null" />.</param>
-    /// <returns>The element count, or <see langword="null" />.</returns>
-    private static int? GetCollectionInitializerLength(InitializerExpressionSyntax? initializer) =>
-        initializer is not null && initializer.IsKind(SyntaxKind.CollectionInitializerExpression)
-            ? initializer.Expressions.Count
-            : null;
 
     /// <summary>
     /// Determines whether the method carries a test marker that is neither the shipped

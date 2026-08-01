@@ -140,11 +140,13 @@ public class XunitV2TestMethodRecognizerTests
     /// cannot shift the discovery assertions above, and it carries one method per rule: a parameterless
     /// <c>[Fact]</c>, one and three <c>[InlineData]</c> rows, a <c>[Theory]</c> without any data source, a
     /// member data source per literal shape - implicit and explicit array creation, an expression-bodied
-    /// getter, a collection initializer, a <c>TheoryData</c> initializer, a collection expression, an empty
-    /// sequence, a method, a field and an inherited member - and the shapes no static reading can size: an
-    /// iterator, an array created by length alone, a member that does not exist and a <c>[ClassData]</c>
-    /// source. The last methods mix the rules: inline data next to an exact and next to an inexact data
-    /// source, and the custom markers whose own discoverer may multiply the cases.
+    /// getter, a collection initializer, a <c>TheoryData</c> initializer, a collection expression, a
+    /// collection expression with a spread element, an empty sequence, a method, a field, an inherited
+    /// member and a body consisting of nothing but <c>yield return</c> statements - and the shapes no static
+    /// reading can size: a genuine iterator built from a loop, an array created by length alone, a member
+    /// that does not exist and a <c>[ClassData]</c> source. The last methods mix the rules: inline data next
+    /// to an exact and next to an inexact data source, and the custom markers whose own discoverer may
+    /// multiply the cases.
     /// </summary>
     private const string CaseCountFixtureSource = """
         namespace Fixture;
@@ -202,10 +204,18 @@ public class XunitV2TestMethodRecognizerTests
             public static IEnumerable<object[]> Method() =>
                 new[] { new object[] { 1 }, new object[] { 2 }, new object[] { 3 }, new object[] { 4 } };
 
-            public static IEnumerable<object[]> Iterator()
+            public static IEnumerable<object[]> YieldedRows()
             {
                 yield return new object[] { 1 };
                 yield return new object[] { 2 };
+            }
+
+            public static IEnumerable<object[]> Iterator()
+            {
+                foreach (var value in new[] { 1, 2 })
+                {
+                    yield return new object[] { value };
+                }
             }
         }
 
@@ -316,6 +326,12 @@ public class XunitV2TestMethodRecognizerTests
             [Theory]
             [MemberData(nameof(Rows.ImplicitArrayProperty), MemberType = typeof(DerivedRows))]
             public void InheritedMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.YieldedRows), MemberType = typeof(Rows))]
+            public void YieldedRowsMemberData(int value)
             {
             }
 
@@ -578,11 +594,13 @@ public class XunitV2TestMethodRecognizerTests
     /// name a test case that never runs.
     /// </para>
     /// <para>
-    /// A member data source is exact only where its rows are written out literally in the compilation. An
-    /// iterator, an array created by length alone and a member that does not exist all stay a lower bound,
-    /// because only executing the member would give the answer and an analyzer must not execute anything. A
-    /// custom marker degrades the count to a lower bound as well: its test-case discoverer may multiply the
-    /// cases, which is no hypothetical - version 3 ships exactly that in <c>[CulturedFact]</c>.
+    /// A member data source is exact only where its rows are written out literally in the compilation, which
+    /// includes a body consisting of nothing but <c>yield return</c> statements - each one yields exactly one
+    /// row. A genuine iterator built from a loop, a collection expression with a spread element, an array
+    /// created by length alone and a member that does not exist all stay a lower bound, because only
+    /// executing the member would give the answer and an analyzer must not execute anything. A custom marker
+    /// degrades the count to a lower bound as well: its test-case discoverer may multiply the cases, which is
+    /// no hypothetical - version 3 ships exactly that in <c>[CulturedFact]</c>.
     /// </para>
     /// </remarks>
     [Test]
@@ -602,6 +620,7 @@ public class XunitV2TestMethodRecognizerTests
     [Arguments("MethodMemberData", "4")]
     [Arguments("FieldMemberData", "5")]
     [Arguments("InheritedMemberData", "2")]
+    [Arguments("YieldedRowsMemberData", "2")]
     [Arguments("SizedArrayMemberData", "1+")]
     [Arguments("IteratorMemberData", "1+")]
     [Arguments("MissingMemberData", "1+")]
