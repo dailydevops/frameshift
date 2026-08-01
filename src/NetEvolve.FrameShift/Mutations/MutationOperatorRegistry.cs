@@ -45,6 +45,7 @@ internal static class MutationOperatorRegistry
         yield return new Operators.BitwiseOperatorMutator();
         yield return new Operators.BooleanLiteralMutator();
         yield return new Operators.CaseConversionMutator();
+        yield return new Operators.CheckedContextMutator();
         yield return new Operators.CollectionInitializerMutator();
         yield return new Operators.ConditionalExpressionMutator();
         yield return new Operators.CultureInfoMutator();
