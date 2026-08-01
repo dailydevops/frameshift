@@ -77,7 +77,10 @@ internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
                 continue;
             }
 
-            if (userDefined is not null && !HasCounterpart(userDefined, GetMetadataName(targetKind)))
+            if (
+                userDefined is not null
+                && !OperatorCounterpart.HasCounterpart(userDefined, GetMetadataName(targetKind))
+            )
             {
                 continue;
             }
@@ -166,28 +169,5 @@ internal sealed class ArithmeticAssignmentMutator : MutationOperatorBase
         }
 
         return type.SpecialType is not (SpecialType.System_String or SpecialType.System_Object);
-    }
-
-    private static bool HasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
-    {
-        var containingType = userDefinedOperator.ContainingType;
-        if (containingType is null)
-        {
-            return false;
-        }
-
-        foreach (var member in containingType.GetMembers(metadataName))
-        {
-            if (
-                member is IMethodSymbol candidate
-                && candidate.MethodKind == MethodKind.UserDefinedOperator
-                && candidate.Parameters.Length == userDefinedOperator.Parameters.Length
-            )
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
