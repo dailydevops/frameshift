@@ -14,7 +14,7 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 30 mutation operators covering arithmetic operators and compound assignments, relational and
+- 31 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical operators (including boolean exclusive-or), conditional expressions
   (branch swap, condition negation, and forcing the condition to `true`/`false`), bitwise/shift
   operators and their compound assignments, logical negation, increment/decrement, unary operators,
@@ -45,6 +45,13 @@ next to every other compiler diagnostic.
   longer a legal pattern is discarded instead of being killed by an exception in every test. The
   family multiplies the mutation points of a single member and can therefore be switched off on its
   own, with `FrameShiftEnableRegexPatternMutations`.
+- A LINQ method operator that renames a well known `System.Linq.Enumerable` call to its counterpart -
+  `All`/`Any`, `First`/`FirstOrDefault`, `Single`/`SingleOrDefault`, `Last`/`LastOrDefault`,
+  `OrderBy`/`OrderByDescending`, `ThenBy`/`ThenByDescending`, `Min`/`Max`, `MinBy`/`MaxBy`,
+  `Skip`/`Take`, `Skip`/`SkipLast` and `SkipWhile`/`TakeWhile`. The invoked method is resolved through
+  the semantic model, so a same-named, same-shaped method on a type of your own is never mistaken for
+  it, and a call is only renamed to a counterpart whose parameter list has the same shape, so that
+  every produced mutant compiles.
 - Every mutant is verified by in-memory recompilation of the mutated syntax tree, so a mutation that
   would not even build is never reported.
 - Mutants that cannot change observable behaviour are recognised and reported separately

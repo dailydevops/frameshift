@@ -194,4 +194,12 @@ internal enum MutationKind
     /// backreference from a mistakenly renumbered one.
     /// </summary>
     RegexBackreference,
+
+    /// <summary>
+    /// Well known <c>System.Linq.Enumerable</c> method calls, such as <c>All</c> / <c>Any</c>,
+    /// <c>First</c> / <c>FirstOrDefault</c> and <c>OrderBy</c> / <c>OrderByDescending</c>, replaced by
+    /// their counterpart. A query that decides correctness through one of these choices has no mutant
+    /// pinning it down until the call is renamed.
+    /// </summary>
+    LinqMethod,
 }
