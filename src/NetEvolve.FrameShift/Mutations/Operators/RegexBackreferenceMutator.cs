@@ -60,6 +60,15 @@ using NetEvolve.FrameShift.Mutations.RegularExpressions;
 /// match, but it is not rejected upstream either, so this operator yields no rewrite for it rather than
 /// throwing.
 /// </para>
+/// <para>
+/// A second, distinct overflow guards the arithmetic once the digits have parsed successfully: a
+/// backreference number of <see cref="int.MaxValue" /> itself is only reachable through the explicit
+/// <c>(?&lt;n&gt;...)</c> numbering form, but it is not rejected upstream, so incrementing it by one would
+/// wrap to <see cref="int.MinValue" /> and render as a nonsensical replacement text. The increase is
+/// therefore never offered for that boundary value. The decrease needs no matching guard: it is only ever
+/// offered once <c>n</c> is at least <c>2</c>, so <c>n - 1</c> can never fall below <c>1</c> and never
+/// underflows.
+/// </para>
 /// </remarks>
 internal sealed class RegexBackreferenceMutator : RegexPatternMutatorBase
 {
@@ -98,10 +107,13 @@ internal sealed class RegexBackreferenceMutator : RegexPatternMutatorBase
                 continue;
             }
 
-            yield return new RegexPatternRewrite(
-                Replace(pattern, token, @"\" + (number + 1).ToString(CultureInfo.InvariantCulture)),
-                "increase-referenced-group"
-            );
+            if (number != int.MaxValue)
+            {
+                yield return new RegexPatternRewrite(
+                    Replace(pattern, token, @"\" + (number + 1).ToString(CultureInfo.InvariantCulture)),
+                    "increase-referenced-group"
+                );
+            }
 
             if (number >= 2)
             {
