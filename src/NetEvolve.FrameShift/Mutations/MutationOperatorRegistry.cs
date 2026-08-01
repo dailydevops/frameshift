@@ -68,6 +68,7 @@ internal static class MutationOperatorRegistry
         yield return new Operators.RegexOptionsMutator();
         yield return new Operators.RegexQuantifierMutator();
         yield return new Operators.RelationalOperatorMutator();
+        yield return new Operators.StatementRemovalMutator();
         yield return new Operators.StringComparerMutator();
         yield return new Operators.StringComparisonMutator();
         yield return new Operators.StringLiteralMutator();
