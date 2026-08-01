@@ -14,10 +14,10 @@ public class MutationOperatorRegistryTests
 {
     /// <summary>
     /// The number of operators the registry must expose: the sixteen expression operators, the six
-    /// operators of the culture sensitivity family and the eight operators of the regular expression
-    /// pattern family.
+    /// operators of the culture sensitivity family, the eight operators of the regular expression
+    /// pattern family and the LINQ method operator.
     /// </summary>
-    private const int ExpectedOperatorCount = 30;
+    private const int ExpectedOperatorCount = 31;
 
     private static readonly string[] _expectedOperatorIds =
     [
@@ -35,6 +35,7 @@ public class MutationOperatorRegistryTests
         "culture.string-comparison",
         "equality",
         "increment-decrement",
+        "linq.method",
         "logical",
         "negation",
         "null-coalescing",
@@ -167,7 +168,7 @@ public class MutationOperatorRegistryTests
                 );
             _ = await Assert
                 .That(Join(Sort(invocationOperators.Select(item => item.Id))))
-                .IsEqualTo("culture.case-conversion, culture.format-provider");
+                .IsEqualTo("culture.case-conversion, culture.format-provider, linq.method");
             _ = await Assert
                 .That(Join(Sort(stringLiteralOperators.Select(item => item.Id))))
                 .IsEqualTo(
