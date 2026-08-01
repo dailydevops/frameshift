@@ -442,12 +442,32 @@ public class NUnitTestMethodRecognizerTests
             }
 
             [Test]
+            public void ZeroStepRangeParameter([Range(1, 5, 0)] int value)
+            {
+            }
+
+            [Test]
+            public void WrongDirectionRangeParameter([Range(5, 1, 1)] int value)
+            {
+            }
+
+            [Test]
+            public void ByteRangedParameter([Range((byte)1, (byte)3)] byte value)
+            {
+            }
+
+            [Test]
             public void CountedRandomParameter([Random(4)] int value)
             {
             }
 
             [Test]
             public void BoundedRandomParameter([Random(1, 10, 2)] int value)
+            {
+            }
+
+            [Test]
+            public void NonPositiveRandomParameter([Random(0)] int value)
             {
             }
 
@@ -953,6 +973,7 @@ public class NUnitTestMethodRecognizerTests
     [Arguments("SteppedRangeParameter", 3)]
     [Arguments("DescendingRangeParameter", 3)]
     [Arguments("TwiceRangedParameter", 4)]
+    [Arguments("ByteRangedParameter", 3)]
     [Arguments("CountedRandomParameter", 4)]
     [Arguments("BoundedRandomParameter", 2)]
     [Arguments("ValueSourcedParameter", 3)]
@@ -992,6 +1013,9 @@ public class NUnitTestMethodRecognizerTests
     [Arguments("EmptyValuesParameter", 1)]
     [Arguments("FloatingRangeParameter", 1)]
     [Arguments("AbsentValueSourceParameter", 1)]
+    [Arguments("ZeroStepRangeParameter", 1)]
+    [Arguments("WrongDirectionRangeParameter", 1)]
+    [Arguments("NonPositiveRandomParameter", 1)]
     public async Task GetTestCaseCount_ShapeThatIsNotWrittenDown_IsALowerBound(string methodName, int expected)
     {
         var compilation = CreateCountFixture();
