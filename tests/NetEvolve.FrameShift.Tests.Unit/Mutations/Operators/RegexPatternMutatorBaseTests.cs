@@ -441,6 +441,147 @@ public class RegexPatternMutatorBaseTests
         _ = await Assert.That(exception).IsNotNull();
     }
 
+    /// <summary>
+    /// The cache-aware overload <see cref="MutantGenerator" /> uses is not part of
+    /// <see cref="IMutationOperator" />, but every operator of the family inherits it from
+    /// <see cref="RegexPatternMutatorBase" />. It has to produce exactly the mutations the interface method
+    /// does for the same node, and it has to reuse whatever a shared <see cref="RegexPatternCache" /> already
+    /// resolved for that node instead of resolving it again.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_WithCache_ProducesTheSameMutationsAsWithoutIt()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        var cache = new RegexPatternCache();
+
+        var withoutCache = new RegexAnchorMutator().CreateMutations(node, semanticModel, CancellationToken.None);
+        var withCache = new RegexAnchorMutator().CreateMutations(node, semanticModel, cache, CancellationToken.None);
+
+        _ = await Assert.That(Describe([.. withCache])).IsEqualTo(Describe([.. withoutCache]));
+    }
+
+    /// <summary>
+    /// Two operators of the family asked about the very same node through the cache-aware overload share
+    /// one resolution: the site, the pattern text and therefore every mutation each of them offers stay
+    /// exactly what they would be without the cache, proving the shared answer is not just reused but reused
+    /// correctly.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_WithCache_SharedBetweenTwoOperators_BothProduceTheirOwnMutations()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        var cache = new RegexPatternCache();
+
+        var first = new RegexAnchorMutator().CreateMutations(node, semanticModel, cache, CancellationToken.None);
+        var second = new RegexAnchorMutator().CreateMutations(node, semanticModel, cache, CancellationToken.None);
+
+        _ = await Assert.That(Describe([.. second])).IsEqualTo(Describe([.. first]));
+        _ = await Assert.That(Describe([.. first])).IsEqualTo(ExpectedLineAnchorMutations);
+    }
+
+    /// <summary>
+    /// A node the cache has never seen before is resolved on demand, exactly like the interface method
+    /// would, so the very first caller through the cache-aware overload is not a special case.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_WithCache_FreshCache_StillResolvesTheNode()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+
+        var mutations = new RegexAnchorMutator().CreateMutations(
+            node,
+            semanticModel,
+            new RegexPatternCache(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(Describe([.. mutations])).IsEqualTo(ExpectedLineAnchorMutations);
+    }
+
+    /// <summary>
+    /// A node of a syntax kind outside <see cref="MutationOperatorBase.SupportedSyntaxKinds" /> is
+    /// rejected before the cache is ever consulted, exactly like the interface method rejects it before
+    /// resolving anything.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_WithCache_UnsupportedSyntaxKind_ReturnsEmpty()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindFirst<ParameterSyntax>(tree);
+
+        var mutations = new RegexAnchorMutator().CreateMutations(
+            node,
+            semanticModel,
+            new RegexPatternCache(),
+            CancellationToken.None
+        );
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_WithCache_NodeIsNull_ThrowsArgumentNullException()
+    {
+        var (_, semanticModel, _) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = new RegexAnchorMutator()
+                .CreateMutations(null!, semanticModel, new RegexPatternCache(), CancellationToken.None)
+                .ToArray()
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("node");
+    }
+
+    [Test]
+    public async Task CreateMutations_WithCache_SemanticModelIsNull_ThrowsArgumentNullException()
+    {
+        var (_, _, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = new RegexAnchorMutator()
+                .CreateMutations(node, null!, new RegexPatternCache(), CancellationToken.None)
+                .ToArray()
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("semanticModel");
+    }
+
+    [Test]
+    public async Task CreateMutations_WithCache_CacheIsNull_ThrowsArgumentNullException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+
+        var exception = Assert.Throws<ArgumentNullException>(() =>
+            _ = new RegexAnchorMutator().CreateMutations(node, semanticModel, null!, CancellationToken.None).ToArray()
+        );
+
+        _ = await Assert.That(exception.ParamName).IsEqualTo("cache");
+    }
+
+    [Test]
+    public async Task CreateMutations_WithCache_CancellationRequested_ThrowsOperationCanceledException()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(CreateCallSource(PlainArguments));
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        using var cancellation = new CancellationTokenSource();
+
+        await cancellation.CancelAsyncCompat().ConfigureAwait(false);
+
+        var exception = Assert.Throws<OperationCanceledException>(() =>
+            _ = new RegexAnchorMutator()
+                .CreateMutations(node, semanticModel, new RegexPatternCache(), cancellation.Token)
+                .ToArray()
+        );
+
+        _ = await Assert.That(exception).IsNotNull();
+    }
+
     [Test]
     public async Task Replace_TokenSpan_IsReplacedByTheText()
     {

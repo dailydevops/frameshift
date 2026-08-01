@@ -65,26 +65,72 @@ internal abstract class RegexPatternMutatorBase : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        var site = RegexPatternLocator.TryLocate(node, semanticModel, cancellationToken);
+        var resolution = RegexPatternResolution.TryResolve(node, semanticModel, cancellationToken);
 
-        if (site is null || !site.AreOptionsKnown)
+        return resolution is null
+            ? []
+            : CreateViableMutations(resolution.Site, resolution.Options, resolution.Tokens, cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates all candidate mutations for <paramref name="node" />, reusing <paramref name="cache" />'s
+    /// already resolved location, validity and tokens for the node when another operator of the family
+    /// asked about it first.
+    /// </summary>
+    /// <param name="node">The node to mutate.</param>
+    /// <param name="semanticModel">The semantic model of the tree <paramref name="node" /> belongs to.</param>
+    /// <param name="cache">
+    /// The cache scoped to the current <see cref="Mutations.MutantGenerator" /> pass, shared by every
+    /// operator of the family for the duration of that pass.
+    /// </param>
+    /// <param name="cancellationToken">A token to observe while creating the mutations.</param>
+    /// <returns>The candidate mutations, or an empty sequence if the node cannot be mutated.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="node" />, <paramref name="semanticModel" /> or <paramref name="cache" /> is
+    /// <see langword="null" />.
+    /// </exception>
+    /// <remarks>
+    /// This is deliberately not part of <see cref="IMutationOperator" />: every other operator of the
+    /// analyzer has nothing to cache and no reason to carry a parameter it would never use. A caller that
+    /// knows it is talking to a member of this family - <see cref="Mutations.MutantGenerator" /> does,
+    /// through a type check - can call this overload instead of the interface method to benefit from the
+    /// cache; every other caller, including a test that instantiates a concrete operator directly, keeps
+    /// using the interface method and pays for the resolution once per call, exactly as before.
+    /// </remarks>
+    internal IEnumerable<Mutation> CreateMutations(
+        SyntaxNode node,
+        SemanticModel semanticModel,
+        RegexPatternCache cache,
+        CancellationToken cancellationToken
+    )
+    {
+        if (node is null)
+        {
+            throw new ArgumentNullException(nameof(node));
+        }
+
+        if (semanticModel is null)
+        {
+            throw new ArgumentNullException(nameof(semanticModel));
+        }
+
+        if (cache is null)
+        {
+            throw new ArgumentNullException(nameof(cache));
+        }
+
+        if (!SupportedSyntaxKinds.Contains(node.Kind()))
         {
             return [];
         }
 
-        var options = ToParseOptions(site.Options!.Value);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        if (!RegexPatternValidity.IsValid(site.Pattern, options, out _))
-        {
-            return [];
-        }
+        var resolution = cache.GetOrResolve(node, semanticModel, cancellationToken);
 
-        if (!RegexPatternTokenizer.TryTokenize(site.Pattern, options, out var tokens, out _, out _))
-        {
-            return [];
-        }
-
-        return CreateViableMutations(site, options, tokens, cancellationToken);
+        return resolution is null
+            ? []
+            : CreateViableMutations(resolution.Site, resolution.Options, resolution.Tokens, cancellationToken);
     }
 
     /// <summary>
@@ -165,22 +211,6 @@ internal abstract class RegexPatternMutatorBase : MutationOperatorBase
 
         return pattern.Substring(0, start) + replacement + pattern.Substring(end);
     }
-
-    /// <summary>
-    /// Turns the resolved options of a site into the options the validity check is allowed to construct a
-    /// <see cref="Regex" /> with.
-    /// </summary>
-    /// <param name="options">The options the site resolved.</param>
-    /// <returns>The options without <see cref="RegexOptions.Compiled" />.</returns>
-    /// <remarks>
-    /// Only <see cref="RegexOptions.Compiled" /> is dropped, and it has to be: it makes the constructor
-    /// emit IL for an object that is thrown away immediately, which an analyzer running inside the
-    /// compiler must not do. It cannot change the answer either, because it selects how the engine is
-    /// built and not which patterns are legal. Every other flag is kept, including the ones that change
-    /// the grammar and the ones that shrink it, because dropping those would answer a different
-    /// question than the one the site asks.
-    /// </remarks>
-    private static RegexOptions ToParseOptions(RegexOptions options) => options & ~RegexOptions.Compiled;
 
     /// <summary>
     /// Turns the surviving rewrites into mutations of the pattern literal.

@@ -1,8 +1,10 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations;
 
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Configuration;
 using NetEvolve.FrameShift.Mutations;
+using NetEvolve.FrameShift.Mutations.Operators;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -250,6 +252,23 @@ public class MutantGeneratorTests
     private const string RegexPatternOperatorIdsWithoutFamily = "arithmetic, numeric-literal, string-literal";
 
     /// <summary>
+    /// A pattern carrying constructs from two different operators of the regular expression family: the
+    /// two anchors <see cref="RegexAnchorMutator" /> removes and the quantifier
+    /// <see cref="RegexQuantifierMutator" /> rewrites. All eight operators of the family are
+    /// still offered this one literal, one after another, which is exactly the situation the cache added to
+    /// <c>MutantGenerator.CreateMutationsCore</c> exists for: the first operator asked about the literal
+    /// resolves it, and the other seven - two of which actually have something to say - reuse that answer.
+    /// </summary>
+    private const string MultiFamilyRegexSource = """
+        using System.Text.RegularExpressions;
+
+        public class Sample
+        {
+            public Regex Create() => new Regex("^a*$");
+        }
+        """;
+
+    /// <summary>
     /// The operator identifiers a single conditional expression produces, in registration order.
     /// </summary>
     private static readonly string[] _multiOperatorIds =
@@ -401,6 +420,51 @@ public class MutantGeneratorTests
         var operatorIds = Generate(MultiOperatorSource).Select(mutation => mutation.OperatorId).ToArray();
 
         _ = await Assert.That(operatorIds).IsEquivalentTo(_multiOperatorIds);
+    }
+
+    /// <summary>
+    /// All eight operators of the regular expression pattern family are offered the same string literal,
+    /// one after another, and the walk now shares one <c>RegexPatternCache</c> between them instead of
+    /// letting each one locate, validate and tokenize the pattern on its own. This has to be invisible from
+    /// the outside: the mutations two of those operators produce for a pattern they both have something to
+    /// say about must be exactly what each of them produces when asked directly, without any cache at all.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_PatternTriggeringSeveralFamilyOperators_MatchesEachOperatorCalledDirectly()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(MultiFamilyRegexSource);
+        var node = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree);
+        var direct = new IMutationOperator[] { new RegexAnchorMutator(), new RegexQuantifierMutator() }
+            .SelectMany(mutationOperator =>
+                mutationOperator.CreateMutations(node, semanticModel, CancellationToken.None)
+            )
+            .ToArray();
+
+        var generated = Generate(MultiFamilyRegexSource)
+            .Where(mutation =>
+                mutation.OperatorId.StartsWith("regex.anchor.", StringComparison.Ordinal)
+                || mutation.OperatorId.StartsWith("regex.quantifier.", StringComparison.Ordinal)
+            )
+            .ToArray();
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(direct.Length).IsGreaterThan(0);
+            _ = await Assert.That(Describe(generated)).IsEqualTo(Describe(direct));
+        }
+    }
+
+    /// <summary>
+    /// Of the eight operators of the family offered the literal, only the two that have something to say
+    /// about <c>^a*$</c> contribute mutations; the other six each ask the shared cache the same question and
+    /// get back an answer that yields nothing for them, exactly as it would without a cache.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_PatternTriggeringSeveralFamilyOperators_OnlyTheRelevantOperatorsContribute()
+    {
+        var operatorIds = OperatorIds(Generate(MultiFamilyRegexSource));
+
+        _ = await Assert.That(operatorIds).IsEqualTo("regex.anchor, regex.quantifier, string-literal");
     }
 
     [Test]

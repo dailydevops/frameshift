@@ -4,6 +4,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Configuration;
+using NetEvolve.FrameShift.Mutations.Operators;
+using NetEvolve.FrameShift.Mutations.RegularExpressions;
 
 /// <summary>
 /// Walks a syntax tree exactly once and asks every registered <see cref="IMutationOperator" /> for
@@ -120,6 +122,12 @@ internal static class MutantGenerator
         CancellationToken cancellationToken
     )
     {
+        // Scoped to this one walk of `root` and shared by every operator of the regular expression
+        // pattern family: the registry offers all eight of them for the same string literal node, one
+        // after another, so the first one to ask locates, validates and tokenizes the pattern and the
+        // remaining seven reuse that answer instead of redoing the same work for the same text.
+        var regexPatternCache = new RegexPatternCache();
+
         foreach (var node in root.DescendantNodesAndSelf(descendIntoChildren: ShouldDescendInto))
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -136,7 +144,11 @@ internal static class MutantGenerator
                     continue;
                 }
 
-                foreach (var mutation in mutationOperator.CreateMutations(node, semanticModel, cancellationToken))
+                var mutations = mutationOperator is RegexPatternMutatorBase regexPatternMutator
+                    ? regexPatternMutator.CreateMutations(node, semanticModel, regexPatternCache, cancellationToken)
+                    : mutationOperator.CreateMutations(node, semanticModel, cancellationToken);
+
+                foreach (var mutation in mutations)
                 {
                     yield return mutation;
                 }
