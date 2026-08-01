@@ -1,11 +1,13 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
+using NetEvolve.FrameShift.Mutations.RegularExpressions;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -308,6 +310,83 @@ public class RegexLookaroundMutatorTests
         );
 
         _ = await Assert.That(exception).IsNotNull();
+    }
+
+    /// <summary>
+    /// <c>GetNegation</c> falls back to <c>(null, null)</c> for a lookaround opening none of the four known
+    /// spellings match, and <c>TryCreateRewrite</c> turns that into a <see langword="null" /> rewrite instead
+    /// of throwing. The tokenizer is asserted to never produce such a token for
+    /// <see cref="RegexTokenKind.Lookaround" />, so this path is unreachable through the public
+    /// <c>CreateMutations</c> entry point; it is exercised here directly through the private static methods,
+    /// the same way <c>ArithmeticOperatorMutatorTests</c> reaches the unreachable default arms of its own
+    /// mapping tables.
+    /// </summary>
+    [Test]
+    public async Task GetNegation_UnknownOpening_ReturnsNullReplacementAndSuffix()
+    {
+        var (replacement, suffix) = InvokeGetNegation("(?#");
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(replacement).IsNull();
+            _ = await Assert.That(suffix).IsNull();
+        }
+    }
+
+    /// <summary>
+    /// <c>TryCreateRewrite</c> is handed a <see cref="RegexToken" /> of kind
+    /// <see cref="RegexTokenKind.Lookaround" /> whose text is not one of the four spellings the tokenizer
+    /// ever produces for that kind. No test can reach this through the tokenizer, since the tokenizer itself
+    /// guarantees the invariant; the token is constructed directly instead.
+    /// </summary>
+    [Test]
+    public async Task TryCreateRewrite_UnknownOpeningToken_ReturnsNullWithoutThrowing()
+    {
+        var token = new RegexToken(RegexTokenKind.Lookaround, 0, "(?#");
+
+        var rewrite = InvokeTryCreateRewrite("(?#x)", token);
+
+        _ = await Assert.That(rewrite).IsNull();
+    }
+
+    /// <summary>
+    /// Invokes the private static <c>GetNegation</c> mapping through reflection, which is the only way to
+    /// reach its defensive default arm: the tokenizer never produces the token text that would drive
+    /// <c>CreateMutations</c> there.
+    /// </summary>
+    /// <param name="opening">The token text to negate.</param>
+    /// <returns>The replacement text and the suffix, both possibly <see langword="null" />.</returns>
+    /// <exception cref="InvalidOperationException">The mapping method no longer exists.</exception>
+    private static (string? Replacement, string? Suffix) InvokeGetNegation(string opening)
+    {
+        var method =
+            typeof(RegexLookaroundMutator).GetMethod("GetNegation", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The mapping method 'GetNegation' no longer exists.");
+
+        var result = method.Invoke(null, [opening]);
+        var resultType = result!.GetType();
+        var replacement = (string?)resultType.GetField("Item1")!.GetValue(result);
+        var suffix = (string?)resultType.GetField("Item2")!.GetValue(result);
+
+        return (replacement, suffix);
+    }
+
+    /// <summary>
+    /// Invokes the private static <c>TryCreateRewrite</c> method through reflection, so that the null
+    /// fallback for an unexpected lookaround token can be asserted directly, without a tokenizer bug to
+    /// produce it.
+    /// </summary>
+    /// <param name="pattern">The pattern the token belongs to.</param>
+    /// <param name="token">The lookaround token to hand to the method.</param>
+    /// <returns>The produced rewrite, or <see langword="null" />.</returns>
+    /// <exception cref="InvalidOperationException">The method no longer exists.</exception>
+    private static RegexPatternRewrite? InvokeTryCreateRewrite(string pattern, RegexToken token)
+    {
+        var method =
+            typeof(RegexLookaroundMutator).GetMethod("TryCreateRewrite", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The method 'TryCreateRewrite' no longer exists.");
+
+        return (RegexPatternRewrite?)method.Invoke(null, [pattern, token]);
     }
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Mutate(string source) =>
