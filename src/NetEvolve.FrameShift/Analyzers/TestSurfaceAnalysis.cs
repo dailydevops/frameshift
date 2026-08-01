@@ -96,6 +96,58 @@ internal static class TestSurfaceAnalysis
     > TestsWithoutProductionReferenceCache = new();
 
     /// <summary>
+    /// Caches, per analysed <see cref="Compilation" />, the raw <see cref="TestMethodDiscovery.FindTestMethods" />
+    /// result of every framework whose awakeness was checked, keyed by the <see cref="ITestFrameworkProbe" />
+    /// type the discovery ran for.
+    /// </summary>
+    /// <remarks>
+    /// A test project awake on several frameworks at once used to have every one of its framework analyzers
+    /// redo the full syntax-tree walk of <see cref="TestMethodDiscovery.FindTestMethods" /> for every
+    /// <em>other</em> registered framework, purely to decide in <see cref="FindAwakeFrameworks" /> whether
+    /// that other framework is awake too — an ordinary case, since one framework can be split across several
+    /// probes, as xUnit is. With N awake frameworks that meant N walks of each framework's own recogniser
+    /// instead of one, none of them shared between the analyzer instances that all ended up asking the same
+    /// question about the same compilation. This cache makes each (compilation, framework) discovery run at
+    /// most once, exactly like <see cref="TestsWithoutProductionReferenceCache" /> already does one step
+    /// further down the pipeline. The outer table is keyed by <see cref="Compilation" /> and evicted by the
+    /// garbage collector together with it; the inner dictionary is a
+    /// <see cref="ConcurrentDictionary{TKey,TValue}" /> for the same reason as above: two framework analyzers
+    /// racing on the same compilation must still only compute a given entry once between them.
+    /// </remarks>
+    private static readonly ConditionalWeakTable<
+        Compilation,
+        ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>
+    > TestMethodDiscoveryCache = new();
+
+    /// <summary>
+    /// Gets the test methods of <paramref name="probe" />'s framework, computing them once per
+    /// <paramref name="compilation" /> and framework and reusing the result for every later caller that
+    /// asks for the same pair.
+    /// </summary>
+    /// <param name="compilation">The test compilation to inspect.</param>
+    /// <param name="probe">The probe identifying the framework the result is cached under.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods of that framework.</param>
+    /// <param name="cancellationToken">A token to observe while discovering, on a cache miss.</param>
+    /// <returns>The discovered test methods, in declaration order.</returns>
+    internal static ImmutableArray<IMethodSymbol> GetTestMethods(
+        Compilation compilation,
+        ITestFrameworkProbe probe,
+        ITestMethodRecognizer recognizer,
+        CancellationToken cancellationToken
+    )
+    {
+        var perCompilation = TestMethodDiscoveryCache.GetValue(
+            compilation,
+            static _ => new ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>()
+        );
+
+        return perCompilation.GetOrAdd(
+            probe.GetType(),
+            _ => TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken)
+        );
+    }
+
+    /// <summary>
     /// Gets the tests of <paramref name="probe" />'s framework that reference no production member,
     /// computing them once per <paramref name="compilation" /> and framework and reusing the result for
     /// every later analyzer invocation that asks for the same pair.
@@ -147,11 +199,7 @@ internal static class TestSurfaceAnalysis
             return;
         }
 
-        var testMethods = TestMethodDiscovery.FindTestMethods(
-            context.Compilation,
-            recognizer,
-            context.CancellationToken
-        );
+        var testMethods = GetTestMethods(context.Compilation, probe, recognizer, context.CancellationToken);
 
         if (testMethods.IsEmpty)
         {
@@ -218,11 +266,7 @@ internal static class TestSurfaceAnalysis
                 continue;
             }
 
-            var testMethods = TestMethodDiscovery.FindTestMethods(
-                context.Compilation,
-                recognizer,
-                context.CancellationToken
-            );
+            var testMethods = GetTestMethods(context.Compilation, candidate, recognizer, context.CancellationToken);
 
             if (!testMethods.IsEmpty)
             {
