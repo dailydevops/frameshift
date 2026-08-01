@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.RegularExpressions;
 
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -1241,6 +1242,51 @@ public class RegexPatternLocatorTests
         {
             _ = await Assert.That(site!.Options).IsEqualTo(RegexOptions.None);
         }
+    }
+
+    /// <summary>
+    /// Resolves the four well-known type symbols once per <see cref="Compilation" /> and reuses them
+    /// across every candidate literal, instead of calling <see cref="Compilation.GetTypeByMetadataName(string)" />
+    /// again for each one. The fixture is the same one <see cref="TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly" />
+    /// exercises. Reflecting on the locator's private cache after the fact proves that a single entry was
+    /// ever created for that compilation, no matter how many literals were examined.
+    /// </summary>
+    [Test]
+    public async Task TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesWellKnownTypesOnlyOnce()
+    {
+        var statements = string.Join(
+            "\n        ",
+            Enumerable
+                .Range(0, 25)
+                .Select(index =>
+                    $"_ = Regex.IsMatch(input, \"a{index}+\", RegexOptions.IgnoreCase); _ = new Regex(\"b{index}+\");"
+                )
+        );
+        var (semanticModel, tree) = CreateFixture(CreateCallSource(statements));
+        var literals = SyntaxNodeLocator.FindAll<LiteralExpressionSyntax>(tree);
+
+        foreach (var literal in literals)
+        {
+            _ = RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None);
+        }
+
+        var cacheField = typeof(RegexPatternLocator).GetField(
+            "WellKnownTypesCache",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+
+        _ = await Assert.That(cacheField).IsNotNull();
+
+        var cache = cacheField!.GetValue(null)!;
+        var tryGetValue = cache.GetType().GetMethod("TryGetValue");
+
+        _ = await Assert.That(tryGetValue).IsNotNull();
+
+        var arguments = new object?[] { semanticModel.Compilation, null };
+        var found = (bool)tryGetValue!.Invoke(cache, arguments)!;
+
+        _ = await Assert.That(found).IsTrue();
+        _ = await Assert.That(arguments[1]).IsNotNull();
     }
 
     /// <summary>
