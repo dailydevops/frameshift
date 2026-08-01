@@ -59,7 +59,7 @@ internal sealed class UnaryOperatorMutator : MutationOperatorBase
         var targetToken = isNegation ? SyntaxKind.PlusToken : SyntaxKind.MinusToken;
         var targetMetadataName = isNegation ? "op_UnaryPlus" : "op_UnaryNegation";
 
-        if (userDefinedOperator is null || HasCounterpart(userDefinedOperator, targetMetadataName))
+        if (userDefinedOperator is null || OperatorCounterpart.HasCounterpart(userDefinedOperator, targetMetadataName))
         {
             var operatorToken = SyntaxFactory.Token(
                 unary.OperatorToken.LeadingTrivia,
@@ -107,28 +107,5 @@ internal sealed class UnaryOperatorMutator : MutationOperatorBase
         }
 
         return object.Equals(unaryConstant.Value, operandConstant.Value);
-    }
-
-    private static bool HasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
-    {
-        var containingType = userDefinedOperator.ContainingType;
-        if (containingType is null)
-        {
-            return false;
-        }
-
-        foreach (var member in containingType.GetMembers(metadataName))
-        {
-            if (
-                member is IMethodSymbol candidate
-                && candidate.MethodKind == MethodKind.UserDefinedOperator
-                && candidate.Parameters.Length == userDefinedOperator.Parameters.Length
-            )
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
