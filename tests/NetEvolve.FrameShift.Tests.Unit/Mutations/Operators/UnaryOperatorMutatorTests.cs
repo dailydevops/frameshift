@@ -1,6 +1,7 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
 using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -409,6 +410,27 @@ public class UnaryOperatorMutatorTests
     }
 
     /// <summary>
+    /// Pins the counterpart lookup directly, ahead of it moving into a shared helper: a member that only
+    /// borrows the metadata name of the unary plus operator is no counterpart, because it is an ordinary
+    /// method rather than a user defined operator.
+    /// </summary>
+    [Test]
+    public async Task HasCounterpart_MemberIsNoOperator_ReturnsFalse()
+    {
+        var (compilation, _, _) = CompilationFactory.CreateWithModel(BorrowedOperatorNameSource);
+        var money =
+            compilation.GetTypeByMetadataName("Fixtures.Money")
+            ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Money'.");
+        var negate = money.GetMembers("op_UnaryNegation").OfType<IMethodSymbol>().Single();
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+            _ = await Assert.That(InvokeHasCounterpart(negate, "op_UnaryPlus")).IsFalse();
+        }
+    }
+
+    /// <summary>
     /// The constant folding guard only skips a literal operand whose constant value survives the operator.
     /// A literal the operator cannot be applied to has no constant value at all, so both mutations are
     /// offered. C# rejects the fixture, which is the only way to negate a string literal.
@@ -510,5 +532,21 @@ public class UnaryOperatorMutatorTests
         var mutator = new UnaryOperatorMutator();
 
         return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node, semanticModel);
+    }
+
+    /// <summary>
+    /// Invokes the private counterpart lookup of the operator, which is the only way to reach it directly.
+    /// </summary>
+    /// <param name="userDefinedOperator">The operator to find a counterpart for.</param>
+    /// <param name="metadataName">The metadata name of the wanted counterpart.</param>
+    /// <returns>Whether the declaring type provides such a counterpart.</returns>
+    /// <exception cref="InvalidOperationException">The lookup no longer exists.</exception>
+    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
+    {
+        var lookup =
+            typeof(UnaryOperatorMutator).GetMethod("HasCounterpart", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The counterpart lookup no longer exists.");
+
+        return (bool)lookup.Invoke(null, [userDefinedOperator, metadataName])!;
     }
 }

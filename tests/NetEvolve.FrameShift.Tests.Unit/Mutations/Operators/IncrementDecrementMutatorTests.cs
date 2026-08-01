@@ -1,6 +1,7 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
 using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -546,6 +547,27 @@ public class IncrementDecrementMutatorTests
         }
     }
 
+    /// <summary>
+    /// Pins the counterpart lookup directly, ahead of it moving into a shared helper: a member that only
+    /// borrows the metadata name of the decrement operator is no counterpart, because it is an ordinary
+    /// method rather than a user defined operator.
+    /// </summary>
+    [Test]
+    public async Task HasCounterpart_MemberIsNoOperator_ReturnsFalse()
+    {
+        var (compilation, _, _) = CompilationFactory.CreateWithModel(BorrowedOperatorNameSource);
+        var ticks =
+            compilation.GetTypeByMetadataName("Fixtures.Ticks")
+            ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Ticks'.");
+        var increment = ticks.GetMembers("op_Increment").OfType<IMethodSymbol>().Single();
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(compilation)).IsEmpty();
+            _ = await Assert.That(InvokeHasCounterpart(increment, "op_Decrement")).IsFalse();
+        }
+    }
+
     [Test]
     public async Task CreateMutations_CancelledToken_ThrowsOperationCanceledException()
     {
@@ -597,5 +619,21 @@ public class IncrementDecrementMutatorTests
         var mutator = new IncrementDecrementMutator();
 
         return ([.. mutator.CreateMutations(node, semanticModel, CancellationToken.None)], tree, node);
+    }
+
+    /// <summary>
+    /// Invokes the private counterpart lookup of the operator, which is the only way to reach it directly.
+    /// </summary>
+    /// <param name="userDefinedOperator">The operator to find a counterpart for.</param>
+    /// <param name="metadataName">The metadata name of the wanted counterpart.</param>
+    /// <returns>Whether the declaring type provides such a counterpart.</returns>
+    /// <exception cref="InvalidOperationException">The lookup no longer exists.</exception>
+    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
+    {
+        var lookup =
+            typeof(IncrementDecrementMutator).GetMethod("HasCounterpart", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The counterpart lookup no longer exists.");
+
+        return (bool)lookup.Invoke(null, [userDefinedOperator, metadataName])!;
     }
 }
