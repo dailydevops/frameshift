@@ -56,7 +56,10 @@ internal sealed class BitwiseOperatorMutator : MutationOperatorBase
         var rightType = semanticModel.GetTypeInfo(binary.Right, cancellationToken).ConvertedType;
         var isShift = binary.IsKind(SyntaxKind.LeftShiftExpression) || binary.IsKind(SyntaxKind.RightShiftExpression);
 
-        if (!IsIntegral(leftType, allowEnum: !isShift) || !IsIntegral(rightType, allowEnum: !isShift))
+        if (
+            !IntegralTypeCheck.IsIntegral(leftType, allowEnum: !isShift)
+            || !IntegralTypeCheck.IsIntegral(rightType, allowEnum: !isShift)
+        )
         {
             return [];
         }
@@ -166,49 +169,4 @@ internal sealed class BitwiseOperatorMutator : MutationOperatorBase
             SyntaxKind.LeftShiftExpression => SyntaxKind.LessThanLessThanToken,
             _ => SyntaxKind.GreaterThanGreaterThanToken,
         };
-
-    private static bool IsIntegral(ITypeSymbol? type, bool allowEnum)
-    {
-        if (type is null)
-        {
-            return false;
-        }
-
-        var effective = type;
-        if (
-            effective is INamedTypeSymbol nullable
-            && nullable.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
-            && nullable.TypeArguments.Length == 1
-        )
-        {
-            effective = nullable.TypeArguments[0];
-        }
-
-        if (effective.TypeKind == TypeKind.Enum)
-        {
-            if (!allowEnum)
-            {
-                return false;
-            }
-
-            var underlyingType = (effective as INamedTypeSymbol)?.EnumUnderlyingType;
-            if (underlyingType is null)
-            {
-                return false;
-            }
-
-            effective = underlyingType;
-        }
-
-        return effective.SpecialType
-            is SpecialType.System_SByte
-                or SpecialType.System_Byte
-                or SpecialType.System_Int16
-                or SpecialType.System_UInt16
-                or SpecialType.System_Int32
-                or SpecialType.System_UInt32
-                or SpecialType.System_Int64
-                or SpecialType.System_UInt64
-                or SpecialType.System_Char;
-    }
 }

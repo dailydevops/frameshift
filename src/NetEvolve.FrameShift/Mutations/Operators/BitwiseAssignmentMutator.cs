@@ -11,9 +11,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// and <c>&gt;&gt;=</c>.
 /// </summary>
 /// <remarks>
-/// Only operands that are integral according to the semantic model are mutated, mirroring the guard
-/// <see cref="BitwiseOperatorMutator" /> already applies to the non-compound operators. Shift
-/// assignments additionally require both operands to be non-enum integral types.
+/// Only operands that <see cref="IntegralTypeCheck.IsIntegral" /> accepts are mutated, the same guard
+/// <see cref="BitwiseOperatorMutator" /> applies to the non-compound operators. Shift assignments
+/// additionally require both operands to be non-enum integral types.
 /// </remarks>
 internal sealed class BitwiseAssignmentMutator : MutationOperatorBase
 {
@@ -59,7 +59,10 @@ internal sealed class BitwiseAssignmentMutator : MutationOperatorBase
         var leftType = semanticModel.GetTypeInfo(assignment.Left, cancellationToken).ConvertedType;
         var rightType = semanticModel.GetTypeInfo(assignment.Right, cancellationToken).ConvertedType;
 
-        if (!IsIntegral(leftType, allowEnum: !isShift) || !IsIntegral(rightType, allowEnum: !isShift))
+        if (
+            !IntegralTypeCheck.IsIntegral(leftType, allowEnum: !isShift)
+            || !IntegralTypeCheck.IsIntegral(rightType, allowEnum: !isShift)
+        )
         {
             return [];
         }
@@ -161,57 +164,4 @@ internal sealed class BitwiseAssignmentMutator : MutationOperatorBase
             SyntaxKind.LeftShiftAssignmentExpression => SyntaxKind.LessThanLessThanEqualsToken,
             _ => SyntaxKind.GreaterThanGreaterThanEqualsToken,
         };
-
-    /// <summary>
-    /// Decides whether a side of the assignment is integral enough to take part in a bitwise or shift
-    /// assignment mutation. Mirrors <c>BitwiseOperatorMutator.IsIntegral</c>, so the two operators agree on
-    /// which operands belong to this family.
-    /// </summary>
-    /// <param name="type">The converted type of the side, or <see langword="null" /> if unknown.</param>
-    /// <param name="allowEnum">Whether an enum operand, resolved to its underlying type, is accepted.</param>
-    /// <returns><see langword="true" /> if the side is integral.</returns>
-    private static bool IsIntegral(ITypeSymbol? type, bool allowEnum)
-    {
-        if (type is null)
-        {
-            return false;
-        }
-
-        var effective = type;
-        if (
-            effective is INamedTypeSymbol nullable
-            && nullable.OriginalDefinition.SpecialType == SpecialType.System_Nullable_T
-            && nullable.TypeArguments.Length == 1
-        )
-        {
-            effective = nullable.TypeArguments[0];
-        }
-
-        if (effective.TypeKind == TypeKind.Enum)
-        {
-            if (!allowEnum)
-            {
-                return false;
-            }
-
-            var underlyingType = (effective as INamedTypeSymbol)?.EnumUnderlyingType;
-            if (underlyingType is null)
-            {
-                return false;
-            }
-
-            effective = underlyingType;
-        }
-
-        return effective.SpecialType
-            is SpecialType.System_SByte
-                or SpecialType.System_Byte
-                or SpecialType.System_Int16
-                or SpecialType.System_UInt16
-                or SpecialType.System_Int32
-                or SpecialType.System_UInt32
-                or SpecialType.System_Int64
-                or SpecialType.System_UInt64
-                or SpecialType.System_Char;
-    }
 }
