@@ -219,4 +219,12 @@ internal enum MutationKind
     /// suite exercising only one branch of the computation notices.
     /// </summary>
     MathMethod,
+
+    /// <summary>
+    /// The element list of an array or collection initializer and of a collection expression, emptied
+    /// when it carries elements and, where provably safe, filled with a single <c>default</c> element
+    /// when it is empty. An emptied lookup table, default argument list or seed collection is otherwise
+    /// indistinguishable from the original to a test suite that never inspects its contents.
+    /// </summary>
+    CollectionInitializer,
 }
