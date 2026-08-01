@@ -206,10 +206,11 @@ internal sealed class XunitV3TestMethodRecognizerTests
     /// cannot shift the discovery assertions above, and it carries one method per rule: a parameterless
     /// <c>[Fact]</c>, one and three <c>[InlineData]</c> rows, a <c>[Theory]</c> without any data source, a
     /// member data source per literal shape — implicit and explicit array creation, an expression-bodied
-    /// getter, a collection initializer, a <c>TheoryData</c> initializer, a collection expression, an empty
-    /// sequence, a method, a field and an inherited member — and the shapes no static reading can size: an
-    /// iterator, an array created by length alone, a member that does not exist and a <c>[ClassData]</c>
-    /// source.
+    /// getter, a collection initializer, a <c>TheoryData</c> initializer, a collection expression, a
+    /// collection expression with a spread element, an empty sequence, a method, a field, an inherited
+    /// member and a body consisting of nothing but <c>yield return</c> statements — and the shapes no static
+    /// reading can size: a genuine iterator built from a loop, an array created by length alone, a member
+    /// that does not exist and a <c>[ClassData]</c> source.
     /// </summary>
     /// <remarks>
     /// On top of the version 2 shapes it carries the three version 3 knows on its own: <c>[CulturedFact]</c>
@@ -307,10 +308,18 @@ internal sealed class XunitV3TestMethodRecognizerTests
             public static IEnumerable<object[]> Method() =>
                 new[] { new object[] { 1 }, new object[] { 2 }, new object[] { 3 }, new object[] { 4 } };
 
-            public static IEnumerable<object[]> Iterator()
+            public static IEnumerable<object[]> YieldedRows()
             {
                 yield return new object[] { 1 };
                 yield return new object[] { 2 };
+            }
+
+            public static IEnumerable<object[]> Iterator()
+            {
+                foreach (var value in new[] { 1, 2 })
+                {
+                    yield return new object[] { value };
+                }
             }
         }
 
@@ -421,6 +430,12 @@ internal sealed class XunitV3TestMethodRecognizerTests
             [Theory]
             [MemberData(nameof(Rows.ImplicitArrayProperty), MemberType = typeof(DerivedRows))]
             public void InheritedMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.YieldedRows), MemberType = typeof(Rows))]
+            public void YieldedRowsMemberData(int value)
             {
             }
 
@@ -888,6 +903,7 @@ internal sealed class XunitV3TestMethodRecognizerTests
     [Arguments("MethodMemberData", "4")]
     [Arguments("FieldMemberData", "5")]
     [Arguments("InheritedMemberData", "2")]
+    [Arguments("YieldedRowsMemberData", "2")]
     [Arguments("SizedArrayMemberData", "1+")]
     [Arguments("IteratorMemberData", "1+")]
     [Arguments("MissingMemberData", "1+")]
