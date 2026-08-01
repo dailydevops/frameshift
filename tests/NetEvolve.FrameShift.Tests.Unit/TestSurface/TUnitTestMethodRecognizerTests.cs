@@ -226,6 +226,15 @@ public class TUnitTestMethodRecognizerTests
         using System.Collections.Generic;
         using TUnit.Core;
 
+        /// <summary>
+        /// A matrix attribute of a shape the framework itself does not ship: its constructor takes no
+        /// argument at all, rather than exactly the one array argument every real variant does. It exists
+        /// only to exercise <c>GetMatrixSet</c>'s branch for that other shape.
+        /// </summary>
+        public sealed class ConstantMatrixAttribute : MatrixAttribute
+        {
+        }
+
         public class Counts
         {
             [Test]
@@ -285,6 +294,17 @@ public class TUnitTestMethodRecognizerTests
 
             [Test]
             public void MatrixWithExclusion([Matrix(1, 2, 3, Excluding = new object[] { 2 })] int value)
+            {
+            }
+
+            [Test]
+            [MatrixExclusion(1, "a")]
+            public void MatrixWithMethodLevelExclusion([Matrix(1, 2)] int left, [Matrix("a", "b")] string right)
+            {
+            }
+
+            [Test]
+            public void MatrixWithNonArrayConstructor([ConstantMatrix] int left, [Matrix(1, 2)] int right)
             {
             }
 
@@ -866,6 +886,8 @@ public class TUnitTestMethodRecognizerTests
     [Arguments("MatrixWithNonLiteralValues", "2+")]
     [Arguments("MatrixFromAMethod", "1+")]
     [Arguments("MatrixWithExclusion", "1+")]
+    [Arguments("MatrixWithMethodLevelExclusion", "1+")]
+    [Arguments("MatrixWithNonArrayConstructor", "2+")]
     [Arguments("MatrixAndUncoveredParameter", "2+")]
     [Arguments("MatrixOverGeneratedValues", "1+")]
     [Arguments("FromACollectionExpression", "3")]
@@ -892,7 +914,7 @@ public class TUnitTestMethodRecognizerTests
 
     /// <summary>
     /// The guard that keeps the table above exhaustive: a shape added to the fixture without a row of its
-    /// own would otherwise be counted by nothing at all. Twenty-seven methods carry the shapes, and the two
+    /// own would otherwise be counted by nothing at all. Thirty-one methods carry the shapes, and the two
     /// of the type with a class-level data source are counted separately.
     /// </summary>
     [Test]
@@ -900,7 +922,7 @@ public class TUnitTestMethodRecognizerTests
     {
         var found = FindTestMethods(CreateCountFixture());
 
-        _ = await Assert.That(found.Length).IsEqualTo(29);
+        _ = await Assert.That(found.Length).IsEqualTo(31);
     }
 
     /// <summary>
@@ -985,6 +1007,8 @@ public class TUnitTestMethodRecognizerTests
     [Arguments("MatrixWithNonLiteralValues", 2)]
     [Arguments("MatrixFromAMethod", 1)]
     [Arguments("MatrixWithExclusion", 1)]
+    [Arguments("MatrixWithMethodLevelExclusion", 1)]
+    [Arguments("MatrixWithNonArrayConstructor", 2)]
     [Arguments("MatrixAndUncoveredParameter", 2)]
     [Arguments("MatrixOverGeneratedValues", 1)]
     public async Task GetTestCaseCount_MatrixThatIsNotWrittenOut_IsALowerBound(string methodName, int expected)
