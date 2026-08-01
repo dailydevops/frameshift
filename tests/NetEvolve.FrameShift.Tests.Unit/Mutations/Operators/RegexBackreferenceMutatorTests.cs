@@ -104,6 +104,23 @@ public class RegexBackreferenceMutatorTests
         """;
 
     /// <summary>
+    /// A backreference whose digit run overflows <see cref="int" />. The XML remarks of the operator
+    /// promise that such a run "is never observed in a pattern that could ever match, but it is not
+    /// rejected upstream either, so this operator yields no rewrite for it rather than throwing" - this
+    /// fixture is the one no existing test constructed to actually exercise that guard.
+    /// </summary>
+    private const string OverflowingBackreferenceSource = """
+        namespace Fixtures;
+
+        using System.Text.RegularExpressions;
+
+        internal static class Patterns
+        {
+            internal static Regex Create() => new Regex(/*!*/"(a)\\99999999999999999999");
+        }
+        """;
+
+    /// <summary>
     /// The source text of the literal of <see cref="MiddleBackreferenceSource" />, meaning
     /// <c>"(a)(b)(c)\\2"</c>.
     /// </summary>
@@ -146,6 +163,7 @@ public class RegexBackreferenceMutatorTests
         NamedBackreferenceSource,
         LastGroupBackreferenceSource,
         MaxInt32BackreferenceSource,
+        OverflowingBackreferenceSource,
     ];
 
     [Test]
@@ -301,6 +319,21 @@ public class RegexBackreferenceMutatorTests
     public async Task CreateMutations_NamedBackreference_ReturnsEmpty()
     {
         var (_, mutations) = Mutate(NamedBackreferenceSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// The digit run of the backreference is long enough that parsing it as an <see cref="int" /> fails,
+    /// which is exactly the documented, deliberate no-throw path described by the operator's XML remarks:
+    /// no rewrite is offered, and no exception escapes the call.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_OverflowingDigitRunBackreference_ReturnsEmptyWithoutThrowing()
+    {
+        Mutation[] mutations = [];
+
+        _ = await Assert.That(() => mutations = Mutate(OverflowingBackreferenceSource).Mutations).ThrowsNothing();
 
         _ = await Assert.That(mutations).IsEmpty();
     }
