@@ -1273,12 +1273,16 @@ internal static class EquivalenceClassifier
     /// <returns>A trivial verdict, or <see langword="null" /> if the check does not apply.</returns>
     private static EquivalenceVerdict? ClassifyConstantOnlyContext(Mutation mutation)
     {
-        var reason = mutation
-            .Original.Ancestors()
-            .Select(GetConstantOnlyContextReason)
-            .FirstOrDefault(candidate => candidate is not null);
+        foreach (var ancestor in mutation.Original.Ancestors())
+        {
+            var reason = GetConstantOnlyContextReason(ancestor);
+            if (reason is not null)
+            {
+                return EquivalenceVerdict.Trivial(reason);
+            }
+        }
 
-        return reason is null ? null : EquivalenceVerdict.Trivial(reason);
+        return null;
     }
 
     /// <summary>
