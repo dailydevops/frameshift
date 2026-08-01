@@ -1,4 +1,5 @@
-﻿FSH0001 Robust.cs(6,36): Mutation '3 => 2' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+﻿FSH0001 Robust.cs(6,1): Mutation 'Console.WriteLine(toolbox.Describe(3)) => (removed)' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Robust.cs(6,36): Mutation '3 => 2' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Robust.cs(6,36): Mutation '3 => 4' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Robust.cs(27,71): Mutation '* => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Robust.cs(27,71): Mutation '* => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
