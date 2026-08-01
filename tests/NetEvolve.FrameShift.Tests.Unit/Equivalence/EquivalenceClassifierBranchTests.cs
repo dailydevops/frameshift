@@ -342,6 +342,49 @@ public class EquivalenceClassifierBranchTests
     }
 
     [Test]
+    public async Task Classify_ContainingLocalFunctionWithBlockBodyOnlyThrows_IsTrivialThrowOnlyBody()
+    {
+        // The owner is still a LocalFunctionStatementSyntax, but this time reached with a block body
+        // instead of an expression body, and the mutation sits several ancestors below it.
+        var source = WrapMember(
+            """
+            public int Compute(int input)
+                {
+                    int Local()
+                    {
+                        throw new NotSupportedException(input > /*!*/1 ? "a" : "b");
+                    }
+
+                    return Local();
+                }
+            """
+        );
+
+        var verdict = ClassifyLiteral(source);
+
+        await AssertTrivialAsync(verdict, ThrowOnlyBodyReason).ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task Classify_ContainingExpressionBodiedAccessorOnlyThrows_IsTrivialThrowOnlyBody()
+    {
+        // The owner is an AccessorDeclarationSyntax reached through its expression body rather than
+        // its block body, which FindBodyOwner has to stop on just the same.
+        var source = WrapMember(
+            """
+            public int Ratio
+                {
+                    get => throw new NotSupportedException(Value > /*!*/1 ? "a" : "b");
+                }
+            """
+        );
+
+        var verdict = ClassifyLiteral(source);
+
+        await AssertTrivialAsync(verdict, ThrowOnlyBodyReason).ConfigureAwait(false);
+    }
+
+    [Test]
     public async Task Classify_MutatedNodeIsAStatement_IsNotTrivial()
     {
         // A statement carries no value that could be discarded, so the discard check must step aside

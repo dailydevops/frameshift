@@ -1105,16 +1105,25 @@ internal static class EquivalenceClassifier
     /// </summary>
     /// <param name="node">The mutated node.</param>
     /// <returns>The owning declaration, or <see langword="null" /> if there is none.</returns>
-    private static SyntaxNode? FindBodyOwner(SyntaxNode node) =>
-        node.AncestorsAndSelf()
-            .FirstOrDefault(ancestor =>
-                ancestor
-                    is BaseMethodDeclarationSyntax
-                        or AccessorDeclarationSyntax
-                        or PropertyDeclarationSyntax
-                        or IndexerDeclarationSyntax
-                        or LocalFunctionStatementSyntax
-            );
+    private static SyntaxNode? FindBodyOwner(SyntaxNode node)
+    {
+        for (var current = node; current is not null; current = current.Parent)
+        {
+            if (
+                current
+                is BaseMethodDeclarationSyntax
+                    or AccessorDeclarationSyntax
+                    or PropertyDeclarationSyntax
+                    or IndexerDeclarationSyntax
+                    or LocalFunctionStatementSyntax
+            )
+            {
+                return current;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// Determines whether a body is a single <see langword="throw" />.
