@@ -1,11 +1,13 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
+using NetEvolve.FrameShift.Mutations.RegularExpressions;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -308,6 +310,40 @@ public class RegexLookaroundMutatorTests
         );
 
         _ = await Assert.That(exception).IsNotNull();
+    }
+
+    /// <summary>
+    /// The tokenizer only ever produces one of the four documented openings for
+    /// <see cref="RegexTokenKind.Lookaround" />, so the default arm of <c>GetNegation</c> - and the
+    /// corresponding null-fallback in <c>TryCreateRewrite</c> - can only be reached by constructing a token
+    /// directly rather than through a pattern the tokenizer itself produced. This pins that fallback to
+    /// <see langword="null" /> instead of leaving it exercised only by the tokenizer's own invariant.
+    /// </summary>
+    [Test]
+    public async Task TryCreateRewrite_TokenTextTheTokenizerNeverProduces_ReturnsNull()
+    {
+        var token = new RegexToken(RegexTokenKind.Lookaround, 0, "(?~unexpected~)");
+
+        var rewrite = InvokeTryCreateRewrite("(?~unexpected~)", token);
+
+        _ = await Assert.That(rewrite).IsNull();
+    }
+
+    /// <summary>
+    /// Invokes the private rewrite factory of the operator directly, which is the only way to reach it with a
+    /// lookaround token text the tokenizer itself never produces.
+    /// </summary>
+    /// <param name="pattern">The pattern the token belongs to.</param>
+    /// <param name="token">The lookaround token to mutate.</param>
+    /// <returns>The rewrite <c>TryCreateRewrite</c> produced, or <see langword="null" />.</returns>
+    /// <exception cref="InvalidOperationException">The rewrite factory no longer exists.</exception>
+    private static object? InvokeTryCreateRewrite(string pattern, RegexToken token)
+    {
+        var method =
+            typeof(RegexLookaroundMutator).GetMethod("TryCreateRewrite", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("The rewrite factory 'TryCreateRewrite' no longer exists.");
+
+        return method.Invoke(null, [pattern, token]);
     }
 
     private static (SyntaxTree Tree, Mutation[] Mutations) Mutate(string source) =>
