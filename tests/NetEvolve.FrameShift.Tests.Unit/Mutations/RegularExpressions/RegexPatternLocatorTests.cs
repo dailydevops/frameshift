@@ -1265,7 +1265,7 @@ public class RegexPatternLocatorTests
             .Select(literal => RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None))
             .ToArray();
 
-        _ = await Assert.That(sites).HasCount().EqualTo(50);
+        _ = await Assert.That(sites).Count().IsEqualTo(50);
 
         foreach (var site in sites)
         {
@@ -1275,8 +1275,8 @@ public class RegexPatternLocatorTests
         var staticMethodSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexStaticMethod).ToArray();
         var constructorSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexConstructor).ToArray();
 
-        _ = await Assert.That(staticMethodSites).HasCount().EqualTo(25);
-        _ = await Assert.That(constructorSites).HasCount().EqualTo(25);
+        _ = await Assert.That(staticMethodSites).Count().IsEqualTo(25);
+        _ = await Assert.That(constructorSites).Count().IsEqualTo(25);
 
         foreach (var site in staticMethodSites)
         {
