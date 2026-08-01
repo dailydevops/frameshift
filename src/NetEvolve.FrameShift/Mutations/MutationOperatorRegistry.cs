@@ -69,6 +69,7 @@ internal static class MutationOperatorRegistry
         yield return new Operators.StringComparerMutator();
         yield return new Operators.StringComparisonMutator();
         yield return new Operators.StringLiteralMutator();
+        yield return new Operators.StringMethodMutator();
         yield return new Operators.UnaryOperatorMutator();
         // <<< operator registrations
     }
