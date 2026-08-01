@@ -94,6 +94,13 @@ internal enum MutationKind
     ShiftOperator,
 
     /// <summary>
+    /// The <c>checked</c> and <c>unchecked</c> keyword of a checked expression or statement, swapped for
+    /// its counterpart. The keyword only decides how arithmetic overflow is handled at run time, so a
+    /// test suite that never distinguishes the two cannot tell whether the choice is actually enforced.
+    /// </summary>
+    CheckedContext,
+
+    /// <summary>
     /// <c>System.StringComparison</c> arguments, replaced by a different member of the same enumeration,
     /// for example <c>Ordinal</c> by <c>OrdinalIgnoreCase</c>. A test suite that never distinguishes the
     /// members cannot tell a case sensitive comparison from a case insensitive or culture aware one.
