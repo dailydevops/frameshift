@@ -1147,23 +1147,14 @@ public class ArithmeticAssignmentMutatorTests
     }
 
     /// <summary>
-    /// Invokes the private counterpart lookup of the operator, which is the only way to reach it with an
-    /// operator the language cannot produce for one of the five supported syntax kinds.
+    /// Reaches the shared counterpart lookup with an operator the language cannot produce for one of the
+    /// five supported syntax kinds.
     /// </summary>
     /// <param name="userDefinedOperator">The operator to find a counterpart for.</param>
     /// <param name="metadataName">The metadata name of the wanted counterpart.</param>
     /// <returns>Whether the declaring type provides such a counterpart.</returns>
-    /// <exception cref="InvalidOperationException">The lookup no longer exists.</exception>
-    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
-    {
-        var lookup =
-            typeof(ArithmeticAssignmentMutator).GetMethod(
-                "HasCounterpart",
-                BindingFlags.NonPublic | BindingFlags.Static
-            ) ?? throw new InvalidOperationException("The counterpart lookup no longer exists.");
-
-        return (bool)lookup.Invoke(null, [userDefinedOperator, metadataName])!;
-    }
+    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName) =>
+        OperatorCounterpart.HasCounterpart(userDefinedOperator, metadataName);
 
     private static string SymbolOf(string name) =>
         name switch

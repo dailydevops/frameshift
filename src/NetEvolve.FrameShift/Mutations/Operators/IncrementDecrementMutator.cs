@@ -42,7 +42,7 @@ internal sealed class IncrementDecrementMutator : MutationOperatorBase
         var boundOperator = semanticModel.GetSymbolInfo(node, cancellationToken).Symbol as IMethodSymbol;
         if (
             boundOperator?.MethodKind == MethodKind.UserDefinedOperator
-            && !HasCounterpart(boundOperator, isIncrement ? "op_Decrement" : "op_Increment")
+            && !OperatorCounterpart.HasCounterpart(boundOperator, isIncrement ? "op_Decrement" : "op_Increment")
         )
         {
             return [];
@@ -119,28 +119,5 @@ internal sealed class IncrementDecrementMutator : MutationOperatorBase
                 replacement
             ),
         ];
-    }
-
-    private static bool HasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
-    {
-        var containingType = userDefinedOperator.ContainingType;
-        if (containingType is null)
-        {
-            return false;
-        }
-
-        foreach (var member in containingType.GetMembers(metadataName))
-        {
-            if (
-                member is IMethodSymbol candidate
-                && candidate.MethodKind == MethodKind.UserDefinedOperator
-                && candidate.Parameters.Length == userDefinedOperator.Parameters.Length
-            )
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

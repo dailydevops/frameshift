@@ -1,7 +1,6 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
 using System.Collections.Immutable;
-using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -622,18 +621,11 @@ public class IncrementDecrementMutatorTests
     }
 
     /// <summary>
-    /// Invokes the private counterpart lookup of the operator, which is the only way to reach it directly.
+    /// Reaches the shared counterpart lookup directly.
     /// </summary>
     /// <param name="userDefinedOperator">The operator to find a counterpart for.</param>
     /// <param name="metadataName">The metadata name of the wanted counterpart.</param>
     /// <returns>Whether the declaring type provides such a counterpart.</returns>
-    /// <exception cref="InvalidOperationException">The lookup no longer exists.</exception>
-    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName)
-    {
-        var lookup =
-            typeof(IncrementDecrementMutator).GetMethod("HasCounterpart", BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException("The counterpart lookup no longer exists.");
-
-        return (bool)lookup.Invoke(null, [userDefinedOperator, metadataName])!;
-    }
+    private static bool InvokeHasCounterpart(IMethodSymbol userDefinedOperator, string metadataName) =>
+        OperatorCounterpart.HasCounterpart(userDefinedOperator, metadataName);
 }
