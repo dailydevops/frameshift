@@ -373,6 +373,23 @@ public class RegexPatternLocatorTests
 #endif
 
 #if !NETFRAMEWORK
+    /// <summary>
+    /// A <c>u8</c>-suffixed string literal sitting at the second-argument position of a call shaped exactly
+    /// like a static <c>Regex</c> method, where the pattern would otherwise be looked for. The parameter it
+    /// binds to is typed <see cref="ReadOnlySpan{T}" /> of <see cref="byte" />, which a <see cref="string" />
+    /// pattern parameter never is; a <c>ReadOnlySpan&lt;byte&gt;</c> parameter needs a reference no .NET
+    /// Framework target of this suite carries, which is why the fixture is guarded the same way
+    /// <see cref="RegularExpressionSource" /> is.
+    /// </summary>
+    private const string Utf8LiteralArgumentSource = """
+        public static class Sample
+        {
+            public static bool IsMatch(string input, System.ReadOnlySpan<byte> pattern) => false;
+
+            public static bool Check(string input) => IsMatch(input, /*!*/"a+"u8);
+        }
+        """;
+
     private const string RegularExpressionSource = """
         using System.ComponentModel.DataAnnotations;
 
@@ -1123,6 +1140,34 @@ public class RegexPatternLocatorTests
         var site = Locate(RegularExpressionErrorMessageSource);
 
         _ = await Assert.That(site).IsNull();
+    }
+#endif
+
+#if !NETFRAMEWORK
+    /// <summary>
+    /// A <c>u8</c>-suffixed string literal is not rejected by the initial literal-value-type guard the way
+    /// the inline comment above it describes: Roslyn stores the plain string value on the token itself -
+    /// <c>literal.Token.Value is not string</c> is <see langword="false" /> for it, exactly as it is for an
+    /// ordinary string literal - and the conversion to bytes happens later, when the compiler binds the
+    /// literal against a target type. What actually keeps a <c>u8</c> literal out of this call is the
+    /// parameter-type check further down: it can only ever bind to a parameter typed
+    /// <see cref="ReadOnlySpan{T}" /> of <see cref="byte" /> or <see cref="byte" />[], never one of type
+    /// <see cref="string" />, so <c>IsPatternSlot</c> - which requires
+    /// <c>SpecialType.System_String</c> - rejects it regardless of the initial guard.
+    /// </summary>
+    [Test]
+    public async Task TryLocate_Utf8StringLiteral_ReturnsNull()
+    {
+        var (semanticModel, tree) = CreateFixture(Utf8LiteralArgumentSource);
+        var node = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+
+        var site = RegexPatternLocator.TryLocate(node, semanticModel, CancellationToken.None);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(node.Token.Value is string).IsTrue();
+            _ = await Assert.That(site).IsNull();
+        }
     }
 #endif
 
