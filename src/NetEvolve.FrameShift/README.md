@@ -32,11 +32,18 @@ next to every other compiler diagnostic.
   compiler would reject); and a standalone invocation of a `void` returning method with no `ref` or
   `out` arguments. These are the early exits, loop-flow changes, guards and discarded side-effecting
   calls a test suite never notices going missing.
-- A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
-  three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted
-  type is resolved through the semantic model, so a literal on a plain `bool` is never touched. It is
-  the family that provokes the difference between `flag == true` and `flag != false`, which only shows
-  once `flag` is `null`.
+- A nullable literal operator that moves a literal of a nullable value type (`bool?`, a nullable numeric
+  type, `char?` or `Guid?`) between its written value, `null` and the default value of the underlying
+  type - a written literal that is not already the default becomes both `null` and that default, and
+  `null` becomes the default (`Guid.Empty` for `Guid?`, since `Guid` has no literal of its own). `bool?`
+  additionally moves `null` to `true`, since `bool` is the one type with exactly one other value worth
+  naming. A negative numeric literal such as `-5` is recognised too - it is a unary minus wrapping the
+  literal `5`, whose own converted type is the non-nullable operand type the unary operator requires, so
+  resolving only the inner literal would never see the nullable conversion, which happens on the whole
+  expression instead. The converted type is resolved through the semantic model, so a literal on the
+  corresponding non-nullable type is never touched. It is the family that provokes the difference
+  between "no value was given" and "the default value was given", which only shows once the type is
+  nullable.
 - A culture-sensitivity operator family of six operators - `StringComparison` arguments,
   `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
   case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's
