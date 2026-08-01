@@ -258,6 +258,30 @@ public class MSTestMethodRecognizerTests
             }
 
             [DataTestMethod]
+            [DynamicData(nameof(YieldThenBreakRows), DynamicDataSourceType.Method)]
+            public void SourceFromYieldThenBreak(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(AutoPropertyRows))]
+            public void SourceFromAutoProperty(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(SetOnlyRows))]
+            public void SourceFromSetOnlyProperty(int value)
+            {
+            }
+
+            [DataTestMethod]
+            [DynamicData(nameof(SpreadRows), DynamicDataSourceType.Method)]
+            public void SourceFromSpread(int value)
+            {
+            }
+
+            [DataTestMethod]
             [DynamicData("Absent")]
             public void SourceFromAnAbsentMember(int value)
             {
@@ -312,6 +336,24 @@ public class MSTestMethodRecognizerTests
             public static IEnumerable<object[]> ComputedRows()
             {
                 return ArrayRows.Where(row => row.Length > 0);
+            }
+
+            public static IEnumerable<object[]> YieldThenBreakRows()
+            {
+                yield return new object[] { 1 };
+                yield break;
+            }
+
+            public static IEnumerable<object[]> AutoPropertyRows { get; }
+
+            public static IEnumerable<object[]> SetOnlyRows
+            {
+                set { }
+            }
+
+            public static IEnumerable<object[]> SpreadRows()
+            {
+                return [.. ArrayRows];
             }
         }
         """;
@@ -591,12 +633,20 @@ public class MSTestMethodRecognizerTests
     /// <summary>
     /// Every shape whose number of cases MSTest only settles while discovering tests, counted as a lower
     /// bound. The bound itself is asserted as well, because it is what a sum built from it reports, and it
-    /// must never be smaller than the number of cases that certainly exist.
+    /// must never be smaller than the number of cases that certainly exist. A method body mixing
+    /// <c>yield return</c> with a <c>yield break</c>, a get-only property whose getter body is absent, a
+    /// set-only property, and a collection expression with a spread element all leave the length unwritten
+    /// exactly as much as a computed sequence does, and inventing one there would report a gap that is not
+    /// there.
     /// </summary>
     /// <param name="methodName">The name of the method whose cases are counted.</param>
     /// <param name="expected">The lower bound of the number of cases.</param>
     [Test]
     [Arguments("SourceFromComputation", 1)]
+    [Arguments("SourceFromYieldThenBreak", 1)]
+    [Arguments("SourceFromAutoProperty", 1)]
+    [Arguments("SourceFromSetOnlyProperty", 1)]
+    [Arguments("SourceFromSpread", 1)]
     [Arguments("SourceFromAnAbsentMember", 1)]
     [Arguments("SourceFromAnExternalTable", 1)]
     [Arguments("SourceFromACustomAttribute", 1)]
