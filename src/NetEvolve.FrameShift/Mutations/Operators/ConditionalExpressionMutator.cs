@@ -5,8 +5,11 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
-/// Mutates the ternary conditional operator by swapping its two branches and by negating its
-/// condition. Conditionals with syntactically equivalent branches are left untouched.
+/// Mutates the ternary conditional operator by swapping its two branches, by negating its condition,
+/// and by forcing its condition to the constant literal <see langword="true" /> or
+/// <see langword="false" />. Conditionals with syntactically equivalent branches are left untouched,
+/// and the constant-forcing mutations are skipped when the condition is already a boolean literal,
+/// since that case is already covered by <see cref="BooleanLiteralMutator" />.
 /// </summary>
 internal sealed class ConditionalExpressionMutator : MutationOperatorBase
 {
@@ -44,7 +47,31 @@ internal sealed class ConditionalExpressionMutator : MutationOperatorBase
         var negated = conditional.WithCondition(Negate(conditional.Condition));
 
         yield return CreateMutation(conditional, negated, "negate-condition", "c ? a : b => !c ? a : b");
+
+        if (!IsBooleanLiteral(conditional.Condition))
+        {
+            var forcedTrue = conditional.WithCondition(
+                SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression).WithTriviaFrom(conditional.Condition)
+            );
+
+            yield return CreateMutation(conditional, forcedTrue, "force-true", "c ? a : b => true ? a : b");
+
+            var forcedFalse = conditional.WithCondition(
+                SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression).WithTriviaFrom(conditional.Condition)
+            );
+
+            yield return CreateMutation(conditional, forcedFalse, "force-false", "c ? a : b => false ? a : b");
+        }
     }
+
+    /// <summary>
+    /// Determines whether <paramref name="expression" /> is the boolean literal <see langword="true" /> or
+    /// <see langword="false" />.
+    /// </summary>
+    /// <param name="expression">The expression to inspect.</param>
+    /// <returns><see langword="true" /> if <paramref name="expression" /> is a boolean literal.</returns>
+    private static bool IsBooleanLiteral(ExpressionSyntax expression) =>
+        expression.IsKind(SyntaxKind.TrueLiteralExpression) || expression.IsKind(SyntaxKind.FalseLiteralExpression);
 
     /// <summary>
     /// Negates <paramref name="condition" />, either by removing an existing logical negation or by

@@ -22,6 +22,21 @@ public class NullCoalescingMutatorTests
     private const string NullableValueSource = "public class Sample { public int Get(int? a) => a ?? 0; }";
     private const string CoalesceAssignmentSource =
         "public class Sample { public string? Field; public void Set(string b) { Field ??= b; } }";
+    private const string CoalesceAssignmentThrowSource =
+        "public class Sample { public string? Field; public void Set() { Field ??= throw new System.InvalidOperationException(); } }";
+
+    private const string CoalesceAssignmentTriviaSource = """
+        namespace Fixtures;
+
+        internal static class Sample
+        {
+            internal static void Set(ref string? field, string value)
+            {
+                /* leading */
+                field /* inner */ ??= /* after */ value; // tail
+            }
+        }
+        """;
 
     /// <summary>
     /// The two operands have nothing in common, so the whole expression has no type. The fixture
@@ -85,8 +100,9 @@ public class NullCoalescingMutatorTests
         {
             _ = await Assert.That(mutator.Id).IsEqualTo("null-coalescing");
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullCoalescing);
-            _ = await Assert.That(supported).Count().IsEqualTo(1);
+            _ = await Assert.That(supported).Count().IsEqualTo(2);
             _ = await Assert.That(supported).Contains(SyntaxKind.CoalesceExpression);
+            _ = await Assert.That(supported).Contains(SyntaxKind.CoalesceAssignmentExpression);
         }
     }
 
@@ -143,9 +159,54 @@ public class NullCoalescingMutatorTests
     }
 
     [Test]
-    public async Task CreateMutations_CoalesceAssignment_ReturnsEmpty()
+    public async Task CreateMutations_CoalesceAssignment_ProducesPlainAssignment()
     {
-        var (_, mutations) = Run(CoalesceAssignmentSource, FindAssignment);
+        var (tree, mutations) = Run(CoalesceAssignmentSource, FindAssignment);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("null-coalescing.coalesce-assign-to-assign");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("a ??= b => a = b");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo("public class Sample { public string? Field; public void Set(string b) { Field = b; } }");
+        }
+    }
+
+    [Test]
+    public async Task ApplyTo_CoalesceAssignment_RewritesOperatorAndKeepsTrivia()
+    {
+        var (tree, mutations) = Run(CoalesceAssignmentTriviaSource, FindAssignment);
+        var mutation = mutations.Single(m =>
+            string.Equals(m.OperatorId, "null-coalescing.coalesce-assign-to-assign", StringComparison.Ordinal)
+        );
+
+        var mutated = Rewrite(tree, mutation);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(mutated)
+                .IsEqualTo(
+                    CoalesceAssignmentTriviaSource.Replace("??= /* after */", "= /* after */", StringComparison.Ordinal)
+                );
+            _ = await Assert.That(mutated).Contains("/* leading */");
+            _ = await Assert.That(mutated).Contains("field /* inner */ = /* after */ value; // tail");
+        }
+    }
+
+    /// <summary>
+    /// A <c>throw</c> right operand is legal for <c>??=</c>, but not for a plain assignment: the
+    /// language only permits a throw expression as the second/third operand of <c>?:</c>, an arm of a
+    /// switch expression, the right operand of <c>??</c>/<c>??=</c>, or an expression-bodied member
+    /// body (see CS8115). The mutation is therefore skipped, the same way the <c>??</c> mutations skip
+    /// a throw expression candidate.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CoalesceAssignmentWithThrowOnTheRight_ReturnsEmpty()
+    {
+        var (_, mutations) = Run(CoalesceAssignmentThrowSource, FindAssignment);
 
         _ = await Assert.That(mutations).IsEmpty();
     }

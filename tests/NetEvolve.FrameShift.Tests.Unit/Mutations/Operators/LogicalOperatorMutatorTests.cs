@@ -13,9 +13,9 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers <see cref="LogicalOperatorMutator" />, which swaps <c>&amp;&amp;</c> with <c>||</c> and the
-/// boolean <c>&amp;</c> with <c>|</c>, while leaving integral <c>&amp;</c> and <c>|</c> to the bitwise
-/// mutation operator.
+/// Covers <see cref="LogicalOperatorMutator" />, which swaps <c>&amp;&amp;</c> with <c>||</c>, the
+/// boolean <c>&amp;</c> with <c>|</c>, and rewrites boolean <c>^</c> into <c>==</c>, while leaving
+/// integral <c>&amp;</c>, <c>|</c> and <c>^</c> to the bitwise mutation operator.
 /// </summary>
 public class LogicalOperatorMutatorTests
 {
@@ -98,6 +98,7 @@ public class LogicalOperatorMutatorTests
             SyntaxKind.LogicalOrExpression,
             SyntaxKind.BitwiseAndExpression,
             SyntaxKind.BitwiseOrExpression,
+            SyntaxKind.ExclusiveOrExpression,
         ];
 
         _ = await Assert.That(_mutator.SupportedSyntaxKinds.ToArray()).IsEquivalentTo(expected);
@@ -172,7 +173,7 @@ public class LogicalOperatorMutatorTests
     }
 
     [Test]
-    public async Task CreateMutations_ExclusiveOrExpression_ReturnsEmpty()
+    public async Task CreateMutations_IntegralExclusiveOrExpression_ReturnsEmpty()
     {
         var (mutations, _, _, errors) = Mutate(CreateSource(IntegralTemplate, "^"));
 
@@ -180,6 +181,52 @@ public class LogicalOperatorMutatorTests
         {
             _ = await Assert.That(errors).IsEqualTo(string.Empty);
             _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
+    }
+
+    [Test]
+    public async Task CreateMutations_BooleanExclusiveOrExpression_ProducesEqualsMutation()
+    {
+        string[] expected = ["^ => =="];
+        var (mutations, _, _, errors) = Mutate(CreateSource(BooleanTemplate, "^"));
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo("logical.boolean-xor-to-equals");
+            _ = await Assert.That(mutations.Single().Kind).IsEqualTo(MutationKind.LogicalOperator);
+        }
+    }
+
+    [Test]
+    public async Task CreateMutations_NullableBooleanExclusiveOrExpression_ProducesEqualsMutation()
+    {
+        string[] expected = ["^ => =="];
+        var (mutations, _, _, errors) = Mutate(CreateSource(NullableBooleanTemplate, "^"));
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo("logical.boolean-xor-to-equals");
+        }
+    }
+
+    [Test]
+    public async Task CreateMutations_MixedNullableAndPlainBooleanExclusiveOrExpression_ProducesEqualsMutation()
+    {
+        string[] expected = ["^ => =="];
+        var (mutations, tree, model, errors) = Mutate(CreateSource(MixedNullableBooleanTemplate, "^"));
+        var binary = SyntaxNodeLocator.FindMarked<BinaryExpressionSyntax>(tree);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(model.GetTypeInfo(binary.Left).Type?.ToDisplayString()).IsEqualTo("bool");
+            _ = await Assert.That(model.GetTypeInfo(binary.Right).Type?.ToDisplayString()).IsEqualTo("bool?");
+            _ = await Assert.That(DisplayNames(mutations)).IsEquivalentTo(expected);
+            _ = await Assert.That(mutations.Single().OperatorId).IsEqualTo("logical.boolean-xor-to-equals");
         }
     }
 
@@ -201,6 +248,7 @@ public class LogicalOperatorMutatorTests
     [Arguments("||", "left && right")]
     [Arguments("&", "left | right")]
     [Arguments("|", "left & right")]
+    [Arguments("^", "left == right")]
     public async Task ApplyTo_BooleanOperands_ProducesCompilableSource(string source, string expectedText)
     {
         var (mutations, tree, _, _) = Mutate(CreateSource(BooleanTemplate, source));
