@@ -14,9 +14,11 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 29 mutation operators covering arithmetic operators and compound assignments, relational and
-  equality operators, logical, conditional and bitwise/shift operators, logical negation,
-  increment/decrement, unary operators, null-coalescing, boolean, numeric and string literals, and
+- 30 mutation operators covering arithmetic operators and compound assignments, relational and
+  equality operators, logical operators (including boolean exclusive-or), conditional expressions
+  (branch swap, condition negation, and forcing the condition to `true`/`false`), bitwise/shift
+  operators and their compound assignments, logical negation, increment/decrement, unary operators,
+  null-coalescing (including the `??=` assignment), boolean, numeric and string literals, and
   the two families below.
 - A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
   three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted

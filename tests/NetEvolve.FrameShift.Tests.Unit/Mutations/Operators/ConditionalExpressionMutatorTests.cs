@@ -319,18 +319,22 @@ public class ConditionalExpressionMutatorTests
     }
 
     [Test]
-    public async Task CreateMutations_Ternary_SwapsBranchesAndNegatesTheCondition()
+    public async Task CreateMutations_Ternary_ProducesSwapNegateAndConstantForcingMutations()
     {
         var (_, mutations) = Run(TernarySource);
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(mutations[0].Kind).IsEqualTo(MutationKind.ConditionalExpression);
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("conditional-expression.swap-branches");
             _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("c ? a : b => c ? b : a");
             _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("conditional-expression.negate-condition");
             _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("c ? a : b => !c ? a : b");
+            _ = await Assert.That(mutations[2].OperatorId).IsEqualTo("conditional-expression.force-true");
+            _ = await Assert.That(mutations[2].DisplayName).IsEqualTo("c ? a : b => true ? a : b");
+            _ = await Assert.That(mutations[3].OperatorId).IsEqualTo("conditional-expression.force-false");
+            _ = await Assert.That(mutations[3].DisplayName).IsEqualTo("c ? a : b => false ? a : b");
         }
     }
 
@@ -353,13 +357,33 @@ public class ConditionalExpressionMutatorTests
     }
 
     [Test]
+    public async Task CreateMutations_Ternary_RewritesForcedTrueCondition()
+    {
+        var (tree, mutations) = Run(TernarySource);
+
+        _ = await Assert
+            .That(Rewrite(tree, mutations[2]))
+            .IsEqualTo("public class Sample { public int Get(bool flag) => true ? 1 : 2; }");
+    }
+
+    [Test]
+    public async Task CreateMutations_Ternary_RewritesForcedFalseCondition()
+    {
+        var (tree, mutations) = Run(TernarySource);
+
+        _ = await Assert
+            .That(Rewrite(tree, mutations[3]))
+            .IsEqualTo("public class Sample { public int Get(bool flag) => false ? 1 : 2; }");
+    }
+
+    [Test]
     public async Task CreateMutations_NegatedCondition_RemovesTheNegation()
     {
         var (tree, mutations) = Run(NegatedSource);
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("conditional-expression.negate-condition");
             _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(TernarySource);
         }
@@ -396,6 +420,34 @@ public class ConditionalExpressionMutatorTests
         var (_, mutations) = Run(EquivalentBranchSource);
 
         _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_TrueLiteralCondition_SkipsConstantForcingMutations()
+    {
+        var (_, mutations) = Run(TrueLiteralSource);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert
+                .That(mutations.All(mutation => !mutation.OperatorId.Contains("force", StringComparison.Ordinal)))
+                .IsTrue();
+        }
+    }
+
+    [Test]
+    public async Task CreateMutations_FalseLiteralCondition_SkipsConstantForcingMutations()
+    {
+        var (_, mutations) = Run(FalseLiteralSource);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert
+                .That(mutations.All(mutation => !mutation.OperatorId.Contains("force", StringComparison.Ordinal)))
+                .IsTrue();
+        }
     }
 
     [Test]
@@ -447,7 +499,6 @@ public class ConditionalExpressionMutatorTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
             _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("conditional-expression.negate-condition");
             _ = await Assert.That(NegatedCondition(mutations[1])).IsEqualTo(expected);
         }
@@ -465,7 +516,7 @@ public class ConditionalExpressionMutatorTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(NegatedCondition(mutations[1])).IsEqualTo(expected);
         }
     }
@@ -499,7 +550,7 @@ public class ConditionalExpressionMutatorTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(CompileErrors(source)).IsEqualTo(string.Empty);
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(mutated).IsEqualTo(expected);
             _ = await Assert.That(CompileErrors(mutated)).IsEqualTo(string.Empty);
         }
@@ -514,7 +565,7 @@ public class ConditionalExpressionMutatorTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(mutated).IsEqualTo(expected);
             _ = await Assert.That(CompileErrors(mutated)).IsEqualTo(string.Empty);
         }
@@ -550,7 +601,7 @@ public class ConditionalExpressionMutatorTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(CompileErrors(RefConditionalSource)).IsEqualTo(string.Empty);
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(mutated).IsEqualTo(expected);
             _ = await Assert.That(CompileErrors(mutated)).IsEqualTo(string.Empty);
         }
@@ -568,7 +619,7 @@ public class ConditionalExpressionMutatorTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(ThrowBranchesSwappedSource);
         }
     }
@@ -600,7 +651,7 @@ public class ConditionalExpressionMutatorTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations).Count().IsEqualTo(4);
             _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expected);
         }
     }
@@ -747,7 +798,7 @@ public class ConditionalExpressionMutatorTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(conditional.Condition.Kind()).IsEqualTo(SyntaxKind.MemberBindingExpression);
-            _ = await Assert.That(mutations.Length).IsEqualTo(2);
+            _ = await Assert.That(mutations.Length).IsEqualTo(4);
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("conditional-expression.swap-branches");
             _ = await Assert.That(swapped.WhenTrue.ToString()).IsEqualTo("2");
             _ = await Assert.That(swapped.WhenFalse.ToString()).IsEqualTo("1");
