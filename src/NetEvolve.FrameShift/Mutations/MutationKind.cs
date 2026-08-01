@@ -42,11 +42,10 @@ internal enum MutationKind
     BooleanLiteral,
 
     /// <summary>
-    /// Literals of type <c>bool?</c>, moved between the three states of three valued logic, so that
-    /// <see langword="true" /> and <see langword="false" /> become <see langword="null" /> and
-    /// <see langword="null" /> becomes both of them.
+    /// Literals of a nullable value type (<c>bool?</c>, a nullable numeric type or <c>char?</c>), moved
+    /// between the written value, <see langword="null" /> and the default value of the underlying type.
     /// </summary>
-    NullableBooleanLiteral,
+    NullableLiteral,
 
     /// <summary>
     /// Numeric literals, replaced by a neighbouring or boundary value.

@@ -32,11 +32,13 @@ next to every other compiler diagnostic.
   compiler would reject); and a standalone invocation of a `void` returning method with no `ref` or
   `out` arguments. These are the early exits, loop-flow changes, guards and discarded side-effecting
   calls a test suite never notices going missing.
-- A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
-  three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted
-  type is resolved through the semantic model, so a literal on a plain `bool` is never touched. It is
-  the family that provokes the difference between `flag == true` and `flag != false`, which only shows
-  once `flag` is `null`.
+- A nullable literal operator that moves a literal of a nullable value type (`bool?`, a nullable numeric
+  type or `char?`) between its written value, `null` and the default value of the underlying type - a
+  written literal that is not already the default becomes both `null` and that default, and `null`
+  becomes the default. The converted type is resolved through the semantic model, so a literal on the
+  corresponding non-nullable type is never touched. It is the family that provokes the difference
+  between "no value was given" and "the default value was given", which only shows once the type is
+  nullable.
 - A culture-sensitivity operator family of six operators - `StringComparison` arguments,
   `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
   case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's
