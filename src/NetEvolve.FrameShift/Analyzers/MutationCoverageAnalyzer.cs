@@ -712,8 +712,13 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
 
             string? single = null;
 
-            foreach (var test in _reachingTests.Where(test => test.Closure.ContainsEnclosing(member)))
+            foreach (var test in _reachingTests)
             {
+                if (!test.Closure.ContainsEnclosing(member))
+                {
+                    continue;
+                }
+
                 if (single is not null)
                 {
                     // Two test cases reach the member, so its inputs are not a single combination.
