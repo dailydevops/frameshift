@@ -117,6 +117,43 @@ public class RegexCharacterClassMutatorTests
         }
         """;
 
+    /// <summary>
+    /// A range whose start sits at <see cref="char.MinValue" /> itself - the extreme the guard
+    /// <c>startCharacter &gt; 0</c> exists to prevent underflowing past. The C# escape <c>\0</c> is resolved
+    /// by the inner compilation before the tokenizer ever sees the pattern text, so the pattern is a single
+    /// raw NUL character followed by <c>-b</c>, not the two-character regex escape <c>\0</c>; only a raw
+    /// class member reaches <c>TryWiden</c> as a single-character range bound. The upper bound still widens
+    /// normally.
+    /// </summary>
+    private const string RangeWideningMinBoundarySource = """
+        namespace Fixtures;
+
+        using System.Text.RegularExpressions;
+
+        internal static class Patterns
+        {
+            internal static Regex Create() => new Regex(/*!*/"[\0-b]");
+        }
+        """;
+
+    /// <summary>
+    /// A range whose end sits at <see cref="char.MaxValue" /> itself - the extreme the guard
+    /// <c>endCharacter &lt; char.MaxValue</c> exists to prevent overflowing past. As with
+    /// <see cref="RangeWideningMinBoundarySource" />, the C# escape resolves to a single raw character
+    /// before the tokenizer runs, so the pattern is <c>a-</c> followed by the raw <c>U+FFFF</c> character.
+    /// The lower bound still widens normally.
+    /// </summary>
+    private const string RangeWideningMaxBoundarySource = """
+        namespace Fixtures;
+
+        using System.Text.RegularExpressions;
+
+        internal static class Patterns
+        {
+            internal static Regex Create() => new Regex(/*!*/"[a-\uffff]");
+        }
+        """;
+
     private const string MemberRemovalSource = """
         namespace Fixtures;
 
@@ -192,6 +229,8 @@ public class RegexCharacterClassMutatorTests
         NestedSubtractionSource,
         RangeWideningSource,
         RangeWideningGuardSource,
+        RangeWideningMinBoundarySource,
+        RangeWideningMaxBoundarySource,
         MemberRemovalSource,
         RangeMemberNoRemovalSource,
         DotSource,
@@ -391,6 +430,70 @@ public class RegexCharacterClassMutatorTests
     }
 
     /// <summary>
+    /// The start of <c>[\0-b]</c> already sits at <see cref="char.MinValue" />, so the guard
+    /// <c>startCharacter &gt; 0</c> must skip the mutation rather than let <c>TryWiden</c> underflow past
+    /// it; the upper bound still widens normally.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_RangeStartAtMinValue_SkipsStartWidening()
+    {
+        var (_, mutations) = Mutate(RangeWideningMinBoundarySource);
+
+        _ = await Assert
+            .That(Lines(mutations))
+            .IsEqualTo(
+                string.Join(
+                    LineSeparator,
+                    "regex.character-class.negate-class | pattern '[\0-b]' => '[^\0-b]'",
+                    "regex.character-class.widen-range-end-at-3 | pattern '[\0-b]' => '[\0-c]'"
+                )
+            );
+        _ = await Assert
+            .That(
+                mutations.Any(mutation =>
+                    string.Equals(
+                        mutation.OperatorId,
+                        OperatorIdPrefix + "widen-range-start-at-1",
+                        StringComparison.Ordinal
+                    )
+                )
+            )
+            .IsFalse();
+    }
+
+    /// <summary>
+    /// The end of <c>[a-\uffff]</c> already sits at <see cref="char.MaxValue" />, so the guard
+    /// <c>endCharacter &lt; char.MaxValue</c> must skip the mutation rather than let <c>TryWiden</c>
+    /// overflow past it; the lower bound still widens normally.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_RangeEndAtMaxValue_SkipsEndWidening()
+    {
+        var (_, mutations) = Mutate(RangeWideningMaxBoundarySource);
+
+        _ = await Assert
+            .That(Lines(mutations))
+            .IsEqualTo(
+                string.Join(
+                    LineSeparator,
+                    "regex.character-class.negate-class | pattern '[a-\uffff]' => '[^a-\uffff]'",
+                    "regex.character-class.widen-range-start-at-1 | pattern '[a-\uffff]' => '[`-\uffff]'"
+                )
+            );
+        _ = await Assert
+            .That(
+                mutations.Any(mutation =>
+                    string.Equals(
+                        mutation.OperatorId,
+                        OperatorIdPrefix + "widen-range-end-at-3",
+                        StringComparison.Ordinal
+                    )
+                )
+            )
+            .IsFalse();
+    }
+
+    /// <summary>
     /// Every standalone member of <c>[abc]</c> is offered as a removal of its own, one rewrite per member,
     /// each touching only its own span.
     /// </summary>
@@ -477,6 +580,8 @@ public class RegexCharacterClassMutatorTests
         var (_, nested) = Mutate(NestedSubtractionSource);
         var (_, range) = Mutate(RangeWideningSource);
         var (_, guard) = Mutate(RangeWideningGuardSource);
+        var (_, minBoundary) = Mutate(RangeWideningMinBoundarySource);
+        var (_, maxBoundary) = Mutate(RangeWideningMaxBoundarySource);
         var (_, removal) = Mutate(MemberRemovalSource);
         var (_, noRemoval) = Mutate(RangeMemberNoRemovalSource);
         var (_, dot) = Mutate(DotSource);
@@ -488,6 +593,8 @@ public class RegexCharacterClassMutatorTests
             .Concat(nested)
             .Concat(range)
             .Concat(guard)
+            .Concat(minBoundary)
+            .Concat(maxBoundary)
             .Concat(removal)
             .Concat(noRemoval)
             .Concat(dot)
@@ -497,7 +604,7 @@ public class RegexCharacterClassMutatorTests
             .Select(mutation => mutation.DisplayName);
 
         _ = await Assert.That(offenders).IsEmpty();
-        _ = await Assert.That(all).Count().IsEqualTo(48);
+        _ = await Assert.That(all).Count().IsEqualTo(52);
     }
 
     [Test]
