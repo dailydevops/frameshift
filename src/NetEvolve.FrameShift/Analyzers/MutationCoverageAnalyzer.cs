@@ -162,9 +162,17 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
 
         var compiler = new MutantCompiler(context.Compilation);
         var attribution = new TestCaseAttribution(context.Compilation, result.Manifest);
+        var unreachableCodeDiagnosticsCache = new UnreachableCodeDiagnosticsCache();
 
         context.RegisterSemanticModelAction(modelContext =>
-            AnalyzeSemanticModel(modelContext, reachable, attribution, compiler, options)
+            AnalyzeSemanticModel(
+                modelContext,
+                reachable,
+                attribution,
+                compiler,
+                unreachableCodeDiagnosticsCache,
+                options
+            )
         );
     }
 
@@ -188,12 +196,16 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// <param name="reachable">The reachable set computed once for the whole compilation.</param>
     /// <param name="attribution">The per-test attribution shared by all files, which memoises its results.</param>
     /// <param name="compiler">The mutant compiler shared by all files, which memoises its results.</param>
+    /// <param name="unreachableCodeDiagnosticsCache">
+    /// The unreachable code diagnostics cache shared by all files, which memoises its results.
+    /// </param>
     /// <param name="options">The configuration of the current compilation.</param>
     private static void AnalyzeSemanticModel(
         SemanticModelAnalysisContext context,
         ReachableSymbolSet reachable,
         TestCaseAttribution attribution,
         MutantCompiler compiler,
+        UnreachableCodeDiagnosticsCache unreachableCodeDiagnosticsCache,
         FrameShiftOptions options
     )
     {
@@ -221,7 +233,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            AnalyzeMutation(context, mutation, tree, state, compiler, options);
+            AnalyzeMutation(context, mutation, tree, state, compiler, unreachableCodeDiagnosticsCache, options);
         }
     }
 
@@ -233,6 +245,9 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// <param name="tree">The unmutated syntax tree the mutation belongs to.</param>
     /// <param name="state">The state of the member enclosing the mutation point.</param>
     /// <param name="compiler">The mutant compiler shared by the whole compilation.</param>
+    /// <param name="unreachableCodeDiagnosticsCache">
+    /// The unreachable code diagnostics cache shared by the whole compilation.
+    /// </param>
     /// <param name="options">The configuration of the current compilation.</param>
     private static void AnalyzeMutation(
         SemanticModelAnalysisContext context,
@@ -240,6 +255,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         SyntaxTree tree,
         MemberState state,
         MutantCompiler compiler,
+        UnreachableCodeDiagnosticsCache unreachableCodeDiagnosticsCache,
         FrameShiftOptions options
     )
     {
@@ -255,7 +271,12 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        var verdict = EquivalenceClassifier.Classify(mutation, context.SemanticModel, cancellationToken);
+        var verdict = EquivalenceClassifier.Classify(
+            mutation,
+            context.SemanticModel,
+            cancellationToken,
+            unreachableCodeDiagnosticsCache
+        );
         if (verdict.IsTrivial)
         {
             if (options.ReportTrivialMutants)
