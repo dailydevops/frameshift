@@ -69,6 +69,11 @@ internal static class EquivalenceClassifier
     /// need semantic information are skipped when the node belongs to a different tree.
     /// </param>
     /// <param name="cancellationToken">A token observed between the individual checks.</param>
+    /// <param name="unreachableCodeDiagnosticsCache">
+    /// The cache memoising the compiler diagnostics used to detect unreachable code, shared by every
+    /// mutation candidate of the same compilation, or <see langword="null" /> to compute the
+    /// diagnostics without memoization, which every existing caller not yet passing one still does.
+    /// </param>
     /// <returns>
     /// A trivial <see cref="EquivalenceVerdict" /> with a precise reason, or
     /// <see cref="EquivalenceVerdict.NotTrivial" /> when triviality could not be proven.
@@ -80,7 +85,8 @@ internal static class EquivalenceClassifier
     public static EquivalenceVerdict Classify(
         Mutation mutation,
         SemanticModel semanticModel,
-        CancellationToken cancellationToken
+        CancellationToken cancellationToken,
+        UnreachableCodeDiagnosticsCache? unreachableCodeDiagnosticsCache = null
     )
     {
         if (mutation is null)
@@ -98,7 +104,7 @@ internal static class EquivalenceClassifier
         return ClassifyNoOpRewrite(mutation)
             ?? ClassifyConstantFolding(mutation, semanticModel, cancellationToken)
             ?? ClassifyRegexQuantifierShorthand(mutation, semanticModel, cancellationToken)
-            ?? ClassifyUnreachableCode(mutation, semanticModel, cancellationToken)
+            ?? ClassifyUnreachableCode(mutation, semanticModel, unreachableCodeDiagnosticsCache, cancellationToken)
             ?? ClassifyDiscardedResult(mutation, semanticModel, cancellationToken)
             ?? ClassifyConstantOnlyContext(mutation)
             ?? ClassifyExcludedMember(mutation, semanticModel, cancellationToken)
@@ -985,11 +991,16 @@ internal static class EquivalenceClassifier
     /// </summary>
     /// <param name="mutation">The mutation to inspect.</param>
     /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="unreachableCodeDiagnosticsCache">
+    /// The cache memoising the compiler diagnostics per member, or <see langword="null" /> to compute
+    /// them without memoization.
+    /// </param>
     /// <param name="cancellationToken">A token to observe.</param>
     /// <returns>A trivial verdict, or <see langword="null" /> if the check does not apply.</returns>
     private static EquivalenceVerdict? ClassifyUnreachableCode(
         Mutation mutation,
         SemanticModel semanticModel,
+        UnreachableCodeDiagnosticsCache? unreachableCodeDiagnosticsCache,
         CancellationToken cancellationToken
     )
     {
@@ -998,7 +1009,7 @@ internal static class EquivalenceClassifier
             return EquivalenceVerdict.Trivial(ThrowOnlyBodyReason);
         }
 
-        return IsInUnreachableStatement(mutation, semanticModel, cancellationToken)
+        return IsInUnreachableStatement(mutation, semanticModel, unreachableCodeDiagnosticsCache, cancellationToken)
             ? EquivalenceVerdict.Trivial(UnreachableStatementReason)
             : null;
     }
@@ -1008,11 +1019,17 @@ internal static class EquivalenceClassifier
     /// </summary>
     /// <param name="mutation">The mutation to inspect.</param>
     /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="unreachableCodeDiagnosticsCache">
+    /// The cache memoising the compiler diagnostics per member, so that every candidate mutation of
+    /// the same member shares one <see cref="SemanticModel.GetDiagnostics(TextSpan?, CancellationToken)" />
+    /// call, or <see langword="null" /> to compute them without memoization.
+    /// </param>
     /// <param name="cancellationToken">A token to observe.</param>
     /// <returns><see langword="true" /> if the mutation is unreachable; otherwise <see langword="false" />.</returns>
     private static bool IsInUnreachableStatement(
         Mutation mutation,
         SemanticModel semanticModel,
+        UnreachableCodeDiagnosticsCache? unreachableCodeDiagnosticsCache,
         CancellationToken cancellationToken
     )
     {
@@ -1022,7 +1039,9 @@ internal static class EquivalenceClassifier
         }
 
         var scope = mutation.Original.FirstAncestorOrSelf<MemberDeclarationSyntax>();
-        var diagnostics = semanticModel.GetDiagnostics(scope?.Span, cancellationToken);
+        var diagnostics =
+            unreachableCodeDiagnosticsCache?.GetDiagnostics(semanticModel, scope?.Span, cancellationToken)
+            ?? semanticModel.GetDiagnostics(scope?.Span, cancellationToken);
         var mutationSpan = mutation.Location.SourceSpan;
 
         return diagnostics.Any(diagnostic =>
