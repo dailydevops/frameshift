@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.RegularExpressions;
 
+using System.Reflection;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -1237,6 +1238,100 @@ public class RegexPatternLocatorTests
         _ = await Assert
             .That(site.ToString())
             .IsEqualTo("RegexConstructor: \"a+\" [options not statically determinable]");
+    }
+
+    /// <summary>
+    /// Pins the behaviour a per-compilation cache of the well-known type symbols must not change: every
+    /// candidate literal in a fixture with many of them - a static-method call and a constructor call, each
+    /// repeated several times with an options argument - still resolves to exactly the site its call form
+    /// implies, all of them read through the same <see cref="SemanticModel" /> and hence the same
+    /// <see cref="Compilation" />. This is the safety net a resolve-once-per-compilation refactor has to
+    /// keep passing.
+    /// </summary>
+    [Test]
+    public async Task TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly()
+    {
+        var statements = string.Join(
+            "\n        ",
+            Enumerable
+                .Range(0, 25)
+                .Select(index =>
+                    $"_ = Regex.IsMatch(input, \"a{index}+\", RegexOptions.IgnoreCase); _ = new Regex(\"b{index}+\");"
+                )
+        );
+        var (semanticModel, tree) = CreateFixture(CreateCallSource(statements));
+        var literals = SyntaxNodeLocator.FindAll<LiteralExpressionSyntax>(tree);
+        var sites = literals
+            .Select(literal => RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None))
+            .ToArray();
+
+        _ = await Assert.That(sites).HasCount().EqualTo(50);
+
+        foreach (var site in sites)
+        {
+            _ = await Assert.That(site).IsNotNull();
+        }
+
+        var staticMethodSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexStaticMethod).ToArray();
+        var constructorSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexConstructor).ToArray();
+
+        _ = await Assert.That(staticMethodSites).HasCount().EqualTo(25);
+        _ = await Assert.That(constructorSites).HasCount().EqualTo(25);
+
+        foreach (var site in staticMethodSites)
+        {
+            _ = await Assert.That(site!.Options).IsEqualTo(RegexOptions.IgnoreCase);
+        }
+
+        foreach (var site in constructorSites)
+        {
+            _ = await Assert.That(site!.Options).IsEqualTo(RegexOptions.None);
+        }
+    }
+
+    /// <summary>
+    /// Resolves the four well-known type symbols once per <see cref="Compilation" /> and reuses them
+    /// across every candidate literal, instead of calling <see cref="Compilation.GetTypeByMetadataName(string)" />
+    /// again for each one. The fixture is the same one <see cref="TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly" />
+    /// exercises. Reflecting on the locator's private cache after the fact proves that a single entry was
+    /// ever created for that compilation, no matter how many literals were examined.
+    /// </summary>
+    [Test]
+    public async Task TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesWellKnownTypesOnlyOnce()
+    {
+        var statements = string.Join(
+            "\n        ",
+            Enumerable
+                .Range(0, 25)
+                .Select(index =>
+                    $"_ = Regex.IsMatch(input, \"a{index}+\", RegexOptions.IgnoreCase); _ = new Regex(\"b{index}+\");"
+                )
+        );
+        var (semanticModel, tree) = CreateFixture(CreateCallSource(statements));
+        var literals = SyntaxNodeLocator.FindAll<LiteralExpressionSyntax>(tree);
+
+        foreach (var literal in literals)
+        {
+            _ = RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None);
+        }
+
+        var cacheField = typeof(RegexPatternLocator).GetField(
+            "WellKnownTypesCache",
+            BindingFlags.NonPublic | BindingFlags.Static
+        );
+
+        _ = await Assert.That(cacheField).IsNotNull();
+
+        var cache = cacheField!.GetValue(null)!;
+        var tryGetValue = cache.GetType().GetMethod("TryGetValue");
+
+        _ = await Assert.That(tryGetValue).IsNotNull();
+
+        var arguments = new object?[] { semanticModel.Compilation, null };
+        var found = (bool)tryGetValue!.Invoke(cache, arguments)!;
+
+        _ = await Assert.That(found).IsTrue();
+        _ = await Assert.That(arguments[1]).IsNotNull();
     }
 
     /// <summary>
