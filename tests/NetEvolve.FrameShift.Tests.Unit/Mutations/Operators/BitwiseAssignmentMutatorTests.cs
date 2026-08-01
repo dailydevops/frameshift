@@ -288,6 +288,52 @@ public class BitwiseAssignmentMutatorTests
     }
 
     /// <summary>
+    /// A nullable integral operand still binds to the lifted <c>&amp;=</c> operator, so it must be
+    /// mutated exactly like its non-nullable counterpart. Exercises the nullable-unwrap branch of
+    /// <see cref="IntegralTypeCheck.IsIntegral" />.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NullableIntegralOperands_ProducesTheBitwiseCounterparts()
+    {
+        var expectedIds = "bitwise-assignment.and-assign-to-or-assign,bitwise-assignment.and-assign-to-xor-assign";
+        var result = Mutate(OperandFixture("int?", "int?", "/*!*/target &= value;"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+    }
+
+    /// <summary>
+    /// A nullable integral shift count still binds to the lifted <c>&lt;&lt;=</c> operator, so the shift
+    /// swap must still fire. Exercises the nullable-unwrap branch on the shift-count side.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NullableIntegralShiftCount_SwapsTheDirection()
+    {
+        var expectedIds = "bitwise-assignment.left-shift-assign-to-right-shift-assign";
+        var result = Mutate(OperandFixture("int?", "int?", "/*!*/target <<= value;"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+    }
+
+    /// <summary>
+    /// A <see langword="char" /> operand is integral enough for the compound bitwise assignments,
+    /// exercising the <see cref="SpecialType.System_Char" /> arm of the allowed-type switch.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CharOperands_ProducesTheBitwiseCounterparts()
+    {
+        var expectedIds = "bitwise-assignment.and-assign-to-or-assign,bitwise-assignment.and-assign-to-xor-assign";
+        var result = Mutate(OperandFixture("char", "char", "/*!*/target &= value;"));
+
+        _ = await Assert
+            .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
+            .IsEquivalentTo(Sorted(SplitValues(expectedIds)));
+    }
+
+    /// <summary>
     /// A floating point operand does not bind to any predefined <c>&amp;=</c> operator at all, so the
     /// fixture deliberately does not compile. The reported error keeps the fixture honest, mirroring how
     /// <see cref="BitwiseOperatorMutatorTests" /> pins non-compiling operand shapes through the semantic
