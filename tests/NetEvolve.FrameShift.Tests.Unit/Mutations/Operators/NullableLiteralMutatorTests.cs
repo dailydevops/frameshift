@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
+using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -175,6 +176,74 @@ public class NullableLiteralMutatorTests
         }
     }
 
+    /// <summary>
+    /// Every other supported integral and floating type reaches the same two mutations as <c>int?</c>
+    /// does, exercising both the type-specific arm of the default-value switch and the type-specific arm
+    /// of the constant-value pattern match that decides whether the literal already is that default.
+    /// </summary>
+    [Test]
+    [Arguments("sbyte", "5", "0")]
+    [Arguments("byte", "5", "0")]
+    [Arguments("short", "5", "0")]
+    [Arguments("ushort", "5", "0")]
+    [Arguments("uint", "5u", "0U")]
+    [Arguments("long", "5L", "0L")]
+    [Arguments("ulong", "5UL", "0UL")]
+    [Arguments("float", "5F", "0F")]
+    [Arguments("double", "5D", "0")]
+    [Arguments("decimal", "5M", "0M")]
+    public async Task CreateMutations_NonZeroNumericLiteral_AcrossSupportedTypes_ReplacesItByNullAndByDefault(
+        string typeName,
+        string literalText,
+        string expectedDefaultText
+    )
+    {
+        var source = $"public class Sample {{ public {typeName}? Get() => {literalText}; }}";
+        var (_, mutations) = Run(source, FindNumericOrNullLiteral);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.literal-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literalText} => null");
+
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-literal.literal-to-default");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"{literalText} => {expectedDefaultText}");
+        }
+    }
+
+    /// <summary>
+    /// The zero value of every other supported integral and floating type is already its own default,
+    /// so only the transition to <see langword="null" /> fires - the mirror of
+    /// <see cref="CreateMutations_ZeroIntLiteral_ReplacesItOnlyByNull" /> for the remaining types.
+    /// </summary>
+    [Test]
+    [Arguments("sbyte", "0")]
+    [Arguments("byte", "0")]
+    [Arguments("short", "0")]
+    [Arguments("ushort", "0")]
+    [Arguments("uint", "0u")]
+    [Arguments("long", "0L")]
+    [Arguments("ulong", "0UL")]
+    [Arguments("float", "0F")]
+    [Arguments("double", "0D")]
+    [Arguments("decimal", "0M")]
+    public async Task CreateMutations_ZeroNumericLiteral_AcrossSupportedTypes_ReplacesItOnlyByNull(
+        string typeName,
+        string literalText
+    )
+    {
+        var source = $"public class Sample {{ public {typeName}? Get() => {literalText}; }}";
+        var (_, mutations) = Run(source, FindNumericOrNullLiteral);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.literal-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literalText} => null");
+        }
+    }
+
     [Test]
     public async Task CreateMutations_NullIntLiteral_ReplacesItByDefault()
     {
@@ -247,6 +316,88 @@ public class NullableLiteralMutatorTests
         var (_, mutations) = Run(GuidWrongNamespaceSource, FindBooleanOrNullLiteral);
 
         _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// <c>Guid</c> has no literal syntax, so <c>IsDefaultValue</c>'s <c>Guid</c> case can never actually
+    /// be reached through <c>CreateMutations</c> - it exists only to keep the switch exhaustive. This
+    /// invokes the private method directly to prove that defensive case still behaves as documented.
+    /// </summary>
+    [Test]
+    public async Task IsDefaultValue_GuidUnderlyingKind_ReturnsFalse()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(NonZeroIntSource);
+        var literal = FindNumericOrNullLiteral(tree);
+
+        var underlyingKindType = typeof(NullableLiteralMutator).GetNestedType(
+            "UnderlyingKind",
+            BindingFlags.NonPublic
+        )!;
+        var guidKind = Enum.Parse(underlyingKindType, "Guid");
+
+        var method = typeof(NullableLiteralMutator).GetMethod(
+            "IsDefaultValue",
+            BindingFlags.NonPublic | BindingFlags.Static
+        )!;
+
+        var result = (bool)method.Invoke(null, [literal, guidKind, semanticModel, CancellationToken.None])!;
+
+        _ = await Assert.That(result).IsFalse();
+    }
+
+    /// <summary>
+    /// The constant-value pattern match only ever sees the runtime types the switch names - a
+    /// <see langword="bool" /> is never among them because the <c>Boolean</c> underlying kind is handled
+    /// earlier and short-circuits before <c>GetConstantValue</c> is even called. Passing a boolean
+    /// literal through with a different <c>underlyingKind</c> reaches the pattern match anyway and
+    /// proves its otherwise unreachable fallback arm returns <see langword="false" /> rather than
+    /// throwing.
+    /// </summary>
+    [Test]
+    public async Task IsDefaultValue_ConstantValueOfAnUnmatchedType_ReturnsFalse()
+    {
+        var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(TrueSource);
+        var literal = FindBooleanOrNullLiteral(tree);
+
+        var underlyingKindType = typeof(NullableLiteralMutator).GetNestedType(
+            "UnderlyingKind",
+            BindingFlags.NonPublic
+        )!;
+        var int32OrSmallerKind = Enum.Parse(underlyingKindType, "Int32OrSmaller");
+
+        var method = typeof(NullableLiteralMutator).GetMethod(
+            "IsDefaultValue",
+            BindingFlags.NonPublic | BindingFlags.Static
+        )!;
+
+        var result = (bool)method.Invoke(null, [literal, int32OrSmallerKind, semanticModel, CancellationToken.None])!;
+
+        _ = await Assert.That(result).IsFalse();
+    }
+
+    /// <summary>
+    /// <c>CreateDefaultExpression</c>'s fallback arm exists only because a <see langword="switch" />
+    /// expression over an <see langword="enum" /> is not provably exhaustive to the compiler - every
+    /// member this operator defines is handled explicitly. This proves the fallback itself, reachable
+    /// only through a value outside the defined range of the enum.
+    /// </summary>
+    [Test]
+    public async Task CreateDefaultExpression_UndefinedUnderlyingKind_ReturnsNull()
+    {
+        var underlyingKindType = typeof(NullableLiteralMutator).GetNestedType(
+            "UnderlyingKind",
+            BindingFlags.NonPublic
+        )!;
+        var undefinedKind = Enum.ToObject(underlyingKindType, -1);
+
+        var method = typeof(NullableLiteralMutator).GetMethod(
+            "CreateDefaultExpression",
+            BindingFlags.NonPublic | BindingFlags.Static
+        )!;
+
+        var result = method.Invoke(null, [undefinedKind]);
+
+        _ = await Assert.That(result).IsNull();
     }
 
     [Test]

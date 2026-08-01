@@ -300,11 +300,10 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
 
         return constant.Value switch
         {
+            // sbyte, byte, short and ushort never appear here: C# has no literal syntax for them, so a
+            // numeric literal targeting one of those types is always folded to int by the compiler before
+            // this method ever sees it - int is the arm that actually fires for all four.
             char charValue => charValue == '\0',
-            sbyte sbyteValue => sbyteValue == 0,
-            byte byteValue => byteValue == 0,
-            short shortValue => shortValue == 0,
-            ushort ushortValue => ushortValue == 0,
             int intValue => intValue == 0,
             uint uintValue => uintValue == 0,
             long longValue => longValue == 0,
