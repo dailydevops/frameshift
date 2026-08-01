@@ -104,6 +104,7 @@ public class TestSurfaceAnalysisDiscoveryTests
         ImmutableArray<IMethodSymbol> testMethods
     )
     {
+#pragma warning disable CS0618 // Obsolete: this constructor is the only way to build the context by hand for a targeted, reflection-driven test of a private helper.
         var context = new CompilationAnalysisContext(
             compilation,
             new AnalyzerOptions(ImmutableArray<AdditionalText>.Empty),
@@ -111,6 +112,7 @@ public class TestSurfaceAnalysisDiscoveryTests
             static _ => true,
             CancellationToken.None
         );
+#pragma warning restore CS0618
 
         var method =
             typeof(TestSurfaceAnalysis).GetMethod("FindAwakeFrameworks", BindingFlags.NonPublic | BindingFlags.Static)

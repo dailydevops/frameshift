@@ -106,7 +106,7 @@ internal static class TestSurfaceAnalysis
             return;
         }
 
-        var awake = FindAwakeFrameworks(context);
+        var awake = FindAwakeFrameworks(context, probe, recognizer, testMethods);
 
         ReportTestsWithoutProductionReference(context, probe, recognizer, awake);
 
@@ -123,17 +123,41 @@ internal static class TestSurfaceAnalysis
     /// their probe recognises them and that at least one of their test methods is actually discovered.
     /// </summary>
     /// <param name="context">The context of the analyzed compilation.</param>
+    /// <param name="currentProbe">The probe of the running analyzer.</param>
+    /// <param name="currentRecognizer">
+    /// The recogniser already created for <paramref name="currentProbe" />, reused instead of being
+    /// recreated for the matching registry entry.
+    /// </param>
+    /// <param name="currentTestMethods">
+    /// The test methods already discovered for <paramref name="currentRecognizer" />, reused instead of
+    /// being rediscovered for the matching registry entry.
+    /// </param>
     /// <returns>
     /// The awake frameworks together with their recognisers, in the order of
     /// <see cref="TestFrameworkProbeRegistry.All" />.
     /// </returns>
-    private static ImmutableArray<AwakeFramework> FindAwakeFrameworks(CompilationAnalysisContext context)
+    private static ImmutableArray<AwakeFramework> FindAwakeFrameworks(
+        CompilationAnalysisContext context,
+        ITestFrameworkProbe currentProbe,
+        ITestMethodRecognizer currentRecognizer,
+        ImmutableArray<IMethodSymbol> currentTestMethods
+    )
     {
         var builder = ImmutableArray.CreateBuilder<AwakeFramework>();
 
         foreach (var candidate in TestFrameworkProbeRegistry.All)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (IsSameFramework(candidate, currentProbe))
+            {
+                if (!currentTestMethods.IsEmpty)
+                {
+                    builder.Add(new AwakeFramework(candidate, currentRecognizer));
+                }
+
+                continue;
+            }
 
             var recognizer = candidate.TryCreateRecognizer(context.Compilation);
 
