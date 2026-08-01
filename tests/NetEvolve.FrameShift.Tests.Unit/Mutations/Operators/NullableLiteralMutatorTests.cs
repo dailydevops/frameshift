@@ -67,12 +67,13 @@ public class NullableLiteralMutatorTests
         {
             _ = await Assert.That(mutator.Id).IsEqualTo("nullable-literal");
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.NullableLiteral);
-            _ = await Assert.That(supported).Count().IsEqualTo(5);
+            _ = await Assert.That(supported).Count().IsEqualTo(6);
             _ = await Assert.That(supported).Contains(SyntaxKind.TrueLiteralExpression);
             _ = await Assert.That(supported).Contains(SyntaxKind.FalseLiteralExpression);
             _ = await Assert.That(supported).Contains(SyntaxKind.NumericLiteralExpression);
             _ = await Assert.That(supported).Contains(SyntaxKind.CharacterLiteralExpression);
             _ = await Assert.That(supported).Contains(SyntaxKind.NullLiteralExpression);
+            _ = await Assert.That(supported).Contains(SyntaxKind.UnaryMinusExpression);
         }
     }
 
@@ -242,6 +243,100 @@ public class NullableLiteralMutatorTests
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.literal-to-null");
             _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"{literalText} => null");
         }
+    }
+
+    /// <summary>
+    /// <c>-5</c> is a unary minus wrapping the literal <c>5</c>, whose own converted type is the
+    /// non-nullable operand type the unary operator requires - not the nullable type of the whole
+    /// expression. The operator has to resolve the nullable conversion of the whole unary expression to
+    /// see this value at all.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NegativeIntLiteral_ReplacesItByNullAndByDefault()
+    {
+        var source = "public class Sample { public int? Get() => -5; }";
+        var expectedNull = "public class Sample { public int? Get() => null; }";
+        var expectedDefault = "public class Sample { public int? Get() => 0; }";
+        var (tree, mutations) = Run(source, FindUnaryMinusExpression);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.literal-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("-5 => null");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(expectedNull);
+
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-literal.literal-to-default");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("-5 => 0");
+            _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(expectedDefault);
+        }
+    }
+
+    /// <summary>
+    /// A negative literal of every other supported numeric type reaches the same two mutations as the
+    /// non-negative case does, for the unary-minus shape.
+    /// </summary>
+    [Test]
+    [Arguments("sbyte", "5", "0")]
+    [Arguments("short", "5", "0")]
+    [Arguments("long", "5L", "0L")]
+    [Arguments("float", "5F", "0F")]
+    [Arguments("double", "5D", "0")]
+    [Arguments("decimal", "5M", "0M")]
+    public async Task CreateMutations_NegativeNumericLiteral_AcrossSupportedTypes_ReplacesItByNullAndByDefault(
+        string typeName,
+        string literalText,
+        string expectedDefaultText
+    )
+    {
+        var source = $"public class Sample {{ public {typeName}? Get() => -{literalText}; }}";
+        var (_, mutations) = Run(source, FindUnaryMinusExpression);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.literal-to-null");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo($"-{literalText} => null");
+
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-literal.literal-to-default");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo($"-{literalText} => {expectedDefaultText}");
+        }
+    }
+
+    /// <summary>
+    /// A negative literal in a plain, non-nullable context is left alone: the whole unary expression's
+    /// converted type is <c>int</c>, not <c>int?</c>, so <see cref="MutationOperatorBase" /> never offers
+    /// the <see langword="null" />/default mutants a non-nullable position could not compile.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NegativePlainIntLiteral_ReturnsEmpty()
+    {
+        var (_, mutations) = Run("public class Sample { public int Get() => -5; }", FindUnaryMinusExpression);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// This operator only ever mutates a unary minus over a numeric <em>literal</em>; a unary minus over
+    /// anything else - a variable, a call, another expression - is left entirely to
+    /// <see cref="UnaryOperatorMutator" />, which already covers negating an arbitrary operand.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NegativeNonLiteralOperand_ReturnsEmpty()
+    {
+        var source = "public class Sample { public int? Get(int value) => -value; }";
+        var (_, mutations) = Run(source, FindUnaryMinusExpression);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_NegativeLiteralDefaultParameterValue_ReturnsEmpty()
+    {
+        var source = "public class Sample { public int? Get(int? value = -5) => value; }";
+        var (_, mutations) = Run(source, FindUnaryMinusExpression);
+
+        _ = await Assert.That(mutations).IsEmpty();
     }
 
     [Test]
@@ -592,6 +687,12 @@ public class NullableLiteralMutatorTests
             tree,
             static literal =>
                 literal.IsKind(SyntaxKind.NumericLiteralExpression) || literal.IsKind(SyntaxKind.NullLiteralExpression)
+        );
+
+    private static SyntaxNode FindUnaryMinusExpression(SyntaxTree tree) =>
+        SyntaxNodeLocator.FindFirst<PrefixUnaryExpressionSyntax>(
+            tree,
+            static unary => unary.IsKind(SyntaxKind.UnaryMinusExpression)
         );
 
     private static SyntaxNode FindCharOrNullLiteral(SyntaxTree tree) =>

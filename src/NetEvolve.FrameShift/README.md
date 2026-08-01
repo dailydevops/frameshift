@@ -37,9 +37,13 @@ next to every other compiler diagnostic.
   type - a written literal that is not already the default becomes both `null` and that default, and
   `null` becomes the default (`Guid.Empty` for `Guid?`, since `Guid` has no literal of its own). `bool?`
   additionally moves `null` to `true`, since `bool` is the one type with exactly one other value worth
-  naming. The converted type is resolved through the semantic model, so a literal on the corresponding
-  non-nullable type is never touched. It is the family that provokes the difference between "no value
-  was given" and "the default value was given", which only shows once the type is nullable.
+  naming. A negative numeric literal such as `-5` is recognised too - it is a unary minus wrapping the
+  literal `5`, whose own converted type is the non-nullable operand type the unary operator requires, so
+  resolving only the inner literal would never see the nullable conversion, which happens on the whole
+  expression instead. The converted type is resolved through the semantic model, so a literal on the
+  corresponding non-nullable type is never touched. It is the family that provokes the difference
+  between "no value was given" and "the default value was given", which only shows once the type is
+  nullable.
 - A culture-sensitivity operator family of six operators - `StringComparison` arguments,
   `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
   case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's

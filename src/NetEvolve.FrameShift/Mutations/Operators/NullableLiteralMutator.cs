@@ -49,6 +49,15 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// have consumed a slot of the per member mutant budget.
 /// </para>
 /// <para>
+/// A negative numeric literal such as <c>-5</c> is a <see langword="unary" /> minus expression wrapping
+/// the literal <c>5</c>, and the operand's own converted type is whatever the unary operator requires -
+/// the non-nullable numeric type, never the nullable one the whole expression converts to afterwards.
+/// Handling only <see cref="LiteralExpressionSyntax" /> would therefore never see a negative value at
+/// all. This operator additionally recognises a unary minus over a numeric literal as its own node,
+/// resolving the nullable conversion of the <em>whole</em> expression instead of the inner literal, and
+/// replaces that whole expression the same way it replaces a bare literal.
+/// </para>
+/// <para>
 /// A <see langword="null" /> literal on a reference type is deliberately out of scope. It belongs to a
 /// separate and considerably riskier family, because the surviving mutant then depends on whether the
 /// dereference is guarded rather than on the presence-of-a-value distinction this operator targets.
@@ -72,6 +81,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
         SyntaxKind.NumericLiteralExpression,
         SyntaxKind.CharacterLiteralExpression,
         SyntaxKind.NullLiteralExpression,
+        SyntaxKind.UnaryMinusExpression,
     ];
 
     /// <summary>
@@ -89,11 +99,28 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
-        // and all five of them are literal expressions, so the cast cannot fail and no type test is
-        // needed here.
-        var literal = (LiteralExpressionSyntax)node;
+        // Every supported syntax kind reaches this point as a literal expression, except the unary
+        // minus over a negative numeric literal, which arrives as its own distinct node shape.
+        var mutations = node is PrefixUnaryExpressionSyntax unaryMinus
+            ? CreateMutationsForNegativeLiteral(unaryMinus, semanticModel, cancellationToken)
+            : CreateMutationsForLiteralNode((LiteralExpressionSyntax)node, semanticModel, cancellationToken);
 
+        foreach (var mutation in mutations)
+        {
+            yield return mutation;
+        }
+    }
+
+    /// <summary>
+    /// Builds the mutations for a literal node: the <see langword="null" />-state mutations for a
+    /// <see langword="null" /> literal, or the written-value mutations for any other literal.
+    /// </summary>
+    private IEnumerable<Mutation> CreateMutationsForLiteralNode(
+        LiteralExpressionSyntax literal,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
         if (ConstantContext.IsRequired(literal))
         {
             yield break;
@@ -107,9 +134,61 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
 
         var mutations = literal.IsKind(SyntaxKind.NullLiteralExpression)
             ? CreateMutationsForNull(literal, underlyingKind)
-            : CreateMutationsForLiteral(literal, underlyingKind, semanticModel, cancellationToken);
+            : CreateMutationsForNonNullValue(
+                literal,
+                literal.Token.Text,
+                underlyingKind,
+                semanticModel,
+                cancellationToken
+            );
 
         foreach (var mutation in mutations)
+        {
+            yield return mutation;
+        }
+    }
+
+    /// <summary>
+    /// Builds the mutations for a negative numeric literal such as <c>-5</c>: resolves the nullable
+    /// conversion of the whole unary expression, not of the inner literal, since that is where it
+    /// actually happens.
+    /// </summary>
+    private IEnumerable<Mutation> CreateMutationsForNegativeLiteral(
+        PrefixUnaryExpressionSyntax unaryMinus,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
+        if (
+            unaryMinus.Operand is not LiteralExpressionSyntax operand
+            || !operand.IsKind(SyntaxKind.NumericLiteralExpression)
+        )
+        {
+            yield break;
+        }
+
+        if (ConstantContext.IsRequired(unaryMinus))
+        {
+            yield break;
+        }
+
+        var convertedType = semanticModel.GetTypeInfo(unaryMinus, cancellationToken).ConvertedType;
+        if (!TryGetNullableUnderlyingType(convertedType, semanticModel.Compilation, out var underlyingKind))
+        {
+            yield break;
+        }
+
+        var displayText = unaryMinus.OperatorToken.Text + operand.Token.Text;
+
+        foreach (
+            var mutation in CreateMutationsForNonNullValue(
+                unaryMinus,
+                displayText,
+                underlyingKind,
+                semanticModel,
+                cancellationToken
+            )
+        )
         {
             yield return mutation;
         }
@@ -144,25 +223,26 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Builds the mutations for a written, non-<see langword="null" /> literal: a move to
-    /// <see langword="null" />, plus a move to the underlying type's default value when the literal is
-    /// not that default already.
+    /// Builds the mutations for a written, non-<see langword="null" /> value - a bare literal or a
+    /// negative numeric literal: a move to <see langword="null" />, plus a move to the underlying type's
+    /// default value when the value is not that default already.
     /// </summary>
-    private IEnumerable<Mutation> CreateMutationsForLiteral(
-        LiteralExpressionSyntax literal,
+    private IEnumerable<Mutation> CreateMutationsForNonNullValue(
+        ExpressionSyntax valueNode,
+        string displayText,
         UnderlyingKind underlyingKind,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
     )
     {
         yield return CreateMutation(
-            literal,
+            valueNode,
             SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression),
             "literal-to-null",
-            $"{literal.Token.Text} => null"
+            $"{displayText} => null"
         );
 
-        if (IsDefaultValue(literal, underlyingKind, semanticModel, cancellationToken))
+        if (IsDefaultValue(valueNode, underlyingKind, semanticModel, cancellationToken))
         {
             yield break;
         }
@@ -171,10 +251,10 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
         if (defaultExpression is not null)
         {
             yield return CreateMutation(
-                literal,
+                valueNode,
                 defaultExpression,
                 "literal-to-default",
-                $"{literal.Token.Text} => {DisplayText(underlyingKind, defaultExpression)}"
+                $"{displayText} => {DisplayText(underlyingKind, defaultExpression)}"
             );
         }
     }
@@ -267,16 +347,16 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Determines whether <paramref name="literal" /> already holds the default value of
+    /// Determines whether <paramref name="valueNode" /> already holds the default value of
     /// <paramref name="underlyingKind" />, so that mutating it to that same default would not be a
     /// mutation at all.
     /// </summary>
     /// <remarks>
-    /// <c>Guid</c> has no literal syntax, so <paramref name="literal" /> can never actually resolve to it
-    /// here; the case exists only to keep the switch exhaustive.
+    /// <c>Guid</c> has no literal syntax, so <paramref name="valueNode" /> can never actually resolve to
+    /// it here; the case exists only to keep the switch exhaustive.
     /// </remarks>
     private static bool IsDefaultValue(
-        LiteralExpressionSyntax literal,
+        ExpressionSyntax valueNode,
         UnderlyingKind underlyingKind,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
@@ -284,7 +364,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     {
         if (underlyingKind == UnderlyingKind.Boolean)
         {
-            return literal.IsKind(SyntaxKind.FalseLiteralExpression);
+            return valueNode.IsKind(SyntaxKind.FalseLiteralExpression);
         }
 
         if (underlyingKind == UnderlyingKind.Guid)
@@ -292,7 +372,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
             return false;
         }
 
-        var constant = semanticModel.GetConstantValue(literal, cancellationToken);
+        var constant = semanticModel.GetConstantValue(valueNode, cancellationToken);
         if (!constant.HasValue)
         {
             return false;
