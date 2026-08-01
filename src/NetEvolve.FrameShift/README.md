@@ -33,12 +33,13 @@ next to every other compiler diagnostic.
   `out` arguments. These are the early exits, loop-flow changes, guards and discarded side-effecting
   calls a test suite never notices going missing.
 - A nullable literal operator that moves a literal of a nullable value type (`bool?`, a nullable numeric
-  type or `char?`) between its written value, `null` and the default value of the underlying type - a
-  written literal that is not already the default becomes both `null` and that default, and `null`
-  becomes the default. The converted type is resolved through the semantic model, so a literal on the
-  corresponding non-nullable type is never touched. It is the family that provokes the difference
-  between "no value was given" and "the default value was given", which only shows once the type is
-  nullable.
+  type, `char?` or `Guid?`) between its written value, `null` and the default value of the underlying
+  type - a written literal that is not already the default becomes both `null` and that default, and
+  `null` becomes the default (`Guid.Empty` for `Guid?`, since `Guid` has no literal of its own). `bool?`
+  additionally moves `null` to `true`, since `bool` is the one type with exactly one other value worth
+  naming. The converted type is resolved through the semantic model, so a literal on the corresponding
+  non-nullable type is never touched. It is the family that provokes the difference between "no value
+  was given" and "the default value was given", which only shows once the type is nullable.
 - A culture-sensitivity operator family of six operators - `StringComparison` arguments,
   `StringComparer` selections, `CultureInfo` choices, the removal of an `IFormatProvider` argument,
   case conversion, and `RegexOptions` flags. These are the defects that pass on the developer's

@@ -12,10 +12,10 @@ using TUnit.Core;
 
 /// <summary>
 /// Covers the nullable literal operator: the mutations produced per source state for each supported
-/// underlying type (<c>bool</c>, an integral and floating type, and <c>char</c>), the rewritten source,
-/// and every position it must leave alone, which is a plain non-nullable type, a reference type
-/// <see langword="null" />, a constant context, and a <see langword="default" /> written in place of a
-/// literal.
+/// underlying type (<c>bool</c>, an integral and floating type, <c>char</c> and <c>Guid</c>), the
+/// rewritten source, and every position it must leave alone, which is a plain non-nullable type, a
+/// reference type <see langword="null" />, a constant context, and a <see langword="default" /> written
+/// in place of a literal.
 /// </summary>
 public class NullableLiteralMutatorTests
 {
@@ -29,6 +29,10 @@ public class NullableLiteralMutatorTests
 
     private const string CharSource = "public class Sample { public char? Get() => 'a'; }";
     private const string NullCharSource = "public class Sample { public char? Get() => null; }";
+
+    private const string NullGuidSource = "public class Sample { public System.Guid? Get() => null; }";
+    private const string GuidWrongNamespaceSource =
+        "namespace Other { public struct Guid { } } namespace Sample { public class Get { public Other.Guid? Value() => null; } }";
 
     private const string PlainBooleanSource = "public class Sample { public bool Get() => true; }";
     private const string PlainIntSource = "public class Sample { public int Get() => 5; }";
@@ -110,18 +114,28 @@ public class NullableLiteralMutatorTests
         }
     }
 
+    /// <summary>
+    /// <c>bool?</c> is the one type with a second, non-default value worth naming explicitly, so
+    /// <see langword="null" /> moves to both <see langword="false" />, its default, and
+    /// <see langword="true" />.
+    /// </summary>
     [Test]
-    public async Task CreateMutations_NullBooleanLiteral_ReplacesItByDefault()
+    public async Task CreateMutations_NullBooleanLiteral_ReplacesItByDefaultAndByTrue()
     {
         var (tree, mutations) = Run(NullBooleanSource, FindBooleanOrNullLiteral);
 
         using (Assert.Multiple())
         {
-            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations).Count().IsEqualTo(2);
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.null-to-default");
             _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => false");
             _ = await Assert.That(mutations[0].Replacement.IsKind(SyntaxKind.FalseLiteralExpression)).IsTrue();
             _ = await Assert.That(Rewrite(tree, mutations[0])).IsEqualTo(FalseSource);
+
+            _ = await Assert.That(mutations[1].OperatorId).IsEqualTo("nullable-literal.null-to-true");
+            _ = await Assert.That(mutations[1].DisplayName).IsEqualTo("null => true");
+            _ = await Assert.That(mutations[1].Replacement.IsKind(SyntaxKind.TrueLiteralExpression)).IsTrue();
+            _ = await Assert.That(Rewrite(tree, mutations[1])).IsEqualTo(TrueSource);
         }
     }
 
@@ -202,6 +216,37 @@ public class NullableLiteralMutatorTests
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.null-to-default");
             _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => '\\0'");
         }
+    }
+
+    /// <summary>
+    /// <c>Guid</c> has no literal syntax, so <c>null</c> is the only state this operator ever meets for
+    /// it; the default it moves to is written fully qualified, so the mutant compiles whether or not the
+    /// mutated file has a <c>using System;</c>.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NullGuidLiteral_ReplacesItByDefault()
+    {
+        var (tree, mutations) = Run(NullGuidSource, FindBooleanOrNullLiteral);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("nullable-literal.null-to-default");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("null => Guid.Empty");
+            _ = await Assert.That(Rewrite(tree, mutations[0])).Contains("global::System.Guid.Empty");
+        }
+    }
+
+    /// <summary>
+    /// The receiver is resolved semantically against <c>System.Guid</c> specifically, so a same-named
+    /// <c>Guid</c> type declared in another namespace is never mistaken for it.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_NullOtherNamespaceGuidLiteral_ReturnsEmpty()
+    {
+        var (_, mutations) = Run(GuidWrongNamespaceSource, FindBooleanOrNullLiteral);
+
+        _ = await Assert.That(mutations).IsEmpty();
     }
 
     [Test]

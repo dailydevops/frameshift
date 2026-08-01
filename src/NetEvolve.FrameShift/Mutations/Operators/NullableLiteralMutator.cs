@@ -6,8 +6,9 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
-/// Moves a literal of a nullable value type (<c>bool?</c>, a nullable numeric type or <c>char?</c>)
-/// between its written value, <see langword="null" /> and the default value of the underlying type.
+/// Moves a literal of a nullable value type (<c>bool?</c>, a nullable numeric type, <c>char?</c> or
+/// <c>System.Guid?</c>) between its written value, <see langword="null" /> and the default value of the
+/// underlying type.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,24 +28,43 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// <see langword="null" /> mutant, since mutating it to itself would not be a mutation at all.
 /// </para>
 /// <para>
+/// <c>bool?</c> gets one further mutant of its own: <see langword="null" /> also moves to
+/// <see langword="true" />, in addition to <see langword="false" />, its default. Unlike every other
+/// supported type, whose non-default values are an open, unbounded set not worth enumerating,
+/// <see langword="bool" /> has exactly one other value, and three valued logic treats it as its own
+/// case - <c>flag == true</c> behaves differently from <c>flag != false</c> once <c>flag</c> is
+/// <see langword="null" /> - so both directions out of <see langword="null" /> are worth provoking.
+/// </para>
+/// <para>
+/// <c>System.Guid?</c> is included even though <c>Guid</c> has no literal syntax of its own: there is no
+/// way to write a <c>Guid</c> value as a literal token, so this operator only ever encounters one for it
+/// on the <see langword="null" /> side, moving it to <c>Guid.Empty</c>, the type's default value.
+/// </para>
+/// <para>
 /// The converted type is resolved through the semantic model and has to be a nullable value type built
-/// over <see langword="bool" />, <c>char</c> or one of the built-in numeric types, never the
-/// corresponding non-nullable type and never a reference type. The check is load bearing rather than
-/// cosmetic: on a plain, non-nullable type the mutant that introduces <see langword="null" /> does not
-/// compile, and although <c>MutantCompiler</c> would discard it afterwards, it would already have
-/// consumed a slot of the per member mutant budget.
+/// over <see langword="bool" />, <c>char</c>, one of the built-in numeric types or <c>System.Guid</c>,
+/// never the corresponding non-nullable type and never a reference type. The check is load bearing
+/// rather than cosmetic: on a plain, non-nullable type the mutant that introduces <see langword="null" />
+/// does not compile, and although <c>MutantCompiler</c> would discard it afterwards, it would already
+/// have consumed a slot of the per member mutant budget.
 /// </para>
 /// <para>
 /// A <see langword="null" /> literal on a reference type is deliberately out of scope. It belongs to a
 /// separate and considerably riskier family, because the surviving mutant then depends on whether the
 /// dereference is guarded rather than on the presence-of-a-value distinction this operator targets.
-/// Types without a literal syntax of their own - an <see langword="enum" />, <c>DateTime</c> or a
-/// user-defined struct - are equally out of scope, since there is no literal node for this operator to
-/// mutate in the first place.
+/// Other types without a literal syntax of their own - an <see langword="enum" />, <c>DateTime</c> or a
+/// user-defined struct - are equally out of scope, since <c>Guid</c> is special-cased explicitly and
+/// there is no literal node for this operator to mutate for any of the others in the first place.
 /// </para>
 /// </remarks>
 internal sealed class NullableLiteralMutator : MutationOperatorBase
 {
+    /// <summary>
+    /// The metadata name the underlying type is resolved by, so that a same-named type from another
+    /// namespace can never match.
+    /// </summary>
+    private const string GuidMetadataName = "System.Guid";
+
     private static readonly ImmutableArray<SyntaxKind> _supportedSyntaxKinds =
     [
         SyntaxKind.TrueLiteralExpression,
@@ -80,27 +100,61 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
         }
 
         var convertedType = semanticModel.GetTypeInfo(literal, cancellationToken).ConvertedType;
-        if (!TryGetNullableUnderlyingType(convertedType, out var underlyingType))
+        if (!TryGetNullableUnderlyingType(convertedType, semanticModel.Compilation, out var underlyingKind))
         {
             yield break;
         }
 
-        if (literal.IsKind(SyntaxKind.NullLiteralExpression))
-        {
-            var defaultLiteral = CreateDefaultLiteral(underlyingType);
-            if (defaultLiteral is not null)
-            {
-                yield return CreateMutation(
-                    literal,
-                    defaultLiteral,
-                    "null-to-default",
-                    $"null => {defaultLiteral.Token.Text}"
-                );
-            }
+        var mutations = literal.IsKind(SyntaxKind.NullLiteralExpression)
+            ? CreateMutationsForNull(literal, underlyingKind)
+            : CreateMutationsForLiteral(literal, underlyingKind, semanticModel, cancellationToken);
 
-            yield break;
+        foreach (var mutation in mutations)
+        {
+            yield return mutation;
+        }
+    }
+
+    /// <summary>
+    /// Builds the mutations for a <see langword="null" /> literal: a move to the underlying type's
+    /// default value, plus, for <see langword="bool" />, an additional move to <see langword="true" />.
+    /// </summary>
+    private IEnumerable<Mutation> CreateMutationsForNull(LiteralExpressionSyntax literal, UnderlyingKind underlyingKind)
+    {
+        var defaultExpression = CreateDefaultExpression(underlyingKind);
+        if (defaultExpression is not null)
+        {
+            yield return CreateMutation(
+                literal,
+                defaultExpression,
+                "null-to-default",
+                $"null => {DisplayText(underlyingKind, defaultExpression)}"
+            );
         }
 
+        if (underlyingKind == UnderlyingKind.Boolean)
+        {
+            yield return CreateMutation(
+                literal,
+                SyntaxFactory.LiteralExpression(SyntaxKind.TrueLiteralExpression),
+                "null-to-true",
+                "null => true"
+            );
+        }
+    }
+
+    /// <summary>
+    /// Builds the mutations for a written, non-<see langword="null" /> literal: a move to
+    /// <see langword="null" />, plus a move to the underlying type's default value when the literal is
+    /// not that default already.
+    /// </summary>
+    private IEnumerable<Mutation> CreateMutationsForLiteral(
+        LiteralExpressionSyntax literal,
+        UnderlyingKind underlyingKind,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
         yield return CreateMutation(
             literal,
             SyntaxFactory.LiteralExpression(SyntaxKind.NullLiteralExpression),
@@ -108,29 +162,54 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
             $"{literal.Token.Text} => null"
         );
 
-        if (!IsDefaultValue(literal, underlyingType, semanticModel, cancellationToken))
+        if (IsDefaultValue(literal, underlyingKind, semanticModel, cancellationToken))
         {
-            var defaultLiteral = CreateDefaultLiteral(underlyingType);
-            if (defaultLiteral is not null)
-            {
-                yield return CreateMutation(
-                    literal,
-                    defaultLiteral,
-                    "literal-to-default",
-                    $"{literal.Token.Text} => {defaultLiteral.Token.Text}"
-                );
-            }
+            yield break;
+        }
+
+        var defaultExpression = CreateDefaultExpression(underlyingKind);
+        if (defaultExpression is not null)
+        {
+            yield return CreateMutation(
+                literal,
+                defaultExpression,
+                "literal-to-default",
+                $"{literal.Token.Text} => {DisplayText(underlyingKind, defaultExpression)}"
+            );
         }
     }
 
     /// <summary>
-    /// Determines whether <paramref name="type" /> is <c>System.Nullable&lt;T&gt;</c> for a
-    /// <paramref name="underlyingType" /> this operator knows how to build a default-value literal for.
+    /// The underlying types this operator knows how to build a default-value expression for, grouping
+    /// the integral types that are all written as a plain, suffix-less numeric literal.
+    /// </summary>
+    private enum UnderlyingKind
+    {
+        Boolean,
+        Char,
+        Int32OrSmaller,
+        UInt32,
+        Int64,
+        UInt64,
+        Single,
+        Double,
+        Decimal,
+        Guid,
+    }
+
+    /// <summary>
+    /// Determines whether <paramref name="type" /> is <c>System.Nullable&lt;T&gt;</c> for an underlying
+    /// <c>T</c> this operator supports.
     /// </summary>
     /// <param name="type">The type to inspect, which may be <see langword="null" /> for an unresolved node.</param>
-    /// <param name="underlyingType">The special type of <c>T</c> when this method returns <see langword="true" />.</param>
+    /// <param name="compilation">The compilation to resolve <c>System.Guid</c> against.</param>
+    /// <param name="underlyingKind">The kind of <c>T</c> when this method returns <see langword="true" />.</param>
     /// <returns><see langword="true" /> if the type is a supported nullable value type.</returns>
-    private static bool TryGetNullableUnderlyingType(ITypeSymbol? type, out SpecialType underlyingType)
+    private static bool TryGetNullableUnderlyingType(
+        ITypeSymbol? type,
+        Compilation compilation,
+        out UnderlyingKind underlyingKind
+    )
     {
         if (
             type is INamedTypeSymbol named
@@ -138,43 +217,79 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
             && named.TypeArguments.Length == 1
         )
         {
-            underlyingType = named.TypeArguments[0].SpecialType;
+            var underlying = named.TypeArguments[0];
 
-            return underlyingType
-                is SpecialType.System_Boolean
-                    or SpecialType.System_Char
-                    or SpecialType.System_SByte
-                    or SpecialType.System_Byte
-                    or SpecialType.System_Int16
-                    or SpecialType.System_UInt16
-                    or SpecialType.System_Int32
-                    or SpecialType.System_UInt32
-                    or SpecialType.System_Int64
-                    or SpecialType.System_UInt64
-                    or SpecialType.System_Single
-                    or SpecialType.System_Double
-                    or SpecialType.System_Decimal;
+            switch (underlying.SpecialType)
+            {
+                case SpecialType.System_Boolean:
+                    underlyingKind = UnderlyingKind.Boolean;
+                    return true;
+                case SpecialType.System_Char:
+                    underlyingKind = UnderlyingKind.Char;
+                    return true;
+                case SpecialType.System_SByte:
+                case SpecialType.System_Byte:
+                case SpecialType.System_Int16:
+                case SpecialType.System_UInt16:
+                case SpecialType.System_Int32:
+                    underlyingKind = UnderlyingKind.Int32OrSmaller;
+                    return true;
+                case SpecialType.System_UInt32:
+                    underlyingKind = UnderlyingKind.UInt32;
+                    return true;
+                case SpecialType.System_Int64:
+                    underlyingKind = UnderlyingKind.Int64;
+                    return true;
+                case SpecialType.System_UInt64:
+                    underlyingKind = UnderlyingKind.UInt64;
+                    return true;
+                case SpecialType.System_Single:
+                    underlyingKind = UnderlyingKind.Single;
+                    return true;
+                case SpecialType.System_Double:
+                    underlyingKind = UnderlyingKind.Double;
+                    return true;
+                case SpecialType.System_Decimal:
+                    underlyingKind = UnderlyingKind.Decimal;
+                    return true;
+            }
+
+            var guidType = compilation.GetTypeByMetadataName(GuidMetadataName);
+            if (guidType is not null && SymbolEqualityComparer.Default.Equals(underlying, guidType))
+            {
+                underlyingKind = UnderlyingKind.Guid;
+                return true;
+            }
         }
 
-        underlyingType = SpecialType.None;
+        underlyingKind = default;
         return false;
     }
 
     /// <summary>
     /// Determines whether <paramref name="literal" /> already holds the default value of
-    /// <paramref name="underlyingType" />, so that mutating it to that same default would not be a
+    /// <paramref name="underlyingKind" />, so that mutating it to that same default would not be a
     /// mutation at all.
     /// </summary>
+    /// <remarks>
+    /// <c>Guid</c> has no literal syntax, so <paramref name="literal" /> can never actually resolve to it
+    /// here; the case exists only to keep the switch exhaustive.
+    /// </remarks>
     private static bool IsDefaultValue(
         LiteralExpressionSyntax literal,
-        SpecialType underlyingType,
+        UnderlyingKind underlyingKind,
         SemanticModel semanticModel,
         CancellationToken cancellationToken
     )
     {
-        if (underlyingType == SpecialType.System_Boolean)
+        if (underlyingKind == UnderlyingKind.Boolean)
         {
             return literal.IsKind(SyntaxKind.FalseLiteralExpression);
+        }
+
+        if (underlyingKind == UnderlyingKind.Guid)
+        {
+            return false;
         }
 
         var constant = semanticModel.GetConstantValue(literal, cancellationToken);
@@ -202,48 +317,80 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Builds the literal expression for the default value of <paramref name="underlyingType" />.
+    /// Builds the expression for the default value of <paramref name="underlyingKind" />: a literal for
+    /// every built-in type, and <c>global::System.Guid.Empty</c> for <c>Guid</c>, which has no literal of
+    /// its own.
     /// </summary>
-    private static LiteralExpressionSyntax? CreateDefaultLiteral(SpecialType underlyingType) =>
-        underlyingType switch
+    private static ExpressionSyntax? CreateDefaultExpression(UnderlyingKind underlyingKind) =>
+        underlyingKind switch
         {
-            SpecialType.System_Boolean => SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression),
-            SpecialType.System_Char => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Boolean => SyntaxFactory.LiteralExpression(SyntaxKind.FalseLiteralExpression),
+            UnderlyingKind.Char => SyntaxFactory.LiteralExpression(
                 SyntaxKind.CharacterLiteralExpression,
                 SyntaxFactory.Literal('\0')
             ),
-            SpecialType.System_SByte
-            or SpecialType.System_Byte
-            or SpecialType.System_Int16
-            or SpecialType.System_UInt16
-            or SpecialType.System_Int32 => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Int32OrSmaller => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0)
             ),
-            SpecialType.System_UInt32 => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.UInt32 => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0U)
             ),
-            SpecialType.System_Int64 => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Int64 => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0L)
             ),
-            SpecialType.System_UInt64 => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.UInt64 => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0UL)
             ),
-            SpecialType.System_Single => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Single => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0F)
             ),
-            SpecialType.System_Double => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Double => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0D)
             ),
-            SpecialType.System_Decimal => SyntaxFactory.LiteralExpression(
+            UnderlyingKind.Decimal => SyntaxFactory.LiteralExpression(
                 SyntaxKind.NumericLiteralExpression,
                 SyntaxFactory.Literal(0M)
             ),
+            UnderlyingKind.Guid => CreateGloballyQualifiedMemberAccess("System", "Guid", "Empty"),
             _ => null,
         };
+
+    /// <summary>
+    /// The human-readable text for a default-value expression, which is the expression's own text for a
+    /// plain literal, and the short, unqualified <c>Guid.Empty</c> for the globally-qualified expression
+    /// this operator builds for <c>Guid</c>.
+    /// </summary>
+    private static string DisplayText(UnderlyingKind underlyingKind, ExpressionSyntax defaultExpression) =>
+        underlyingKind == UnderlyingKind.Guid ? "Guid.Empty" : defaultExpression.ToString();
+
+    /// <summary>
+    /// Builds <c>global::</c><paramref name="namespaceName" />.<paramref name="typeName" />.
+    /// <paramref name="memberName" />, fully qualified so the mutant resolves regardless of what the
+    /// mutated file has - or has not - imported.
+    /// </summary>
+    private static MemberAccessExpressionSyntax CreateGloballyQualifiedMemberAccess(
+        string namespaceName,
+        string typeName,
+        string memberName
+    )
+    {
+        var globalNamespace = SyntaxFactory.AliasQualifiedName(
+            SyntaxFactory.IdentifierName(SyntaxFactory.Token(SyntaxKind.GlobalKeyword)),
+            SyntaxFactory.IdentifierName(namespaceName)
+        );
+
+        var qualifiedType = SyntaxFactory.QualifiedName(globalNamespace, SyntaxFactory.IdentifierName(typeName));
+
+        return SyntaxFactory.MemberAccessExpression(
+            SyntaxKind.SimpleMemberAccessExpression,
+            qualifiedType,
+            SyntaxFactory.IdentifierName(memberName)
+        );
+    }
 }
