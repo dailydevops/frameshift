@@ -14,7 +14,7 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 36 mutation operators covering arithmetic operators and compound assignments, relational and
+- 37 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical operators (including boolean exclusive-or), conditional expressions
   (branch swap, condition negation, and forcing the condition to `true`/`false`), bitwise/shift
   operators and their compound assignments, logical negation, increment/decrement, unary operators,
@@ -23,6 +23,14 @@ next to every other compiler diagnostic.
   `IsNullOrEmpty`/`IsNullOrWhiteSpace` - a `System.Math` method operator, the element list of
   array/collection initializers and collection expressions, statement removal, checked/unchecked
   context, and the two families below.
+- An optional argument removal operator that drops the trailing `StringComparer`,
+  `IComparer<T>` or `IEqualityComparer<T>` argument of an object creation - for example
+  `new Dictionary<string, string>(StringComparer.Ordinal)` becomes
+  `new Dictionary<string, string>()` - whenever a same-type overload without that argument exists.
+  Unlike the `IFormatProvider` removal of the culture-sensitivity family below, the mutant is only
+  ever offered once the constructor the mutated call would bind to is confirmed, through the
+  semantic model, to belong to the very same type; a call whose only constructor requires the
+  comparer, or where the comparer is needed to disambiguate the remaining arguments, is left alone.
 - A statement removal operator that drops a whole statement outright - replacing it with an empty
   statement `;` - covering four constructs: a bare `return;` inside a `void` returning method, local
   function or lambda (skipped when it is the trailing statement of the member's own body, which would
