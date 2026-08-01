@@ -72,6 +72,51 @@ public class MathMethodMutatorTests
         }
         """;
 
+    /// <summary>
+    /// A call brought in through <c>using static System.Math;</c> is invoked as a bare identifier rather
+    /// than through a member access, so it never reaches the semantic-model lookup at all.
+    /// </summary>
+    private const string BareIdentifierSource = """
+        using static System.Math;
+
+        internal static class Computations
+        {
+            public static double Compute(double value) => /*!*/Sin(value);
+        }
+        """;
+
+    /// <summary>
+    /// A call the semantic model cannot resolve to any method at all - here, an ambiguous extension
+    /// method brought in from two namespaces - binds to no <see cref="IMethodSymbol" />, which the
+    /// operator has to reject rather than crash on. Mirrors <c>StringMethodMutatorTests</c>' own
+    /// unresolved-invocation fixture, adapted to a <see cref="double" /> receiver.
+    /// </summary>
+    private const string UnresolvedCallSource = """
+        using NamespaceA;
+        using NamespaceB;
+
+        namespace NamespaceA
+        {
+            internal static class Ext
+            {
+                internal static void Handle(this double value) { }
+            }
+        }
+
+        namespace NamespaceB
+        {
+            internal static class Ext
+            {
+                internal static void Handle(this double value) { }
+            }
+        }
+
+        internal static class Computations
+        {
+            public static void Compute(double value) => /*!*/value.Handle();
+        }
+        """;
+
     private static readonly MathMethodMutator _mutator = new MathMethodMutator();
 
     [Test]
@@ -360,6 +405,98 @@ public class MathMethodMutatorTests
             _ = await Assert.That(mutations.ToArray()).IsEmpty();
         }
     }
+
+    /// <summary>
+    /// A call to a well-known <see cref="System.Math" /> method brought in via <c>using static</c> is
+    /// invoked as a bare identifier, not as a member access; the operator's first guard rejects it before
+    /// the semantic model is ever consulted.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_BareIdentifierInvocation_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, errors) = Mutate(
+            BareIdentifierSource,
+            SyntaxNodeLocator.FindMarked<InvocationExpressionSyntax>
+        );
+        var invocation = (InvocationExpressionSyntax)node;
+        var method = model.GetSymbolInfo(invocation).Symbol as IMethodSymbol;
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(invocation.Expression).IsNotAssignableTo<MemberAccessExpressionSyntax>();
+            _ = await Assert.That(method?.Name).IsEqualTo("Sin");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
+    }
+
+    /// <summary>
+    /// A call the semantic model cannot resolve to a single method - here, an ambiguous extension method
+    /// call - binds to no <see cref="IMethodSymbol" /> at all, which the operator has to reject rather
+    /// than crash on.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_UnresolvedInvocation_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, errors) = Mutate(
+            UnresolvedCallSource,
+            SyntaxNodeLocator.FindMarked<InvocationExpressionSyntax>
+        );
+        var invocation = (InvocationExpressionSyntax)node;
+        var symbol = model.GetSymbolInfo(invocation).Symbol;
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsNotEqualTo(string.Empty);
+            _ = await Assert.That(symbol as IMethodSymbol).IsNull();
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
+    }
+
+    /// <summary>
+    /// <see cref="System.Math" /> declares every counterpart pair this operator knows with matching
+    /// parameter shapes on both sides - <c>Sin</c>/<c>Cos</c>, <c>Asin</c>/<c>Acos</c>, <c>Tan</c>/
+    /// <c>Atan</c> and <c>Sinh</c>/<c>Cosh</c> only for <see cref="double" />, and <c>Min</c>/<c>Max</c>
+    /// as well as <c>Floor</c>/<c>Ceiling</c> for every numeric type either declares an overload for.
+    /// There is therefore no well-known <see cref="System.Math" /> call whose counterpart name exists but
+    /// whose parameter shape does not match, which makes the <c>!HasMatchingOverload</c> branch in
+    /// <see cref="MathMethodMutator" /> unreachable through this operator's own counterpart table; it
+    /// only guards against a hypothetical future counterpart pair that is not symmetrical this way. This
+    /// test pins down that symmetry for every pair the operator currently maps, so a change that breaks
+    /// it is caught here rather than by a missing mutation somewhere else.
+    /// </summary>
+    [Test]
+    [Arguments("Sin", "Cos")]
+    [Arguments("Asin", "Acos")]
+    [Arguments("Tan", "Atan")]
+    [Arguments("Sinh", "Cosh")]
+    [Arguments("Min", "Max")]
+    [Arguments("Floor", "Ceiling")]
+    public async Task MathCounterpartPairs_Always_DeclareMatchingOverloadsBothWays(string first, string second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+
+        var mathType = typeof(Math);
+        var firstShapes = ParameterShapes(mathType, first);
+        var secondShapes = ParameterShapes(mathType, second);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(firstShapes).IsNotEmpty();
+            _ = await Assert.That(secondShapes).IsEquivalentTo(firstShapes);
+        }
+    }
+
+    private static string[] ParameterShapes(Type type, string methodName) =>
+        [
+            .. type.GetMethods()
+                .Where(candidate => string.Equals(candidate.Name, methodName, StringComparison.Ordinal))
+                .Select(candidate =>
+                    string.Join(",", candidate.GetParameters().Select(parameter => parameter.ParameterType.Name))
+                )
+                .OrderBy(shape => shape, StringComparer.Ordinal),
+        ];
 
     private static string CreateUnarySource(string type, string methodName) =>
         UnaryCallTemplate
