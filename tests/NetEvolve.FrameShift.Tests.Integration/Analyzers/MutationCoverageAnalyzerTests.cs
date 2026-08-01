@@ -36,6 +36,7 @@ public class MutationCoverageAnalyzerTests
     private const string AddMemberId = "M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32";
     private const string IgnoreMemberId = "M:Fixture.Gap.Ignore(System.Int32)";
     private const string CombineMemberId = "M:Fixture.Gap.Combine(System.Int32)~System.Int32";
+    private const string CoveredLogMemberId = "M:Fixture.Covered.Log(System.String)";
 
     /// <summary>
     /// The test method id the manifests of the reachability tests are attributed to. Those tests state
@@ -89,6 +90,8 @@ public class MutationCoverageAnalyzerTests
     private const int NormalizeMemberLine = 12;
     private const int MultiplyMemberLine = 20;
     private const int CombineMemberLine = 15;
+    private const int CoveredLogLine = 9;
+    private const int UncoveredLogLine = 17;
 
     /// <summary>
     /// The number of meaningful mutants <c>Gap.Combine</c> of <see cref="BudgetSource" /> carries, and the
@@ -301,6 +304,33 @@ public class MutationCoverageAnalyzerTests
         """;
 
     /// <summary>
+    /// Two members with identical shape, each a standalone <c>void</c> invocation statement - the
+    /// statement removal operator's invocation construct. <c>Covered.Log</c> sits on line 9,
+    /// <c>Uncovered.Log</c> on line 17.
+    /// </summary>
+    private const string StatementRemovalSource = """
+        namespace Fixture;
+
+        using System;
+
+        public static class Covered
+        {
+            public static void Log(string message)
+            {
+                Console.WriteLine(message);
+            }
+        }
+
+        public static class Uncovered
+        {
+            public static void Log(string message)
+            {
+                Console.WriteLine(message);
+            }
+        }
+        """;
+
+    /// <summary>
     /// Three interchangeable members on lines 7, 15 and 23, so that each manifest can cover exactly
     /// one of them.
     /// </summary>
@@ -502,6 +532,32 @@ public class MutationCoverageAnalyzerTests
                 .That(gaps.Select(summary => summary.Line).Distinct())
                 .IsEquivalentTo(new[] { TrivialFixtureGapLine });
             _ = await Assert.That(trivial.Select(summary => summary.Message)).Contains(DiscardedTrivialMessage);
+        }
+    }
+
+    /// <summary>
+    /// Drives the statement removal operator's invocation construct end to end: <c>Covered.Log</c> is
+    /// reached by the manifest and reports nothing, while the identically shaped <c>Uncovered.Log</c>
+    /// is not reached and reports the removal of its standalone <c>Console.WriteLine</c> call as a gap.
+    /// </summary>
+    [Test]
+    public async Task Analyze_StatementRemovalInvocationConstruct_ReportsOnlyTheUncoveredMember()
+    {
+        var compilation = CompilationFactory.Create(StatementRemovalSource, ProductionAssemblyName);
+
+        var diagnostics = await RunAsync(compilation, [CreateManifest(CoveredLogMemberId)]).ConfigureAwait(false);
+        var gaps = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint);
+        var lines = DiagnosticAssertions.Summarise(gaps).Select(summary => summary.Line);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
+            _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { UncoveredLogLine });
+            _ = await Assert.That(lines.Where(line => line == CoveredLogLine)).IsEmpty();
+            _ = await Assert
+                .That(DiagnosticAssertions.Describe(gaps))
+                .Contains("Mutation 'Console.WriteLine(message) => (removed)'");
         }
     }
 

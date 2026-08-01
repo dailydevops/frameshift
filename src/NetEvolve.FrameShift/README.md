@@ -14,14 +14,24 @@ next to every other compiler diagnostic.
 
 - Build-time gap detection - the analysis runs inside the compiler, so nothing is executed,
   scheduled or spawned, and the result appears in the build log and in the IDE error list.
-- 34 mutation operators covering arithmetic operators and compound assignments, relational and
+- 35 mutation operators covering arithmetic operators and compound assignments, relational and
   equality operators, logical operators (including boolean exclusive-or), conditional expressions
   (branch swap, condition negation, and forcing the condition to `true`/`false`), bitwise/shift
   operators and their compound assignments, logical negation, increment/decrement, unary operators,
   null-coalescing (including the `??=` assignment), boolean, numeric and string literals, well
   known `System.String` method calls - `StartsWith`/`EndsWith`, `Trim`/`TrimStart`/`TrimEnd` and
   `IsNullOrEmpty`/`IsNullOrWhiteSpace` - a `System.Math` method operator, the element list of
-  array/collection initializers and collection expressions, and the two families below.
+  array/collection initializers and collection expressions, statement removal, and the two families
+  below.
+- A statement removal operator that drops a whole statement outright - replacing it with an empty
+  statement `;` - covering four constructs: a bare `return;` inside a `void` returning method, local
+  function or lambda (skipped when it is the trailing statement of the member's own body, which would
+  be a no-op); a loop `break` or `continue` (a `break` whose nearest enclosing breakable construct is a
+  `switch` rather than a loop is left alone, since that changes fall-through semantics instead); a
+  `throw` statement (skipped when it is the trailing statement of a non-`void` member's body, which the
+  compiler would reject); and a standalone invocation of a `void` returning method with no `ref` or
+  `out` arguments. These are the early exits, loop-flow changes, guards and discarded side-effecting
+  calls a test suite never notices going missing.
 - A nullable boolean literal operator that moves a literal of type `bool?` between all three states of
   three-valued logic - `true` and `false` become `null`, and `null` becomes both of them. The converted
   type is resolved through the semantic model, so a literal on a plain `bool` is never touched. It is

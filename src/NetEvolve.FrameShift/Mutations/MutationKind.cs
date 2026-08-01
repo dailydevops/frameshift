@@ -227,4 +227,14 @@ internal enum MutationKind
     /// indistinguishable from the original to a test suite that never inspects its contents.
     /// </summary>
     CollectionInitializer,
+
+    /// <summary>
+    /// Whole statements removed outright: a bare <c>return;</c> inside a <see langword="void" />
+    /// returning member, a loop <c>break</c> or <c>continue</c>, a <c>throw</c> statement, and a
+    /// standalone invocation of a <see langword="void" /> returning method with no <c>ref</c> or
+    /// <c>out</c> arguments. A test suite that never distinguishes the statement being there from it
+    /// being gone cannot tell an early return, a changed loop exit, a silently skipped guard or a
+    /// discarded side-effecting call apart from the code that no longer has it.
+    /// </summary>
+    StatementRemoval,
 }
