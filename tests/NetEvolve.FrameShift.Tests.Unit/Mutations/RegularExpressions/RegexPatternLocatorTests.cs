@@ -1195,6 +1195,55 @@ public class RegexPatternLocatorTests
     }
 
     /// <summary>
+    /// Pins the behaviour a per-compilation cache of the well-known type symbols must not change: every
+    /// candidate literal in a fixture with many of them - a static-method call and a constructor call, each
+    /// repeated several times with an options argument - still resolves to exactly the site its call form
+    /// implies, all of them read through the same <see cref="SemanticModel" /> and hence the same
+    /// <see cref="Compilation" />. This is the safety net a resolve-once-per-compilation refactor has to
+    /// keep passing.
+    /// </summary>
+    [Test]
+    public async Task TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly()
+    {
+        var statements = string.Join(
+            "\n        ",
+            Enumerable
+                .Range(0, 25)
+                .Select(index =>
+                    $"_ = Regex.IsMatch(input, \"a{index}+\", RegexOptions.IgnoreCase); _ = new Regex(\"b{index}+\");"
+                )
+        );
+        var (semanticModel, tree) = CreateFixture(CreateCallSource(statements));
+        var literals = SyntaxNodeLocator.FindAll<LiteralExpressionSyntax>(tree);
+        var sites = literals
+            .Select(literal => RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None))
+            .ToArray();
+
+        _ = await Assert.That(sites).HasCount().EqualTo(50);
+
+        foreach (var site in sites)
+        {
+            _ = await Assert.That(site).IsNotNull();
+        }
+
+        var staticMethodSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexStaticMethod).ToArray();
+        var constructorSites = sites.Where(site => site!.Origin == RegexPatternOrigin.RegexConstructor).ToArray();
+
+        _ = await Assert.That(staticMethodSites).HasCount().EqualTo(25);
+        _ = await Assert.That(constructorSites).HasCount().EqualTo(25);
+
+        foreach (var site in staticMethodSites)
+        {
+            _ = await Assert.That(site!.Options).IsEqualTo(RegexOptions.IgnoreCase);
+        }
+
+        foreach (var site in constructorSites)
+        {
+            _ = await Assert.That(site!.Options).IsEqualTo(RegexOptions.None);
+        }
+    }
+
+    /// <summary>
     /// The sources of <see cref="TryLocate_SameNamedRegexTypeOfAnotherNamespace_ReturnsNull" />.
     /// </summary>
     /// <returns>The two fixtures, one per detection form of the look-alike type.</returns>
