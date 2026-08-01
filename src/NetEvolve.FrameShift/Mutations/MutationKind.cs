@@ -211,4 +211,12 @@ internal enum MutationKind
     /// pinning it down until the call is renamed.
     /// </summary>
     LinqMethod,
+
+    /// <summary>
+    /// Calls to well-known <c>System.Math</c> static methods, replaced by a related method such as
+    /// <c>Sin</c> by <c>Cos</c>, <c>Min</c> by <c>Max</c> or <c>Floor</c> by <c>Ceiling</c>, or with
+    /// <c>Math.Abs</c> dropped entirely. Picking the wrong function of the same shape is a defect no test
+    /// suite exercising only one branch of the computation notices.
+    /// </summary>
+    MathMethod,
 }
