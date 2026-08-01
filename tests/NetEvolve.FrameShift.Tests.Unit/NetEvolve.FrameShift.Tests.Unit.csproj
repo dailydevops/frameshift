@@ -42,6 +42,10 @@
     <PackageReference Include="TUnit" />
     <PackageReference Include="Verify.TUnit" />
   </ItemGroup>
+  <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net481' ">
+    <!-- Gives the Span/ReadOnlySpan fixtures of CollectionInitializerMutatorTests the real types on .NET Framework. -->
+    <PackageReference Include="System.Memory" />
+  </ItemGroup>
   <ItemGroup Label="Test framework metadata, compile-time only">
     <PackageReference Include="MSTest.TestFramework" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
     <PackageReference Include="NUnit" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
