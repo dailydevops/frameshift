@@ -53,6 +53,7 @@ internal static class MutationOperatorRegistry
         yield return new Operators.LinqMethodMutator();
         yield return new Operators.LogicalNegationMutator();
         yield return new Operators.LogicalOperatorMutator();
+        yield return new Operators.MathMethodMutator();
         yield return new Operators.NullableBooleanLiteralMutator();
         yield return new Operators.NullCoalescingMutator();
         yield return new Operators.NumericLiteralMutator();
