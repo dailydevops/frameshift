@@ -243,4 +243,12 @@ internal enum MutationKind
     /// discarded side-effecting call apart from the code that no longer has it.
     /// </summary>
     StatementRemoval,
+
+    /// <summary>
+    /// The trailing <c>System.StringComparer</c>, <c>IComparer&lt;T&gt;</c> or
+    /// <c>IEqualityComparer&lt;T&gt;</c> argument of an object creation, removed so that the call resolves
+    /// to a same-type overload with no comparer at all. A test suite that never asserts on comparer
+    /// sensitive behaviour cannot tell whether a non-default comparer was needed in the first place.
+    /// </summary>
+    OptionalArgumentRemoval,
 }
