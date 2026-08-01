@@ -132,6 +132,58 @@ public class CollectionInitializerMutatorTests
         }
         """;
 
+    /// <summary>
+    /// An attribute argument is one of the few places an array initializer is legal syntax, and it is a
+    /// compile time constant context, so <see cref="ConstantContext.IsRequired(SyntaxNode)" /> must refuse
+    /// the initializer here even though it carries more than one element.
+    /// </summary>
+    private const string AttributeArgumentArrayInitializerSource = """
+        namespace Fixtures;
+
+        internal sealed class NumbersAttribute : System.Attribute
+        {
+            public NumbersAttribute(int[] values) => Values = values;
+
+            public int[] Values { get; }
+        }
+
+        [Numbers(new[] { 1, 2, 3 })]
+        internal static class Sample
+        {
+        }
+        """;
+
+    /// <summary>
+    /// A default parameter value is a compile time constant context as well. This fixture deliberately
+    /// does not compile - a collection expression is not itself a constant - but it is the only way to
+    /// place the collection expression in a position <see cref="ConstantContext.IsRequired(SyntaxNode)" />
+    /// has to refuse.
+    /// </summary>
+    private const string DefaultParameterCollectionExpressionSource = """
+        internal static class Sample
+        {
+            public static void Convert(int[] values = [1, 2, 3]) { }
+        }
+        """;
+
+    private const string EmptyCollectionExpressionReadOnlySpanSource = """
+        using System;
+
+        internal static class Sample
+        {
+            public static ReadOnlySpan<int> Values() => [];
+        }
+        """;
+
+    private const string EmptyCollectionExpressionSpanSource = """
+        using System;
+
+        internal static class Sample
+        {
+            public static Span<int> Values() => [];
+        }
+        """;
+
     [Test]
     public async Task Metadata_Operator_DescribesCollectionInitializerFamily()
     {
@@ -320,6 +372,70 @@ public class CollectionInitializerMutatorTests
         var (_, mutations) = RunCollectionExpression(EmptyCollectionExpressionUnconstrainedGenericSource);
 
         _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// An array initializer sitting in an attribute argument must never be emptied, no matter how many
+    /// elements it carries, because <see cref="ConstantContext.IsRequired(SyntaxNode)" /> refuses the
+    /// position before the element count is ever considered.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_ArrayInitializerInAttributeArgument_ReturnsEmpty()
+    {
+        var (_, mutations) = RunInitializer(AttributeArgumentArrayInitializerSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A collection expression sitting in a default parameter value must never be emptied either, for the
+    /// same reason: the position is a compile time constant context.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_CollectionExpressionInDefaultParameterValue_ReturnsEmpty()
+    {
+        var (_, mutations) = RunCollectionExpression(DefaultParameterCollectionExpressionSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    /// <summary>
+    /// A <see cref="System.ReadOnlySpan{T}" />-returning member exercises the <c>Span</c>/<c>ReadOnlySpan</c>
+    /// branch of <c>ResolveElementType</c>, which is distinct from both the array and the
+    /// <see cref="System.Collections.Generic.IEnumerable{T}" /> paths.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EmptyCollectionExpressionTargetingReadOnlySpan_OffersDefaultElement()
+    {
+        var (tree, mutations) = RunCollectionExpression(EmptyCollectionExpressionReadOnlySpanSource);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("collection-initializer.empty-to-default");
+            _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("[] => [default]");
+            _ = await Assert
+                .That(Rewrite(tree, mutations[0]))
+                .IsEqualTo(
+                    EmptyCollectionExpressionReadOnlySpanSource.Replace("[]", "[default]", StringComparison.Ordinal)
+                );
+        }
+    }
+
+    /// <summary>
+    /// A <see cref="System.Span{T}" />-returning member hits the same <c>Span</c>/<c>ReadOnlySpan</c> branch,
+    /// just through the mutable span type rather than the read only one.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_EmptyCollectionExpressionTargetingSpan_OffersDefaultElement()
+    {
+        var (_, mutations) = RunCollectionExpression(EmptyCollectionExpressionSpanSource);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("collection-initializer.empty-to-default");
+        }
     }
 
     [Test]

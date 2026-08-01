@@ -288,7 +288,15 @@ internal static class ReferenceAssemblies
         return MetadataReference.CreateFromFile(location);
     }
 
-    private static ImmutableArray<MetadataReference> CreateDefault() => CreateReferences(_frameworkPaths.Value);
+    private static ImmutableArray<MetadataReference> CreateDefault() =>
+#if NETFRAMEWORK
+        // .NET Framework never shipped Span{T}/ReadOnlySpan{T}; the System.Memory package is what a
+        // fixture using either type needs to resolve them the same way it does on .NET, where they are
+        // already part of the runtime the trusted-platform-assemblies path picks up.
+        CreateWith(SystemMemoryAnchors);
+#else
+        CreateReferences(_frameworkPaths.Value);
+#endif
 
     private static ImmutableArray<MetadataReference> CreateWithTUnit() => CreateWith(TUnitAnchors);
 
@@ -346,6 +354,15 @@ internal static class ReferenceAssemblies
     /// The seed of the MSTest reference set.
     /// </summary>
     private static Type[] MSTestAnchors => [typeof(MSTestFramework.TestMethodAttribute)];
+
+#if NETFRAMEWORK
+    /// <summary>
+    /// The seed of the .NET Framework <c>System.Memory</c> reference, added to <see cref="Default" /> so
+    /// that a fixture declaring a <see cref="Span{T}" /> or <see cref="ReadOnlySpan{T}" /> member resolves
+    /// on .NET Framework the same way it does on .NET.
+    /// </summary>
+    private static Type[] SystemMemoryAnchors => [typeof(Span<int>)];
+#endif
 
     /// <summary>
     /// Builds <see cref="Default" /> plus the assembly graph reachable from every anchor.
