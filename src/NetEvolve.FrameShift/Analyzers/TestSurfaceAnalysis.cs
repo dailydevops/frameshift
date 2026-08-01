@@ -1,7 +1,9 @@
 namespace NetEvolve.FrameShift.Analyzers;
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
@@ -71,6 +73,56 @@ using NetEvolve.FrameShift.TestSurface;
 /// </remarks>
 internal static class TestSurfaceAnalysis
 {
+    /// <summary>
+    /// Caches, per analysed <see cref="Compilation" />, the tests-without-production-reference result of
+    /// every awake framework, keyed by the <see cref="ITestFrameworkProbe" /> type that produced it.
+    /// </summary>
+    /// <remarks>
+    /// A test project on which several framework analyzers are awake used to walk
+    /// <see cref="TestSurfaceCollector.FindTestsWithoutProductionReference" /> for every one of the earlier
+    /// frameworks again, once per later analyzer that had to dedupe against it — on top of that framework's
+    /// own walk of itself. This cache makes that walk run at most once per compilation and framework,
+    /// however many awake frameworks end up asking for it. The outer table is keyed by
+    /// <see cref="Compilation" /> and evicted by the garbage collector together with it, so nothing here
+    /// outlives the compilation it was computed for; the inner dictionary is a
+    /// <see cref="ConcurrentDictionary{TKey,TValue}" /> because analyzers may run concurrently within one
+    /// compilation, and two framework analyzers racing to populate the very same entry must still only
+    /// compute it once between them (or, in the rare case both start before either publishes, keep only one
+    /// of their equal results — never corrupt shared state).
+    /// </remarks>
+    private static readonly ConditionalWeakTable<
+        Compilation,
+        ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>
+    > TestsWithoutProductionReferenceCache = new();
+
+    /// <summary>
+    /// Gets the tests of <paramref name="probe" />'s framework that reference no production member,
+    /// computing them once per <paramref name="compilation" /> and framework and reusing the result for
+    /// every later analyzer invocation that asks for the same pair.
+    /// </summary>
+    /// <param name="compilation">The test compilation to inspect.</param>
+    /// <param name="probe">The probe identifying the framework the result is cached under.</param>
+    /// <param name="recognizer">The recogniser deciding which methods are test methods of that framework.</param>
+    /// <param name="cancellationToken">A token to observe while collecting, on a cache miss.</param>
+    /// <returns>The test methods without any production reference, in declaration order.</returns>
+    internal static ImmutableArray<IMethodSymbol> GetTestsWithoutProductionReference(
+        Compilation compilation,
+        ITestFrameworkProbe probe,
+        ITestMethodRecognizer recognizer,
+        CancellationToken cancellationToken
+    )
+    {
+        var perCompilation = TestsWithoutProductionReferenceCache.GetValue(
+            compilation,
+            static _ => new ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>()
+        );
+
+        return perCompilation.GetOrAdd(
+            probe.GetType(),
+            _ => TestSurfaceCollector.FindTestsWithoutProductionReference(compilation, recognizer, cancellationToken)
+        );
+    }
+
     /// <summary>
     /// Runs the test-side analysis for the framework <paramref name="probe" /> detects. Reports
     /// <c>FSH0004</c> for the tests of that framework that no earlier awake framework already reports,
@@ -250,8 +302,9 @@ internal static class TestSurfaceAnalysis
     {
         var reported = CollectReportsOfPrecedingFrameworks(context, probe, awake);
 
-        var testMethods = TestSurfaceCollector.FindTestsWithoutProductionReference(
+        var testMethods = GetTestsWithoutProductionReference(
             context.Compilation,
+            probe,
             recognizer,
             context.CancellationToken
         );
@@ -307,8 +360,9 @@ internal static class TestSurfaceAnalysis
         {
             context.CancellationToken.ThrowIfCancellationRequested();
 
-            var testMethods = TestSurfaceCollector.FindTestsWithoutProductionReference(
+            var testMethods = GetTestsWithoutProductionReference(
                 context.Compilation,
+                framework.Probe,
                 framework.Recognizer,
                 context.CancellationToken
             );
