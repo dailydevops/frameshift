@@ -1,6 +1,7 @@
 namespace NetEvolve.FrameShift.TestSurface;
 
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -363,7 +364,9 @@ internal sealed class XunitTestCaseCounter
             ImplicitArrayCreationExpressionSyntax array => array.Initializer.Expressions.Count,
             ArrayCreationExpressionSyntax array => array.Initializer?.Expressions.Count,
             BaseObjectCreationExpressionSyntax creation => GetCollectionInitializerLength(creation.Initializer),
-            CollectionExpressionSyntax collection => collection.Elements.Count,
+            CollectionExpressionSyntax collection => collection.Elements.Any(element => element is SpreadElementSyntax)
+                ? null
+                : collection.Elements.Count,
             InitializerExpressionSyntax initializer => initializer.Expressions.Count,
             _ => null,
         };
