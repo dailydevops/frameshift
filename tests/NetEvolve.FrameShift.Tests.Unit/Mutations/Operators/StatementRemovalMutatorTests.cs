@@ -355,6 +355,60 @@ public class StatementRemovalMutatorTests
         }
         """;
 
+    private const string InvocationWithInArgumentSource = """
+        public static class Sample
+        {
+            public static void Read(in int value) { }
+
+            public static void Run()
+            {
+                var number = 1;
+                Read(in number);
+            }
+        }
+        """;
+
+    private const string ReturnInPropertySetterSource = """
+        public static class Sample
+        {
+            private static int _value;
+
+            public static int Value
+            {
+                get => _value;
+                set
+                {
+                    if (value < 0)
+                    {
+                        return;
+                    }
+
+                    _value = value;
+                }
+            }
+        }
+        """;
+
+    private const string ReturnInConstructorSource = """
+        public static class Holder
+        {
+            public static int Value;
+        }
+
+        public class Sample
+        {
+            public Sample(bool flag)
+            {
+                if (flag)
+                {
+                    return;
+                }
+
+                Holder.Value = 1;
+            }
+        }
+        """;
+
     [Test]
     public async Task Metadata_Operator_DescribesStatementRemovalFamily()
     {
@@ -599,6 +653,45 @@ public class StatementRemovalMutatorTests
     public async Task CreateMutations_InvocationWithUnresolvedSymbol_ReturnsEmpty()
     {
         var (_, mutations) = Run<ExpressionStatementSyntax>(InvocationUnresolvedSymbolSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_InvocationWithInArgument_RemovesIt()
+    {
+        // The by-ref guard only checks for `ref`/`out` argument keywords; an `in` argument is not
+        // considered by-ref for this purpose, so the invocation is still removed. This pins down that
+        // currently-intended behavior explicitly.
+        var (tree, mutations) = Run<ExpressionStatementSyntax>(InvocationWithInArgumentSource);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(mutations).Count().IsEqualTo(1);
+            _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("statement-removal.invocation");
+            _ = await Assert.That(CompilationFactory.GetCompileErrors(Compile(Rewrite(tree, mutations[0])))).IsEmpty();
+        }
+    }
+
+    [Test]
+    public async Task CreateMutations_ReturnInPropertySetter_ReturnsEmpty()
+    {
+        // Documents that `FindContainingExecutableMember` finds an `AccessorDeclarationSyntax` owner for
+        // a `return;` inside a property setter, but `CreateForReturn`'s owner-shape guard only accepts
+        // MethodDeclarationSyntax, LocalFunctionStatementSyntax or AnonymousFunctionExpressionSyntax, so
+        // a setter's `return;` is never removed.
+        var (_, mutations) = Run<ReturnStatementSyntax>(ReturnInPropertySetterSource);
+
+        _ = await Assert.That(mutations).IsEmpty();
+    }
+
+    [Test]
+    public async Task CreateMutations_ReturnInConstructor_ReturnsEmpty()
+    {
+        // Documents that `FindContainingExecutableMember` finds a `ConstructorDeclarationSyntax` owner
+        // (a BaseMethodDeclarationSyntax) for a `return;` inside a constructor body, but
+        // `CreateForReturn`'s owner-shape guard rejects it, so a constructor's `return;` is never removed.
+        var (_, mutations) = Run<ReturnStatementSyntax>(ReturnInConstructorSource);
 
         _ = await Assert.That(mutations).IsEmpty();
     }
