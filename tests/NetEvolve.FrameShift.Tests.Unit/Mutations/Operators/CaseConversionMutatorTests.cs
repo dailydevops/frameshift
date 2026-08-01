@@ -109,6 +109,18 @@ public class CaseConversionMutatorTests
         }
         """;
 
+    private const string StaticUserDefinedSource = """
+        internal static class Label
+        {
+            public static string ToUpper(string value) => value;
+        }
+
+        internal static class Conversions
+        {
+            public static string Convert(string value) => Label.ToUpper(value);
+        }
+        """;
+
     private const string CharSource = """
         internal static class Conversions
         {
@@ -563,6 +575,33 @@ public class CaseConversionMutatorTests
             _ = await Assert.That(errors).IsEqualTo(string.Empty);
             _ = await Assert.That(method?.Name).IsEqualTo(methodName);
             _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Label");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
+    }
+
+    /// <summary>
+    /// A user-defined <see langword="static" /> method named like a conversion is otherwise
+    /// indistinguishable from a valid call: its <see cref="MethodKind" /> is <see cref="MethodKind.Ordinary" />,
+    /// it is not an extension method, its name is one of the four well-known ones and its single
+    /// <see cref="string" /> parameter matches <c>HasExpectedParameters</c>. Only the <c>IsStatic</c>
+    /// guard keeps it from being treated as a conversion of <see cref="string" />, so this fixture pins
+    /// that guard down in isolation instead of it being incidentally covered by a fixture whose containing
+    /// type would have failed the later check regardless.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_StaticConversionOnAnotherType_ReturnsEmpty()
+    {
+        var (mutations, node, _, model, errors) = MutateCall(StaticUserDefinedSource, "ToUpper");
+        var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(errors).IsEqualTo(string.Empty);
+            _ = await Assert.That(method?.Name).IsEqualTo("ToUpper");
+            _ = await Assert.That(method?.ContainingType.Name).IsEqualTo("Label");
+            _ = await Assert.That(method?.MethodKind).IsEqualTo(MethodKind.Ordinary);
+            _ = await Assert.That(method?.IsExtensionMethod).IsFalse();
+            _ = await Assert.That(method?.IsStatic).IsTrue();
             _ = await Assert.That(mutations.ToArray()).IsEmpty();
         }
     }
