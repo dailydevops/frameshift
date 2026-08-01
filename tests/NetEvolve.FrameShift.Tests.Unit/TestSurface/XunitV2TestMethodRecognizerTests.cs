@@ -192,6 +192,9 @@ public class XunitV2TestMethodRecognizerTests
 
             public static IEnumerable<object[]> CollectionExpressionProperty => [[1], [2]];
 
+            public static IEnumerable<object[]> CollectionExpressionSpreadProperty =>
+                [.. Method(), new object[] { 1 }, new object[] { 2 }];
+
             public static IEnumerable<object[]> EmptyProperty => new object[][] { };
 
             public static IEnumerable<object[]> SizedArrayProperty => new object[4][];
@@ -277,6 +280,12 @@ public class XunitV2TestMethodRecognizerTests
             [Theory]
             [MemberData(nameof(Rows.CollectionExpressionProperty), MemberType = typeof(Rows))]
             public void CollectionExpressionMemberData(int value)
+            {
+            }
+
+            [Theory]
+            [MemberData(nameof(Rows.CollectionExpressionSpreadProperty), MemberType = typeof(Rows))]
+            public void CollectionExpressionSpreadMemberData(int value)
             {
             }
 
@@ -588,6 +597,7 @@ public class XunitV2TestMethodRecognizerTests
     [Arguments("ListMemberData", "2")]
     [Arguments("TheoryDataMemberData", "3")]
     [Arguments("CollectionExpressionMemberData", "2")]
+    [Arguments("CollectionExpressionSpreadMemberData", "1+")]
     [Arguments("EmptyMemberData", "0")]
     [Arguments("MethodMemberData", "4")]
     [Arguments("FieldMemberData", "5")]
