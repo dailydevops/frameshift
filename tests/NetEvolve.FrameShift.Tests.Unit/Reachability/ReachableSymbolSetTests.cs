@@ -251,6 +251,38 @@ public class ReachableSymbolSetTests
         _ = await Assert.That(set.ContainsEnclosing(inner)).IsFalse();
     }
 
+    /// <summary>
+    /// A root-level member with no enclosing local function stops the walk at its containing type
+    /// without ever entering the loop over <c>ContainingSymbol</c>.
+    /// </summary>
+    [Test]
+    public async Task ContainsEnclosing_RootSymbolNotRecorded_ReturnsFalse()
+    {
+        var compilation = CompilationFactory.Create(SetSource);
+        var untested = Method(compilation, "Production.Holder", "Untested");
+        var set = new ReachableSymbolSet([Method(compilation, "Production.Holder", "Nested")]);
+
+        _ = await Assert.That(set.ContainsEnclosing(untested)).IsFalse();
+    }
+
+    /// <summary>
+    /// A match one level up the chain, rather than on the symbol itself or several levels up, exercises
+    /// the loop finding the answer on its first iteration.
+    /// </summary>
+    [Test]
+    public async Task ContainsEnclosing_OneLevelUpTheChainIsRecorded_ReturnsTrue()
+    {
+        var (compilation, semanticModel, tree) = CompilationFactory.CreateWithModel(SetSource);
+        var outer = LocalFunction(semanticModel, tree, "Outer");
+        var set = new ReachableSymbolSet([Method(compilation, "Production.Holder", "Nested")]);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(set.Contains(outer)).IsFalse();
+            _ = await Assert.That(set.ContainsEnclosing(outer)).IsTrue();
+        }
+    }
+
     private static IMethodSymbol ReducedExtensionInvocation(SemanticModel semanticModel, SyntaxTree tree)
     {
         var invocation = SyntaxNodeLocator.FindMarked<InvocationExpressionSyntax>(tree);

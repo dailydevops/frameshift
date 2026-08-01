@@ -175,7 +175,32 @@ internal sealed class ReachableSymbolSet
     /// The walk deliberately stops before the containing type. A reachable type therefore never makes
     /// all of its members reachable, which would hide exactly the gaps this analysis is looking for.
     /// </remarks>
-    public bool ContainsEnclosing(ISymbol? symbol) => symbol is not null && EnclosingChain(symbol).Any(ContainsCore);
+    public bool ContainsEnclosing(ISymbol? symbol)
+    {
+        if (symbol is null)
+        {
+            return false;
+        }
+
+        if (ContainsCore(symbol))
+        {
+            return true;
+        }
+
+        var current = symbol.ContainingSymbol;
+
+        while (current is not null and not ITypeSymbol and not INamespaceSymbol)
+        {
+            if (ContainsCore(current))
+            {
+                return true;
+            }
+
+            current = current.ContainingSymbol;
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Gets the documentation comment ids of the test methods that reach <paramref name="symbol" />.
