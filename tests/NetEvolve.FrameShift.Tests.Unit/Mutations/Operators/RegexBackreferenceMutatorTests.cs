@@ -119,12 +119,33 @@ public class RegexBackreferenceMutatorTests
     /// </summary>
     private const string MiddleDecreasedLiteralText = @"""(a)(b)(c)\\1""";
 
+    /// <summary>
+    /// A backreference whose number is explicitly registered as a capture via <c>(?&lt;n&gt;...)</c> at
+    /// <see cref="int.MaxValue" /> itself, the largest number the pattern grammar accepts at all - one more
+    /// and the real regular expression engine rejects the pattern outright, per
+    /// <c>"Quantifier and capture group numbers must be less than or equal to Int32.MaxValue."</c>. A
+    /// backreference this large can only be defined through the explicit numbering form: no pattern could
+    /// ever spell out two billion capturing parentheses. It exists to reach the exact boundary at which the
+    /// increase path's <c>number + 1</c> arithmetic would overflow <see cref="int" />.
+    /// </summary>
+    private const string MaxInt32BackreferenceSource = """
+        namespace Fixtures;
+
+        using System.Text.RegularExpressions;
+
+        internal static class Patterns
+        {
+            internal static Regex Create() => new Regex(/*!*/"(?<2147483647>a)\\2147483647");
+        }
+        """;
+
     private static readonly string[] _fixtures =
     [
         MiddleBackreferenceSource,
         OnlyGroupBackreferenceSource,
         NamedBackreferenceSource,
         LastGroupBackreferenceSource,
+        MaxInt32BackreferenceSource,
     ];
 
     [Test]
@@ -248,6 +269,28 @@ public class RegexBackreferenceMutatorTests
             .IsEqualTo(@"regex.backreference.decrease-referenced-group | pattern '(a)(b)\2' => '(a)(b)\1'");
         _ = await Assert.That(mutations).Count().IsEqualTo(1);
         _ = await Assert.That(IsAcceptedByRegex(@"(a)(b)\3", RegexOptions.None)).IsFalse();
+    }
+
+    /// <summary>
+    /// A backreference number at <see cref="int.MaxValue" /> must not make the increase path's
+    /// <c>number + 1</c> arithmetic wrap around to <see cref="int.MinValue" />. Before the overflow guard,
+    /// the wrapped value was rendered as the replacement text <c>\-2147483648</c>, which the real regular
+    /// expression engine does not reject as a malformed backreference - it reads the leading backslash as
+    /// an escape of the literal <c>-</c> and the digits that follow as ordinary text, so the base class's
+    /// validity filter would not have caught it either. The fixed operator instead offers no increase at
+    /// all once the number cannot be incremented without overflowing, leaving only the decrease.
+    /// </summary>
+    [Test]
+    public async Task CreateMutations_MaxInt32Backreference_OffersOnlyTheDecrease()
+    {
+        var (_, mutations) = Mutate(MaxInt32BackreferenceSource);
+
+        _ = await Assert
+            .That(Lines(mutations))
+            .IsEqualTo(
+                @"regex.backreference.decrease-referenced-group | pattern '(?<2147483647>a)\2147483647' => '(?<2147483647>a)\2147483646'"
+            );
+        _ = await Assert.That(mutations).Count().IsEqualTo(1);
     }
 
     /// <summary>
