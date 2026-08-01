@@ -110,7 +110,7 @@ internal sealed class RegexOptionsMutator : MutationOperatorBase
         // MutationOperatorBase.CreateMutations only hands over nodes of one of the SupportedSyntaxKinds,
         // and both a member access and a bitwise or are expressions, so the cast cannot fail.
         var expression = (ExpressionSyntax)node;
-        var optionsType = semanticModel.Compilation.GetTypeByMetadataName(RegexOptionsMetadataName);
+        var optionsType = WellKnownTypeCache.GetType(semanticModel.Compilation, RegexOptionsMetadataName);
 
         if (optionsType is null || !IsFlagExpressionRoot(expression, optionsType, semanticModel, cancellationToken))
         {

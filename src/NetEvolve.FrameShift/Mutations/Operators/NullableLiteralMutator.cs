@@ -334,7 +334,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
                     return true;
             }
 
-            var guidType = compilation.GetTypeByMetadataName(GuidMetadataName);
+            var guidType = WellKnownTypeCache.GetType(compilation, GuidMetadataName);
             if (guidType is not null && SymbolEqualityComparer.Default.Equals(underlying, guidType))
             {
                 underlyingKind = UnderlyingKind.Guid;

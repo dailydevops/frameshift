@@ -92,7 +92,7 @@ internal sealed class FormatProviderArgumentMutator : MutationOperatorBase
             return [];
         }
 
-        var provider = semanticModel.Compilation.GetTypeByMetadataName(FormatProviderMetadataName);
+        var provider = WellKnownTypeCache.GetType(semanticModel.Compilation, FormatProviderMetadataName);
 
         if (provider is null)
         {

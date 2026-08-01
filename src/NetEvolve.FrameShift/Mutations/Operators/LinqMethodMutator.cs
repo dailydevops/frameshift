@@ -127,7 +127,7 @@ internal sealed class LinqMethodMutator : MutationOperatorBase
             return [];
         }
 
-        var enumerableType = semanticModel.Compilation.GetTypeByMetadataName(EnumerableMetadataName);
+        var enumerableType = WellKnownTypeCache.GetType(semanticModel.Compilation, EnumerableMetadataName);
 
         if (enumerableType is null || !SymbolEqualityComparer.Default.Equals(method.ContainingType, enumerableType))
         {

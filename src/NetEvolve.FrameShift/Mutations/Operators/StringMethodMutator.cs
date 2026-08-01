@@ -177,7 +177,7 @@ internal sealed class StringMethodMutator : MutationOperatorBase
             return false;
         }
 
-        var stringType = compilation.GetTypeByMetadataName(StringMetadataName);
+        var stringType = WellKnownTypeCache.GetType(compilation, StringMetadataName);
 
         return stringType is not null && SymbolEqualityComparer.Default.Equals(method.ContainingType, stringType);
     }
