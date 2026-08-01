@@ -524,6 +524,55 @@ internal sealed class RegexPatternTokenizerTests
         }
     }
 
+    /// <summary>
+    /// Pins the three roles a <c>-</c> inside a character class can play - subtraction, range or ordinary
+    /// member - together in a single test, so that a future change to the flag state behind that decision
+    /// (<c>MemberSeen</c>, <c>MemberPending</c> and the one-character lookahead) can be verified against all
+    /// three outcomes at once instead of only the one a change happens to touch.
+    /// </summary>
+    /// <param name="pattern">The pattern whose dash plays one of the three roles.</param>
+    /// <param name="expected">The expected token sequence.</param>
+    /// <returns>A task that represents the asynchronous assertions.</returns>
+    [Test]
+    // Ordinary member: the class holds no member yet, so '-[' cannot subtract and '[' is read as a member.
+    [Arguments(
+        "[-[a]",
+        "CharacterClassOpen:0:[|CharacterClassContent:1:-|CharacterClassContent:2:[|CharacterClassContent:3:a|CharacterClassClose:4:]"
+    )]
+    // Subtraction: a member was seen before the dash, and '[' follows it directly.
+    [Arguments(
+        "[a-[b]]",
+        "CharacterClassOpen:0:[|CharacterClassContent:1:a|CharacterClassSubtraction:2:-|CharacterClassOpen:3:[|CharacterClassContent:4:b|CharacterClassClose:5:]|CharacterClassClose:6:]"
+    )]
+    // Range: a member is pending and the following character is neither '[' nor the closing ']'.
+    [Arguments(
+        "[a-z]",
+        "CharacterClassOpen:0:[|CharacterClassContent:1:a|CharacterClassRange:2:-|CharacterClassContent:3:z|CharacterClassClose:4:]"
+    )]
+    // Ordinary member again: once a range has consumed the pending member, a further dash starts fresh.
+    [Arguments(
+        "[a-b-c]",
+        "CharacterClassOpen:0:[|CharacterClassContent:1:a|CharacterClassRange:2:-|CharacterClassContent:3:b|CharacterClassContent:4:-|CharacterClassContent:5:c|CharacterClassClose:6:]"
+    )]
+    // A leading ']' is a member like any other, which is what turns the dash behind it into a subtraction.
+    [Arguments(
+        "[]-[a]]",
+        "CharacterClassOpen:0:[|CharacterClassContent:1:]|CharacterClassSubtraction:2:-|CharacterClassOpen:3:[|CharacterClassContent:4:a|CharacterClassClose:5:]|CharacterClassClose:6:]"
+    )]
+    public async Task Tokenize_CharacterClassDash_DecidesRoleFromMemberStateAndLookahead(
+        string pattern,
+        string expected
+    )
+    {
+        var tokens = RegexPatternTokenizer.Tokenize(pattern, RegexOptions.None);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Describe(tokens)).IsEqualTo(expected);
+            _ = await Assert.That(Covers(pattern, tokens)).IsTrue();
+        }
+    }
+
     [Test]
     public async Task Tokenize_EmptyPattern_ProducesNoTokens()
     {

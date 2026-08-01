@@ -1414,6 +1414,41 @@ internal static class RegexPatternTokenizer
     /// The state a group scopes: the options in effect inside it and whether it already holds something a
     /// quantifier could repeat.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The three flags below cooperate to decide whether a quantifier may apply and whether a bare <c>?</c>
+    /// reached across blanks turns lazy instead of nesting. Every method allowed to mutate one is listed so
+    /// that reading a flag's contract does not require grepping the whole scanner:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// <see cref="AtomPresent" /> - set by <c>MarkAtom</c> (called from <c>AddAtom</c>, <c>AddEscape</c> for a
+    /// non class escape, and <c>Scanner.ScanGroupClose</c>) whenever the last token is something a quantifier
+    /// could repeat; cleared by <c>Scanner.ScanAlternation</c> and <c>Scanner.ScanOptions</c>, both of which
+    /// start a fresh branch with nothing yet to repeat. Read only by <c>Scanner.CanQuantify</c>.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <see cref="QuantifierApplied" /> - set by <c>Scanner.ScanSimpleQuantifier</c> and
+    /// <c>Scanner.ScanBraceQuantifier</c> once a quantifier has been emitted; cleared by <c>MarkAtom</c> (a
+    /// fresh atom accepts a quantifier of its own), <c>Scanner.ScanAlternation</c> and
+    /// <c>Scanner.ScanOptions</c>. Read only by <c>Scanner.CanQuantify</c>, which is what turns a second
+    /// quantifier in a row into a rejected nested quantifier.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <see cref="LazyMarkerAvailable" /> - set by <c>Scanner.ScanSimpleQuantifier</c> and
+    /// <c>Scanner.ScanBraceQuantifier</c> to whether the quantifier just emitted still leaves room for a lazy
+    /// <c>?</c> (it does unless that quantifier already consumed one); cleared by <c>Scanner.Add</c> for every
+    /// token except a blank or a comment, which is what keeps the window open across a run of blanks of any
+    /// length and closes it for everything else. Read only by <c>Scanner.ScanSimpleQuantifier</c>.
+    /// </description>
+    /// </item>
+    /// </list>
+    /// </remarks>
     private sealed class GroupFrame
     {
         /// <summary>
@@ -1458,6 +1493,51 @@ internal static class RegexPatternTokenizer
     /// <summary>
     /// The state a character class scopes, which is what decides the role of a <c>-</c> inside it.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The four flags below cooperate to decide, together with a one-character lookahead, whether a
+    /// <c>-</c> is a subtraction, the separator of a range or an ordinary member (see
+    /// <c>Scanner.ScanCharacterClassDash</c>). Every method allowed to mutate one is listed so that reading a
+    /// flag's contract does not require grepping the whole scanner:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// <see cref="MemberSeen" /> - set once and never cleared, by <c>Scanner.AddClassMember</c> the first
+    /// time any member (including a leading <c>]</c>) is added to the class. Read only by
+    /// <c>Scanner.ScanCharacterClassDash</c>, which requires it before a following <c>-[</c> counts as a
+    /// subtraction rather than an ordinary member.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <see cref="MemberPending" /> - set by <c>Scanner.AddClassMember</c> whenever the member just added
+    /// could still become the lower end of a range; cleared by <c>Scanner.ScanCharacterClassDash</c> once
+    /// that member is consumed as either end of a range or as the operand of a subtraction, and by
+    /// <c>Scanner.ScanCharacterClassClose</c> when the class closes. Read only by
+    /// <c>Scanner.ScanCharacterClassDash</c>, which requires it before a following <c>-</c> (that is not a
+    /// subtraction) starts a range instead of standing for itself.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <see cref="AwaitingRangeEnd" /> - set by <c>Scanner.ScanCharacterClassDash</c> once a range has been
+    /// opened, so the member that follows closes it instead of starting a new one of its own; cleared by
+    /// <c>Scanner.AddClassMember</c> when that member is added, and by <c>Scanner.ScanCharacterClassClose</c>
+    /// when the class closes with the range never completed (as in <c>[a-]</c>, where the trailing <c>-</c>
+    /// is already read as an ordinary member and this flag stays <see langword="false" /> throughout).
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// <see cref="SubtractionApplied" /> - set by <c>Scanner.ScanCharacterClassClose</c> when closing a
+    /// nested class returns control to the class that subtracted it, which is always the case because a
+    /// class only ever nests as the operand of a subtraction. Read only by <c>Scanner.ScanInsideClass</c>,
+    /// which is what enforces a subtraction being the last element of its enclosing class.
+    /// </description>
+    /// </item>
+    /// </list>
+    /// </remarks>
     private sealed class ClassFrame
     {
         /// <summary>
