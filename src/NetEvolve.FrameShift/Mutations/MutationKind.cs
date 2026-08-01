@@ -129,6 +129,15 @@ internal enum MutationKind
     CaseConversion,
 
     /// <summary>
+    /// Calls to well known <see cref="string" /> methods, such as <c>StartsWith</c> / <c>EndsWith</c>,
+    /// <c>Trim</c> / <c>TrimStart</c> / <c>TrimEnd</c> and <c>IsNullOrEmpty</c> /
+    /// <c>IsNullOrWhiteSpace</c>, replaced by a counterpart with a matching overload. A test suite that
+    /// never distinguishes a prefix from a suffix check, trims the wrong side, or treats an empty
+    /// string the same as a whitespace-only one, cannot tell the mutant from the original.
+    /// </summary>
+    StringMethod,
+
+    /// <summary>
     /// <c>System.Text.RegularExpressions.RegexOptions</c> arguments, with a flag such as
     /// <c>IgnoreCase</c>, <c>Multiline</c> or <c>Singleline</c> added or removed. The flags change the
     /// pattern grammar and the matching semantics, so an untested flag hides matches the code relies on.
