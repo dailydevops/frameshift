@@ -170,6 +170,51 @@ public class StringMethodMutatorTests
         }
         """;
 
+    private const string AttributeArgumentSource = """
+        namespace Fixtures;
+
+        internal sealed class NameAttribute : System.Attribute
+        {
+            public NameAttribute(bool value) => Value = value;
+
+            public bool Value { get; }
+        }
+
+        internal static class Checks
+        {
+            [Name("x".StartsWith("y"))]
+            public static bool Check(string value) => value.Length > 0;
+        }
+        """;
+
+    private const string ConstFieldSource = """
+        internal static class Checks
+        {
+            private const bool StartsWithY = "x".StartsWith("y");
+
+            public static bool Check() => StartsWithY;
+        }
+        """;
+
+    private const string ConstLocalSource = """
+        internal static class Checks
+        {
+            public static bool Check(string value)
+            {
+                const bool startsWithY = "x".StartsWith("y");
+
+                return startsWithY;
+            }
+        }
+        """;
+
+    private const string DefaultParameterSource = """
+        internal static class Checks
+        {
+            public static bool Check(bool value = "x".StartsWith("y")) => value;
+        }
+        """;
+
     private static readonly StringMethodMutator _mutator = new StringMethodMutator();
 
     [Test]
@@ -426,6 +471,35 @@ public class StringMethodMutatorTests
         {
             _ = await Assert.That(errors).IsEqualTo(string.Empty);
             _ = await Assert.That(method?.Name).IsEqualTo("Substring");
+            _ = await Assert.That(mutations.ToArray()).IsEmpty();
+        }
+    }
+
+    /// <summary>
+    /// A string method call is never a compile time constant, so every one of these fixtures deliberately
+    /// does not compile. They are still the only way to place the call in a position that demands a
+    /// constant, which is exactly what the operator has to skip; the symbol assertions therefore pin that
+    /// the call binds to <c>StartsWith</c> of <see cref="string" /> and that only the position kept the
+    /// mutations away.
+    /// </summary>
+    /// <param name="source">The fixture source.</param>
+    /// <returns>A task that represents the asynchronous test.</returns>
+    [Test]
+    [Arguments(AttributeArgumentSource)]
+    [Arguments(ConstFieldSource)]
+    [Arguments(ConstLocalSource)]
+    [Arguments(DefaultParameterSource)]
+    public async Task CreateMutations_StringMethodInAConstantContext_ReturnsEmpty(string source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var (mutations, node, _, model, _) = MutateCall(source, "StartsWith");
+        var method = model.GetSymbolInfo(node).Symbol as IMethodSymbol;
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(method?.Name).IsEqualTo("StartsWith");
+            _ = await Assert.That(method?.ContainingType.SpecialType).IsEqualTo(SpecialType.System_String);
             _ = await Assert.That(mutations.ToArray()).IsEmpty();
         }
     }
