@@ -251,4 +251,14 @@ internal enum MutationKind
     /// sensitive behaviour cannot tell whether a non-default comparer was needed in the first place.
     /// </summary>
     OptionalArgumentRemoval,
+
+    /// <summary>
+    /// A parenthesized additive sub-expression (<c>+</c>, <c>-</c>) reassociated across an enclosing
+    /// multiplicative expression (<c>*</c>, <c>/</c>, <c>%</c>), such as <c>(a + b) * c</c> becoming
+    /// <c>a + b * c</c>. Parentheses that override the default operator precedence are exactly the
+    /// kind of thing a developer gets wrong once and a test suite never notices, because the
+    /// unparenthesized reading of the same operators is a different, equally plausible-looking
+    /// expression.
+    /// </summary>
+    Parenthesization,
 }

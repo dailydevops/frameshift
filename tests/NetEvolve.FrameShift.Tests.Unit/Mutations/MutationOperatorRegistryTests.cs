@@ -13,12 +13,12 @@ using TUnit.Core;
 public class MutationOperatorRegistryTests
 {
     /// <summary>
-    /// The number of operators the registry must expose: the twenty expression operators, the string
+    /// The number of operators the registry must expose: the twenty-one expression operators, the string
     /// method operator, the <c>Math</c> method operator, the six operators of the culture sensitivity
     /// family, the eight operators of the regular expression pattern family, the LINQ method operator and
     /// the optional argument removal operator.
     /// </summary>
-    private const int ExpectedOperatorCount = 37;
+    private const int ExpectedOperatorCount = 38;
 
     private static readonly string[] _expectedOperatorIds =
     [
@@ -46,6 +46,7 @@ public class MutationOperatorRegistryTests
         "null-coalescing",
         "nullable-literal",
         "numeric-literal",
+        "parenthesization",
         "regex.alternation",
         "regex.anchor",
         "regex.backreference",

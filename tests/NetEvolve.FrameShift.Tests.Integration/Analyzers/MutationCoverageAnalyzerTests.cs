@@ -97,7 +97,7 @@ public class MutationCoverageAnalyzerTests
     /// The number of meaningful mutants <c>Gap.Combine</c> of <see cref="BudgetSource" /> carries, and the
     /// number of diagnostics it therefore produces without a budget.
     /// </summary>
-    private const int CombineMutantCount = 15;
+    private const int CombineMutantCount = 17;
 
     /// <summary>
     /// The line feed the snapshots are built with, instead of <see cref="Environment.NewLine" />.

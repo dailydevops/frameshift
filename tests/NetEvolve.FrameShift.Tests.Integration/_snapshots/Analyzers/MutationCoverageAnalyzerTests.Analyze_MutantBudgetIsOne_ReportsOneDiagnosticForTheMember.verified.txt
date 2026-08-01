@@ -1,8 +1,10 @@
 ﻿=== every mutant of the member ===
+FSH0001 Source.cs(15,16): Mutation '(a + b) * c => a + b * c' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,16): Mutation '* => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,16): Mutation '* => +' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,16): Mutation '* => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,16): Mutation '* => /' at this location is not reachable from any test; a surviving mutant here would go unnoticed
+FSH0001 Source.cs(15,16): Mutation 'a * (b - c) => a * b - c' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,17): Mutation '+ => %' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,17): Mutation '+ => *' at this location is not reachable from any test; a surviving mutant here would go unnoticed
 FSH0001 Source.cs(15,17): Mutation '+ => -' at this location is not reachable from any test; a surviving mutant here would go unnoticed
