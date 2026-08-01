@@ -29,6 +29,7 @@ public class EquivalenceClassifierBranchTests
     private const string ThrowOnlyBodyReason = "the containing member does nothing but throw";
     private const string DiscardAssignmentReason = "the mutated value is assigned to a discard";
     private const string AttributeArgumentReason = "the mutation only changes a compile-time attribute argument";
+    private const string ConstantDeclarationReason = "the mutation only changes a compile-time constant";
     private const string WellKnownMemberReason = "the containing member is a well known infrastructure member";
     private const string ExcludedMemberReason = "the containing member is excluded from coverage";
 
@@ -469,6 +470,51 @@ public class EquivalenceClassifierBranchTests
         var verdict = Classify(original, replacement, model);
 
         await AssertTrivialAsync(verdict, AttributeArgumentReason).ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task Classify_MutationInNestedAttributeArgumentExpression_IsTrivialAttributeArgument()
+    {
+        // The mutated literal sits several ancestors below the attribute argument itself - a binary
+        // expression, then a parenthesized expression, then another binary expression - so the
+        // constant-only-context walk has to step past all of them before it reaches the
+        // AttributeArgumentSyntax that actually proves triviality.
+        var source = """
+            namespace Fixture;
+
+            using System;
+
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class LimitAttribute : Attribute
+            {
+                public LimitAttribute(int value) => Value = value;
+
+                public int Value { get; }
+            }
+
+            public sealed class Widget
+            {
+                [Limit(1 + (2 * /*!*/3))]
+                public int Compute() => 2;
+            }
+            """;
+
+        var verdict = ClassifyLiteral(source);
+
+        await AssertTrivialAsync(verdict, AttributeArgumentReason).ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task Classify_MutationInNestedConstantLocalExpression_IsTrivialConstantDeclaration()
+    {
+        // Same idea for a constant local: the walk has to pass a binary expression and a
+        // parenthesized expression before it reaches the LocalDeclarationStatementSyntax carrying the
+        // const modifier.
+        var source = WrapStatements("const int limit = (1 + /*!*/2) * 3;\n        return left + limit;");
+
+        var verdict = ClassifyLiteral(source);
+
+        await AssertTrivialAsync(verdict, ConstantDeclarationReason).ConfigureAwait(false);
     }
 
     [Test]
