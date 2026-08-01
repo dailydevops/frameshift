@@ -15,7 +15,7 @@ The **test side** therefore runs first. A test-framework specific analyzer disco
 The **production side** consumes the manifest through `AdditionalFiles`. `MutationCoverageAnalyzer` seeds the reachable set from the recorded member ids, closes it transitively over the production call graph — which only this side can see — walks every syntax tree, generates the candidate mutants, verifies by in-memory recompilation that each one still compiles, and classifies those that cannot change observable behaviour. What remains is reported: `FSH0001` for a meaningful mutant in an unreachable member, `FSH0002` for a mutant without observable effect, `FSH0003` for a manifest that is missing, malformed or stale, `FSH0004` for a test method that references no production member at all, and `FSH0006` for a mutation point that is reached, but only by tests contributing a single input combination in total — reachable code whose mutation would still go unnoticed. A project without a manifest stays silent, because it has not opted in; the MSBuild warning `FSH0005` reports the missing setup instead.
 
 ```mermaid
-flowchart TB
+flowchart LR
     subgraph pass1["Pass 1 — test project"]
         T1["Test methods<br/>TUnit · xUnit v2 · xUnit v3 · NUnit · MSTest"]
         T2["TestSurface<br/>probes · recognisers · collector"]
