@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.RegularExpressions;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using TUnit.Assertions;
@@ -1290,11 +1291,13 @@ public class RegexPatternLocatorTests
     }
 
     /// <summary>
-    /// Resolves the four well-known type symbols once per <see cref="Compilation" /> and reuses them
-    /// across every candidate literal, instead of calling <see cref="Compilation.GetTypeByMetadataName(string)" />
-    /// again for each one. The fixture is the same one <see cref="TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly" />
-    /// exercises. Reflecting on the locator's private cache after the fact proves that a single entry was
-    /// ever created for that compilation, no matter how many literals were examined.
+    /// Resolves the well-known type symbols the locator needs once per <see cref="Compilation" /> and
+    /// reuses them across every candidate literal, instead of calling
+    /// <see cref="Compilation.GetTypeByMetadataName(string)" /> again for each one. The fixture is the
+    /// same one <see cref="TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesEachSiteCorrectly" />
+    /// exercises. Reflecting on the shared <see cref="WellKnownTypeCache" /> after the fact proves that a
+    /// single entry was ever created per metadata name for that compilation, no matter how many literals
+    /// were examined.
     /// </summary>
     [Test]
     public async Task TryLocate_ManyCandidateLiteralsInOneCompilation_ResolvesWellKnownTypesOnlyOnce()
@@ -1315,10 +1318,7 @@ public class RegexPatternLocatorTests
             _ = RegexPatternLocator.TryLocate(literal, semanticModel, CancellationToken.None);
         }
 
-        var cacheField = typeof(RegexPatternLocator).GetField(
-            "WellKnownTypesCache",
-            BindingFlags.NonPublic | BindingFlags.Static
-        );
+        var cacheField = typeof(WellKnownTypeCache).GetField("_cache", BindingFlags.NonPublic | BindingFlags.Static);
 
         _ = await Assert.That(cacheField).IsNotNull();
 
@@ -1331,7 +1331,18 @@ public class RegexPatternLocatorTests
         var found = (bool)tryGetValue!.Invoke(cache, arguments)!;
 
         _ = await Assert.That(found).IsTrue();
-        _ = await Assert.That(arguments[1]).IsNotNull();
+
+        var perCompilation = arguments[1];
+
+        _ = await Assert.That(perCompilation).IsNotNull();
+
+        // Every one of the 50 candidate literals binds to either the Regex constructor or one of the
+        // static methods, so only the Regex and RegexOptions metadata names are ever resolved; the two
+        // attribute types are never looked up for this fixture, which is exactly the point: only the
+        // names an examined candidate actually needs are ever entered into the per-compilation cache.
+        var count = (int)perCompilation!.GetType().GetProperty("Count")!.GetValue(perCompilation)!;
+
+        _ = await Assert.That(count).IsEqualTo(2);
     }
 
     /// <summary>

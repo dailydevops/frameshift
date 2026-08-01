@@ -157,7 +157,7 @@ internal sealed class CultureInfoMutator : MutationOperatorBase
             return null;
         }
 
-        var cultureInfo = semanticModel.Compilation.GetTypeByMetadataName(CultureInfoMetadataName);
+        var cultureInfo = WellKnownTypeCache.GetType(semanticModel.Compilation, CultureInfoMetadataName);
 
         return cultureInfo is not null && SymbolEqualityComparer.Default.Equals(property.ContainingType, cultureInfo)
             ? property.Name

@@ -148,7 +148,7 @@ internal abstract class CultureCaseAxisMutatorBase : MutationOperatorBase
             return null;
         }
 
-        var declaringType = semanticModel.Compilation.GetTypeByMetadataName(metadataName);
+        var declaringType = WellKnownTypeCache.GetType(semanticModel.Compilation, metadataName);
 
         if (!SymbolEqualityComparer.Default.Equals(symbol.ContainingType, declaringType))
         {

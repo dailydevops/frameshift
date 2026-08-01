@@ -1,6 +1,5 @@
 namespace NetEvolve.FrameShift.Mutations.RegularExpressions;
 
-using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -44,10 +43,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// declaration is not one either, since nothing there says the value is ever used as a pattern.
 /// </para>
 /// <para>
-/// Every member is static, and the only state the class keeps - the per-<see cref="Compilation" /> cache
-/// of well-known type symbols - lives in a <see cref="ConditionalWeakTable{TKey, TValue}" />, which is
-/// safe under concurrent reads and writes and never ties an entry's lifetime to anything longer-lived than
-/// the compilation itself. The class is therefore safe to use from concurrent analyzer callbacks.
+/// Every member is static, and the class keeps no state of its own: the four well-known type symbols it
+/// resolves through <see cref="Compilation.GetTypeByMetadataName(string)" /> are cached once per
+/// <see cref="Compilation" /> by the shared <see cref="WellKnownTypeCache" />, which every other mutation
+/// operator resolving a well-known type uses as well, instead of each keeping a cache of its own. The
+/// class is therefore safe to use from concurrent analyzer callbacks.
 /// </para>
 /// </remarks>
 internal static class RegexPatternLocator
@@ -70,47 +70,6 @@ internal static class RegexPatternLocator
     /// The parameter the pattern binds to in a static <c>Regex</c> method, which takes the input first.
     /// </summary>
     private const int SecondPatternOrdinal = 1;
-
-    /// <summary>
-    /// Caches the four well-known type symbols per <see cref="Compilation" />, so that
-    /// <see cref="Compilation.GetTypeByMetadataName(string)" /> is called at most once for each of them per
-    /// compilation, no matter how many candidate literals are examined. A <see cref="Compilation" /> is
-    /// immutable and the lookup is deterministic for it, so the cached symbols never go stale; the table is
-    /// keyed by reference identity and lets its entries be collected once a compilation is no longer
-    /// referenced elsewhere, which is exactly what concurrent, overlapping analyzer runs need.
-    /// </summary>
-    private static readonly ConditionalWeakTable<Compilation, WellKnownRegexTypes> WellKnownTypesCache = new();
-
-    /// <summary>
-    /// Resolves, or returns the already resolved, well-known type symbols for <paramref name="compilation" />.
-    /// </summary>
-    /// <param name="compilation">The compilation the symbols are resolved in.</param>
-    /// <returns>The cached, per-compilation set of well-known type symbols.</returns>
-    private static WellKnownRegexTypes GetWellKnownTypes(Compilation compilation) =>
-        WellKnownTypesCache.GetValue(compilation, static c => new WellKnownRegexTypes(c));
-
-    /// <summary>
-    /// The well-known type symbols the locator resolves through <see cref="Compilation" />, cached once per
-    /// compilation instead of once per candidate literal.
-    /// </summary>
-    private sealed class WellKnownRegexTypes
-    {
-        public WellKnownRegexTypes(Compilation compilation)
-        {
-            Regex = compilation.GetTypeByMetadataName(RegexMetadataName);
-            RegexOptions = compilation.GetTypeByMetadataName(RegexOptionsMetadataName);
-            GeneratedRegexAttribute = compilation.GetTypeByMetadataName(GeneratedRegexAttributeMetadataName);
-            RegularExpressionAttribute = compilation.GetTypeByMetadataName(RegularExpressionAttributeMetadataName);
-        }
-
-        public INamedTypeSymbol? Regex { get; }
-
-        public INamedTypeSymbol? RegexOptions { get; }
-
-        public INamedTypeSymbol? GeneratedRegexAttribute { get; }
-
-        public INamedTypeSymbol? RegularExpressionAttribute { get; }
-    }
 
     /// <summary>
     /// Decides whether <paramref name="node" /> is a string literal used as a regular expression pattern
@@ -194,7 +153,7 @@ internal static class RegexPatternLocator
             return null;
         }
 
-        var regexType = GetWellKnownTypes(semanticModel.Compilation).Regex;
+        var regexType = WellKnownTypeCache.GetType(semanticModel.Compilation, RegexMetadataName);
 
         if (regexType is null || !SymbolEqualityComparer.Default.Equals(method.ContainingType, regexType))
         {
@@ -314,15 +273,14 @@ internal static class RegexPatternLocator
             return null;
         }
 
-        var wellKnownTypes = GetWellKnownTypes(compilation);
-        var generated = wellKnownTypes.GeneratedRegexAttribute;
+        var generated = WellKnownTypeCache.GetType(compilation, GeneratedRegexAttributeMetadataName);
 
         if (generated is not null && SymbolEqualityComparer.Default.Equals(attributeType, generated))
         {
             return RegexPatternOrigin.GeneratedRegex;
         }
 
-        var dataAnnotations = wellKnownTypes.RegularExpressionAttribute;
+        var dataAnnotations = WellKnownTypeCache.GetType(compilation, RegularExpressionAttributeMetadataName);
 
         return dataAnnotations is not null && SymbolEqualityComparer.Default.Equals(attributeType, dataAnnotations)
             ? RegexPatternOrigin.DataAnnotationsRegularExpression
@@ -367,7 +325,7 @@ internal static class RegexPatternLocator
         CancellationToken cancellationToken
     )
     {
-        var optionsType = GetWellKnownTypes(semanticModel.Compilation).RegexOptions;
+        var optionsType = WellKnownTypeCache.GetType(semanticModel.Compilation, RegexOptionsMetadataName);
 
         if (optionsType is null)
         {

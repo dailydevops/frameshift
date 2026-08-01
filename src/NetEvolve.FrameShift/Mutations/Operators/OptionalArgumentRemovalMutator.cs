@@ -171,7 +171,7 @@ internal sealed class OptionalArgumentRemovalMutator : MutationOperatorBase
     /// <returns><see langword="true" /> if the parameter is comparer shaped.</returns>
     private static bool IsComparerType(ITypeSymbol type, Compilation compilation)
     {
-        var stringComparer = compilation.GetTypeByMetadataName(StringComparerMetadataName);
+        var stringComparer = WellKnownTypeCache.GetType(compilation, StringComparerMetadataName);
 
         for (var current = type; current is not null; current = current.BaseType)
         {
@@ -181,8 +181,8 @@ internal sealed class OptionalArgumentRemovalMutator : MutationOperatorBase
             }
         }
 
-        var comparer = compilation.GetTypeByMetadataName(ComparerMetadataName);
-        var equalityComparer = compilation.GetTypeByMetadataName(EqualityComparerMetadataName);
+        var comparer = WellKnownTypeCache.GetType(compilation, ComparerMetadataName);
+        var equalityComparer = WellKnownTypeCache.GetType(compilation, EqualityComparerMetadataName);
 
         return IsOrImplementsGenericInterface(type, comparer) || IsOrImplementsGenericInterface(type, equalityComparer);
     }

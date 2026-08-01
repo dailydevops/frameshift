@@ -183,7 +183,7 @@ internal sealed class MathMethodMutator : MutationOperatorBase
             return false;
         }
 
-        var mathType = compilation.GetTypeByMetadataName(MathMetadataName);
+        var mathType = WellKnownTypeCache.GetType(compilation, MathMetadataName);
 
         return mathType is not null && SymbolEqualityComparer.Default.Equals(method.ContainingType, mathType);
     }
