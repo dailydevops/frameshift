@@ -987,9 +987,7 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert.That(problems).Count().IsEqualTo(1);
             _ = await Assert.That(DiagnosticAssertions.Describe(problems)).Contains(BrokenManifestPath);
-            _ = await Assert
-                .That(GapLines(diagnostics).Distinct())
-                .IsEquivalentTo([BetaMemberLine, GammaMemberLine]);
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([BetaMemberLine, GammaMemberLine]);
         }
     }
 

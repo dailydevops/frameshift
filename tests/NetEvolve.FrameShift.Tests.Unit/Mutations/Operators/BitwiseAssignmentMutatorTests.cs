@@ -112,15 +112,13 @@ public class BitwiseAssignmentMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.BitwiseOperator);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(
-                    [
-                        SyntaxKind.AndAssignmentExpression,
-                        SyntaxKind.OrAssignmentExpression,
-                        SyntaxKind.ExclusiveOrAssignmentExpression,
-                        SyntaxKind.LeftShiftAssignmentExpression,
-                        SyntaxKind.RightShiftAssignmentExpression,
-                    ]
-                );
+                .IsEquivalentTo([
+                    SyntaxKind.AndAssignmentExpression,
+                    SyntaxKind.OrAssignmentExpression,
+                    SyntaxKind.ExclusiveOrAssignmentExpression,
+                    SyntaxKind.LeftShiftAssignmentExpression,
+                    SyntaxKind.RightShiftAssignmentExpression,
+                ]);
         }
     }
 

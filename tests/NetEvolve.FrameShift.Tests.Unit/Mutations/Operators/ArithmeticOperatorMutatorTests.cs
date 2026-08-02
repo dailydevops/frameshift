@@ -366,15 +366,13 @@ public class ArithmeticOperatorMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.ArithmeticOperator);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(
-                    [
-                        SyntaxKind.AddExpression,
-                        SyntaxKind.SubtractExpression,
-                        SyntaxKind.MultiplyExpression,
-                        SyntaxKind.DivideExpression,
-                        SyntaxKind.ModuloExpression,
-                    ]
-                );
+                .IsEquivalentTo([
+                    SyntaxKind.AddExpression,
+                    SyntaxKind.SubtractExpression,
+                    SyntaxKind.MultiplyExpression,
+                    SyntaxKind.DivideExpression,
+                    SyntaxKind.ModuloExpression,
+                ]);
         }
     }
 

@@ -244,9 +244,7 @@ public class RegexCharacterClassMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.character-class");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexCharacterClass);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

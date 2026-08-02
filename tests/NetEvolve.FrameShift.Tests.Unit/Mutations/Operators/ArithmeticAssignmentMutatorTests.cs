@@ -486,15 +486,13 @@ public class ArithmeticAssignmentMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.ArithmeticAssignment);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(
-                    [
-                        SyntaxKind.AddAssignmentExpression,
-                        SyntaxKind.SubtractAssignmentExpression,
-                        SyntaxKind.MultiplyAssignmentExpression,
-                        SyntaxKind.DivideAssignmentExpression,
-                        SyntaxKind.ModuloAssignmentExpression,
-                    ]
-                );
+                .IsEquivalentTo([
+                    SyntaxKind.AddAssignmentExpression,
+                    SyntaxKind.SubtractAssignmentExpression,
+                    SyntaxKind.MultiplyAssignmentExpression,
+                    SyntaxKind.DivideAssignmentExpression,
+                    SyntaxKind.ModuloAssignmentExpression,
+                ]);
         }
     }
 

@@ -121,9 +121,7 @@ public class RegexEscapeMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.escape");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexEscape);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

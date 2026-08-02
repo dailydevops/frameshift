@@ -190,9 +190,7 @@ public class RegexPatternMutatorBaseTests
     {
         var mutator = new ProbePatternMutator(static _ => []);
 
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
         _ = await Assert.That(mutator.Id).IsEqualTo(ProbeId);
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexAnchor);
     }

@@ -104,9 +104,7 @@ public class RegexLookaroundMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.lookaround");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexLookaround);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

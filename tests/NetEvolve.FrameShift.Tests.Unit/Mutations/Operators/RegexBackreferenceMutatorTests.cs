@@ -173,9 +173,7 @@ public class RegexBackreferenceMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.backreference");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexBackreference);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

@@ -90,14 +90,12 @@ public class CheckedContextMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.CheckedContext);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(
-                    [
-                        SyntaxKind.CheckedExpression,
-                        SyntaxKind.UncheckedExpression,
-                        SyntaxKind.CheckedStatement,
-                        SyntaxKind.UncheckedStatement,
-                    ]
-                );
+                .IsEquivalentTo([
+                    SyntaxKind.CheckedExpression,
+                    SyntaxKind.UncheckedExpression,
+                    SyntaxKind.CheckedStatement,
+                    SyntaxKind.UncheckedStatement,
+                ]);
         }
     }
 

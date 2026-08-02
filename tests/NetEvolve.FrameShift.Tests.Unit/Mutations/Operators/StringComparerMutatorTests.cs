@@ -235,21 +235,19 @@ public class StringComparerMutatorTests
     public static IEnumerable<Func<string>> CompilingFixtures() =>
         _memberNames
             .Select(Fixture)
-            .Concat(
-                [
-                    VariableInitialiserSource,
-                    SwitchArmSource,
-                    NullableSource,
-                    FullyQualifiedSource,
-                    AliasSource,
-                    UsingStaticSource,
-                    TriviaInsideAccessSource,
-                    CommentedSource,
-                    ReceiverSource,
-                    FactoryMethodSource,
-                    UnrelatedTypeSource,
-                ]
-            )
+            .Concat([
+                VariableInitialiserSource,
+                SwitchArmSource,
+                NullableSource,
+                FullyQualifiedSource,
+                AliasSource,
+                UsingStaticSource,
+                TriviaInsideAccessSource,
+                CommentedSource,
+                ReceiverSource,
+                FactoryMethodSource,
+                UnrelatedTypeSource,
+            ])
             .Select(source => (Func<string>)(() => source));
 
     /// <summary>

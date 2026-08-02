@@ -241,9 +241,7 @@ public class RegexAnchorMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.anchor");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexAnchor);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

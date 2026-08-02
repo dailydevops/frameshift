@@ -311,9 +311,7 @@ public class MutantCompilerTests
 
         using (Assert.Multiple())
         {
-            _ = await Assert
-                .That(VerdictsOf(results, ViableOperatorId))
-                .IsEquivalentTo([MutantViability.Viable]);
+            _ = await Assert.That(VerdictsOf(results, ViableOperatorId)).IsEquivalentTo([MutantViability.Viable]);
             _ = await Assert
                 .That(VerdictsOf(results, BrokenOperatorId))
                 .IsEquivalentTo([MutantViability.DoesNotCompile]);
@@ -549,14 +547,12 @@ public class MutantCompilerTests
             _ = await Assert.That(broken.Location.SourceSpan).IsEqualTo(viable.Location.SourceSpan);
             _ = await Assert
                 .That(verdicts)
-                .IsEquivalentTo(
-                    [
-                        MutantViability.Viable,
-                        MutantViability.DoesNotCompile,
-                        MutantViability.Viable,
-                        MutantViability.DoesNotCompile,
-                    ]
-                );
+                .IsEquivalentTo([
+                    MutantViability.Viable,
+                    MutantViability.DoesNotCompile,
+                    MutantViability.Viable,
+                    MutantViability.DoesNotCompile,
+                ]);
         }
     }
 

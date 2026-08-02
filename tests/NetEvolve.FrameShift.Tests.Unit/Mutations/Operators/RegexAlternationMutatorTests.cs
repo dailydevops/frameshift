@@ -173,9 +173,7 @@ public class RegexAlternationMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("regex.alternation");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexAlternation);
-        _ = await Assert
-            .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
+        _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>

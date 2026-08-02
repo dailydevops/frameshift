@@ -277,14 +277,12 @@ public class IncrementDecrementMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.Increment);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(
-                    [
-                        SyntaxKind.PreIncrementExpression,
-                        SyntaxKind.PreDecrementExpression,
-                        SyntaxKind.PostIncrementExpression,
-                        SyntaxKind.PostDecrementExpression,
-                    ]
-                );
+                .IsEquivalentTo([
+                    SyntaxKind.PreIncrementExpression,
+                    SyntaxKind.PreDecrementExpression,
+                    SyntaxKind.PostIncrementExpression,
+                    SyntaxKind.PostDecrementExpression,
+                ]);
         }
     }
 
