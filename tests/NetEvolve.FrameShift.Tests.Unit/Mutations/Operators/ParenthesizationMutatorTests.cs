@@ -180,7 +180,7 @@ public class ParenthesizationMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.Parenthesization);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(new[] { SyntaxKind.ParenthesizedExpression });
+                .IsEquivalentTo([SyntaxKind.ParenthesizedExpression]);
         }
     }
 

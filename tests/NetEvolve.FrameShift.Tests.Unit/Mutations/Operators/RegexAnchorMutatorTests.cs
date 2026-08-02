@@ -243,7 +243,7 @@ public class RegexAnchorMutatorTests
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexAnchor);
         _ = await Assert
             .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(new[] { SyntaxKind.StringLiteralExpression });
+            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
     }
 
     /// <summary>
@@ -271,7 +271,7 @@ public class RegexAnchorMutatorTests
         _ = await Assert.That(offenders).IsEmpty();
         _ = await Assert
             .That(mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.RegexAnchor });
+            .IsEquivalentTo([MutationKind.RegexAnchor]);
     }
 
     /// <summary>

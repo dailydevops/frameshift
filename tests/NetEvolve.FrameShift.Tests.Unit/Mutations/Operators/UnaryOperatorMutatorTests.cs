@@ -165,7 +165,7 @@ public class UnaryOperatorMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.UnaryOperator);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(new[] { SyntaxKind.UnaryMinusExpression, SyntaxKind.UnaryPlusExpression });
+                .IsEquivalentTo([SyntaxKind.UnaryMinusExpression, SyntaxKind.UnaryPlusExpression]);
         }
     }
 
@@ -201,7 +201,7 @@ public class UnaryOperatorMutatorTests
                 .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
             _ = await Assert
                 .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-                .IsEquivalentTo(new[] { MutationKind.UnaryOperator });
+                .IsEquivalentTo([MutationKind.UnaryOperator]);
         }
     }
 

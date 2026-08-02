@@ -487,14 +487,13 @@ public class ArithmeticAssignmentMutatorTests
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
                 .IsEquivalentTo(
-                    new[]
-                    {
+                    [
                         SyntaxKind.AddAssignmentExpression,
                         SyntaxKind.SubtractAssignmentExpression,
                         SyntaxKind.MultiplyAssignmentExpression,
                         SyntaxKind.DivideAssignmentExpression,
                         SyntaxKind.ModuloAssignmentExpression,
-                    }
+                    ]
                 );
         }
     }
@@ -534,7 +533,7 @@ public class ArithmeticAssignmentMutatorTests
                 .IsEquivalentTo(Sorted(targets.Select(target => $"{symbol} => {SymbolOf(target)}")));
             _ = await Assert
                 .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-                .IsEquivalentTo(new[] { MutationKind.ArithmeticAssignment });
+                .IsEquivalentTo([MutationKind.ArithmeticAssignment]);
         }
     }
 

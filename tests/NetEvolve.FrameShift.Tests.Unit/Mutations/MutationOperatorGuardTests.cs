@@ -178,7 +178,7 @@ public class MutationOperatorGuardTests
         {
             _ = await Assert.That(mutator.Id).IsEqualTo(ProbeId);
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringLiteral);
-            _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo(new[] { SyntaxKind.AddExpression });
+            _ = await Assert.That(mutator.SupportedSyntaxKinds).IsEquivalentTo([SyntaxKind.AddExpression]);
         }
     }
 

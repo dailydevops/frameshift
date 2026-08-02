@@ -278,13 +278,12 @@ public class IncrementDecrementMutatorTests
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
                 .IsEquivalentTo(
-                    new[]
-                    {
+                    [
                         SyntaxKind.PreIncrementExpression,
                         SyntaxKind.PreDecrementExpression,
                         SyntaxKind.PostIncrementExpression,
                         SyntaxKind.PostDecrementExpression,
-                    }
+                    ]
                 );
         }
     }
@@ -315,10 +314,10 @@ public class IncrementDecrementMutatorTests
         {
             _ = await Assert
                 .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-                .IsEquivalentTo(new[] { expectedId });
+                .IsEquivalentTo([expectedId]);
             _ = await Assert
                 .That(Sorted(result.Mutations.Select(mutation => mutation.DisplayName)))
-                .IsEquivalentTo(new[] { expectedDisplayName });
+                .IsEquivalentTo([expectedDisplayName]);
             _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
             _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
         }
@@ -502,7 +501,7 @@ public class IncrementDecrementMutatorTests
         {
             _ = await Assert
                 .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-                .IsEquivalentTo(new[] { expectedId });
+                .IsEquivalentTo([expectedId]);
             _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
             _ = await Assert.That(result.Mutations[0].Original).IsEqualTo(result.Node);
         }

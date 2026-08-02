@@ -313,10 +313,10 @@ public class MutantCompilerTests
         {
             _ = await Assert
                 .That(VerdictsOf(results, ViableOperatorId))
-                .IsEquivalentTo(new[] { MutantViability.Viable });
+                .IsEquivalentTo([MutantViability.Viable]);
             _ = await Assert
                 .That(VerdictsOf(results, BrokenOperatorId))
-                .IsEquivalentTo(new[] { MutantViability.DoesNotCompile });
+                .IsEquivalentTo([MutantViability.DoesNotCompile]);
         }
     }
 
@@ -550,13 +550,12 @@ public class MutantCompilerTests
             _ = await Assert
                 .That(verdicts)
                 .IsEquivalentTo(
-                    new[]
-                    {
+                    [
                         MutantViability.Viable,
                         MutantViability.DoesNotCompile,
                         MutantViability.Viable,
                         MutantViability.DoesNotCompile,
-                    }
+                    ]
                 );
         }
     }
@@ -629,7 +628,7 @@ public class MutantCompilerTests
 
         var hashes = Enumerable.Range(0, 5).Select(_ => key.GetHashCode()).Distinct().ToArray();
 
-        _ = await Assert.That(hashes).IsEquivalentTo(new[] { key.GetHashCode() });
+        _ = await Assert.That(hashes).IsEquivalentTo([key.GetHashCode()]);
     }
 
     /// <summary>
@@ -662,7 +661,7 @@ public class MutantCompilerTests
     /// <param name="span">The source span the mutation rewrites.</param>
     /// <returns>The boxed key.</returns>
     private static object CreateKey(string operatorId, string? filePath, TextSpan span) =>
-        Activator.CreateInstance(_keyType, new object?[] { operatorId, filePath, span })!;
+        Activator.CreateInstance(_keyType, [operatorId, filePath, span])!;
 
     /// <summary>
     /// Calls the <see cref="IEquatable{T}" /> overload, which is the one the memoising dictionary uses.
@@ -671,7 +670,7 @@ public class MutantCompilerTests
     /// <param name="right">The right operand.</param>
     /// <returns>The result of the comparison.</returns>
     private static bool TypedEquals(object left, object right) =>
-        (bool)_keyType.GetMethod("Equals", new[] { _keyType })!.Invoke(left, new object?[] { right })!;
+        (bool)_keyType.GetMethod("Equals", [_keyType])!.Invoke(left, [right])!;
 
     /// <summary>
     /// Calls the <see cref="object.Equals(object)" /> override, which no production path reaches, because
@@ -681,14 +680,14 @@ public class MutantCompilerTests
     /// <param name="right">The value to compare it with, possibly of a foreign type or <see langword="null" />.</param>
     /// <returns>The result of the comparison.</returns>
     private static bool ObjectEquals(object left, object? right) =>
-        (bool)_keyType.GetMethod("Equals", new[] { typeof(object) })!.Invoke(left, new[] { right })!;
+        (bool)_keyType.GetMethod("Equals", [typeof(object)])!.Invoke(left, [right])!;
 
     private static bool OperatorEquals(object left, object right) => InvokeOperator("op_Equality", left, right);
 
     private static bool OperatorNotEquals(object left, object right) => InvokeOperator("op_Inequality", left, right);
 
     private static bool InvokeOperator(string name, object left, object right) =>
-        (bool)_keyType.GetMethod(name)!.Invoke(null, new object?[] { left, right })!;
+        (bool)_keyType.GetMethod(name)!.Invoke(null, [left, right])!;
 
     private static bool HasError(IEnumerable<Diagnostic> diagnostics) =>
         diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);

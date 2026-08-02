@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
+﻿namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
 using System.Globalization;
@@ -493,7 +493,7 @@ public class CultureMutationTests
                         (CaseConversionLine, "ToUpperInvariant => ToLowerInvariant")
                     )
                 );
-            _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { CaseConversionLine });
+            _ = await Assert.That(lines.Distinct()).IsEquivalentTo([CaseConversionLine]);
             _ = await Assert.That(Trivial(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
         }
     }

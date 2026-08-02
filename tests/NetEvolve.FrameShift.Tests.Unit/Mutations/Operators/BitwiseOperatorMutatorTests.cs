@@ -164,14 +164,13 @@ public class BitwiseOperatorMutatorTests
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
                 .IsEquivalentTo(
-                    new[]
-                    {
+                    [
                         SyntaxKind.BitwiseAndExpression,
                         SyntaxKind.BitwiseOrExpression,
                         SyntaxKind.ExclusiveOrExpression,
                         SyntaxKind.LeftShiftExpression,
                         SyntaxKind.RightShiftExpression,
-                    }
+                    ]
                 );
         }
     }
@@ -209,7 +208,7 @@ public class BitwiseOperatorMutatorTests
                 .IsEquivalentTo(Sorted(SplitValues(expectedDisplayNames)));
             _ = await Assert
                 .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-                .IsEquivalentTo(new[] { MutationKind.BitwiseOperator });
+                .IsEquivalentTo([MutationKind.BitwiseOperator]);
         }
     }
 
@@ -229,7 +228,7 @@ public class BitwiseOperatorMutatorTests
         {
             _ = await Assert
                 .That(Sorted(result.Mutations.Select(mutation => mutation.OperatorId)))
-                .IsEquivalentTo(new[] { expectedId });
+                .IsEquivalentTo([expectedId]);
             _ = await Assert.That(result.Mutations[0].DisplayName).IsEqualTo(expectedDisplayName);
             _ = await Assert.That(result.Mutations[0].Replacement.ToString()).IsEqualTo(expectedReplacement);
             _ = await Assert.That(result.Mutations[0].Kind.ToString()).IsEqualTo("ShiftOperator");

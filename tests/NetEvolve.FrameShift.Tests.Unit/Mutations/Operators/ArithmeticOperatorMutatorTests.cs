@@ -367,14 +367,13 @@ public class ArithmeticOperatorMutatorTests
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
                 .IsEquivalentTo(
-                    new[]
-                    {
+                    [
                         SyntaxKind.AddExpression,
                         SyntaxKind.SubtractExpression,
                         SyntaxKind.MultiplyExpression,
                         SyntaxKind.DivideExpression,
                         SyntaxKind.ModuloExpression,
-                    }
+                    ]
                 );
         }
     }
@@ -414,7 +413,7 @@ public class ArithmeticOperatorMutatorTests
                 .IsEquivalentTo(Sorted(targets.Select(target => $"{symbol} => {SymbolOf(target)}")));
             _ = await Assert
                 .That(result.Mutations.Select(mutation => mutation.Kind).Distinct())
-                .IsEquivalentTo(new[] { MutationKind.ArithmeticOperator });
+                .IsEquivalentTo([MutationKind.ArithmeticOperator]);
         }
     }
 

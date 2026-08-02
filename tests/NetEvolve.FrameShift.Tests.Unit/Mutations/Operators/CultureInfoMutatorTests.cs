@@ -363,7 +363,7 @@ public class CultureInfoMutatorTests
         {
             _ = await Assert.That(mutator.Id).IsEqualTo("culture.culture-info");
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.CultureInfo);
-            _ = await Assert.That(supported).IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression });
+            _ = await Assert.That(supported).IsEquivalentTo([SyntaxKind.SimpleMemberAccessExpression]);
         }
     }
 

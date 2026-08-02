@@ -257,7 +257,7 @@ public class RegexQuantifierMutatorTests
         _ = await Assert.That(offenders).IsEmpty();
         _ = await Assert
             .That(mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.RegexQuantifier });
+            .IsEquivalentTo([MutationKind.RegexQuantifier]);
     }
 
     /// <summary>

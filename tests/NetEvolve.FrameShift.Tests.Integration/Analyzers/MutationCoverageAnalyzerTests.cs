@@ -485,7 +485,7 @@ public class MutationCoverageAnalyzerTests
             _ = await Assert.That(manifestText).Contains(CoveredMemberId);
             _ = await Assert.That(manifestText.Contains("Shrink", StringComparison.Ordinal)).IsFalse();
             _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
-            _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { UncoveredMemberLine });
+            _ = await Assert.That(lines.Distinct()).IsEquivalentTo([UncoveredMemberLine]);
             _ = await Assert.That(lines.Where(line => line == CoveredMemberLine)).IsEmpty();
             _ = await Assert.That(DiagnosticAssertions.Describe(gaps)).Contains("Mutation '/ => +'");
         }
@@ -527,10 +527,10 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert
                 .That(trivial.Select(summary => summary.Line).Distinct())
-                .IsEquivalentTo(new[] { TrivialMutationLine });
+                .IsEquivalentTo([TrivialMutationLine]);
             _ = await Assert
                 .That(gaps.Select(summary => summary.Line).Distinct())
-                .IsEquivalentTo(new[] { TrivialFixtureGapLine });
+                .IsEquivalentTo([TrivialFixtureGapLine]);
             _ = await Assert.That(trivial.Select(summary => summary.Message)).Contains(DiscardedTrivialMessage);
         }
     }
@@ -553,7 +553,7 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert.That(Errors(compilation)).IsEmpty();
             _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
-            _ = await Assert.That(lines.Distinct()).IsEquivalentTo(new[] { UncoveredLogLine });
+            _ = await Assert.That(lines.Distinct()).IsEquivalentTo([UncoveredLogLine]);
             _ = await Assert.That(lines.Where(line => line == CoveredLogLine)).IsEmpty();
             _ = await Assert
                 .That(DiagnosticAssertions.Describe(gaps))
@@ -625,7 +625,7 @@ public class MutationCoverageAnalyzerTests
             _ = await Assert.That(Errors(compilation)).IsEmpty();
             _ = await Assert.That(AnalyzerRunner.OfId(verified, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
             _ = await Assert.That(AnalyzerRunner.OfId(verified, DiagnosticIds.UnreachableMutationPoint)).IsEmpty();
-            _ = await Assert.That(reported.Select(summary => summary.Line)).IsEquivalentTo(new[] { ElapsedMemberLine });
+            _ = await Assert.That(reported.Select(summary => summary.Line)).IsEquivalentTo([ElapsedMemberLine]);
             _ = await Assert.That(DiagnosticAssertions.Describe(unverified)).Contains("Mutation '- => +'");
         }
     }
@@ -719,11 +719,11 @@ public class MutationCoverageAnalyzerTests
             _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
             _ = await Assert
                 .That(SingleTestCaseLines(diagnostics).Distinct())
-                .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+                .IsEquivalentTo([AddMemberLine, NormalizeMemberLine]);
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([MultiplyMemberLine]);
             _ = await Assert
                 .That(SingleTestCaseMethods(diagnostics).Distinct(StringComparer.Ordinal))
-                .IsEquivalentTo(new[] { FirstAddTestName });
+                .IsEquivalentTo([FirstAddTestName]);
         }
     }
 
@@ -745,7 +745,7 @@ public class MutationCoverageAnalyzerTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([MultiplyMemberLine]);
         }
     }
 
@@ -764,7 +764,7 @@ public class MutationCoverageAnalyzerTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([MultiplyMemberLine]);
         }
     }
 
@@ -784,7 +784,7 @@ public class MutationCoverageAnalyzerTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([MultiplyMemberLine]);
         }
     }
 
@@ -807,7 +807,7 @@ public class MutationCoverageAnalyzerTests
         using (Assert.Multiple())
         {
             _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { MultiplyMemberLine });
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([MultiplyMemberLine]);
         }
     }
 
@@ -829,7 +829,7 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert
                 .That(SingleTestCaseLines(alone).Distinct())
-                .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
+                .IsEquivalentTo([AddMemberLine, NormalizeMemberLine]);
             _ = await Assert.That(SingleTestCaseDiagnostics(merged)).IsEmpty();
         }
     }
@@ -852,10 +852,10 @@ public class MutationCoverageAnalyzerTests
             _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest)).IsEmpty();
             _ = await Assert
                 .That(SingleTestCaseLines(diagnostics).Distinct())
-                .IsEquivalentTo(new[] { AddMemberLine, NormalizeMemberLine });
+                .IsEquivalentTo([AddMemberLine, NormalizeMemberLine]);
             _ = await Assert
                 .That(SingleTestCaseMethods(diagnostics).Distinct(StringComparer.Ordinal))
-                .IsEquivalentTo(new[] { FirstAddTestName });
+                .IsEquivalentTo([FirstAddTestName]);
         }
     }
 
@@ -877,9 +877,9 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert
                 .That(trivial.Select(summary => summary.Line).Distinct())
-                .IsEquivalentTo(new[] { TrivialMutationLine });
+                .IsEquivalentTo([TrivialMutationLine]);
             _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsEmpty();
-            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo(new[] { TrivialFixtureGapLine });
+            _ = await Assert.That(GapLines(diagnostics).Distinct()).IsEquivalentTo([TrivialFixtureGapLine]);
         }
     }
 
@@ -909,7 +909,7 @@ public class MutationCoverageAnalyzerTests
         {
             _ = await Assert.That(SingleTestCaseDiagnostics(unlimited)).Count().IsEqualTo(CombineMutantCount);
             _ = await Assert.That(SingleTestCaseDiagnostics(limited)).Count().IsEqualTo(1);
-            _ = await Assert.That(SingleTestCaseLines(limited)).IsEquivalentTo(new[] { CombineMemberLine });
+            _ = await Assert.That(SingleTestCaseLines(limited)).IsEquivalentTo([CombineMemberLine]);
         }
     }
 
@@ -989,7 +989,7 @@ public class MutationCoverageAnalyzerTests
             _ = await Assert.That(DiagnosticAssertions.Describe(problems)).Contains(BrokenManifestPath);
             _ = await Assert
                 .That(GapLines(diagnostics).Distinct())
-                .IsEquivalentTo(new[] { BetaMemberLine, GammaMemberLine });
+                .IsEquivalentTo([BetaMemberLine, GammaMemberLine]);
         }
     }
 

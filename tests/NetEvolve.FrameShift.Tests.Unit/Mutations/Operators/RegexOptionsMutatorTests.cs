@@ -336,7 +336,7 @@ public class RegexOptionsMutatorTests
             _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexOptions);
             _ = await Assert
                 .That(mutator.SupportedSyntaxKinds)
-                .IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression, SyntaxKind.BitwiseOrExpression });
+                .IsEquivalentTo([SyntaxKind.SimpleMemberAccessExpression, SyntaxKind.BitwiseOrExpression]);
         }
     }
 
@@ -368,7 +368,7 @@ public class RegexOptionsMutatorTests
             _ = await Assert.That(offenders).IsEmpty();
             _ = await Assert
                 .That(mutations.Select(mutation => mutation.Kind).Distinct())
-                .IsEquivalentTo(new[] { MutationKind.RegexOptions });
+                .IsEquivalentTo([MutationKind.RegexOptions]);
             _ = await Assert.That(mutations[0].OperatorId).IsEqualTo("culture.regex-options.remove-ignore-case");
             _ = await Assert.That(mutations[0].DisplayName).IsEqualTo("RegexOptions - IgnoreCase");
         }

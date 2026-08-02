@@ -236,8 +236,7 @@ public class StringComparerMutatorTests
         _memberNames
             .Select(Fixture)
             .Concat(
-                new[]
-                {
+                [
                     VariableInitialiserSource,
                     SwitchArmSource,
                     NullableSource,
@@ -249,7 +248,7 @@ public class StringComparerMutatorTests
                     ReceiverSource,
                     FactoryMethodSource,
                     UnrelatedTypeSource,
-                }
+                ]
             )
             .Select(source => (Func<string>)(() => source));
 
@@ -299,7 +298,7 @@ public class StringComparerMutatorTests
 
         _ = await Assert.That(mutator.Id).IsEqualTo("culture.string-comparer");
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.StringComparer);
-        _ = await Assert.That(supported).IsEquivalentTo(new[] { SyntaxKind.SimpleMemberAccessExpression });
+        _ = await Assert.That(supported).IsEquivalentTo([SyntaxKind.SimpleMemberAccessExpression]);
     }
 
     /// <summary>

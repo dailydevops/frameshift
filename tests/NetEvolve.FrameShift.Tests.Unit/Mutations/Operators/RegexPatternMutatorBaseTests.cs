@@ -192,7 +192,7 @@ public class RegexPatternMutatorBaseTests
 
         _ = await Assert
             .That(mutator.SupportedSyntaxKinds)
-            .IsEquivalentTo(new[] { SyntaxKind.StringLiteralExpression });
+            .IsEquivalentTo([SyntaxKind.StringLiteralExpression]);
         _ = await Assert.That(mutator.Id).IsEqualTo(ProbeId);
         _ = await Assert.That(mutator.Kind).IsEqualTo(MutationKind.RegexAnchor);
     }
@@ -233,7 +233,7 @@ public class RegexPatternMutatorBaseTests
 
         _ = await Assert
             .That(mutations.Select(mutation => mutation.Kind).Distinct())
-            .IsEquivalentTo(new[] { MutationKind.RegexAnchor });
+            .IsEquivalentTo([MutationKind.RegexAnchor]);
         _ = await Assert.That(mutations[0].Original.Span).IsEqualTo(literal.Span);
         _ = await Assert.That(mutations[0].Original.ToString()).IsEqualTo("\"^a$\"");
         _ = await Assert.That(mutations[0].Location.SourceSpan).IsEqualTo(literal.Span);
