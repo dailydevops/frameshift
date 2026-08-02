@@ -11,6 +11,7 @@
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="NetEvolve.Extensions.TUnit" />
     <PackageReference Include="TUnit" />
+    <PackageReference Include="Verify.TUnit" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />

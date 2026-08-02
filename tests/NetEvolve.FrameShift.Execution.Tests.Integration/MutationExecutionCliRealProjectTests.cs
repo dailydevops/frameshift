@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Execution;
+namespace NetEvolve.FrameShift.Execution.Tests.Integration;
 
 using System.Diagnostics;
 using NetEvolve.FrameShift.Execution;

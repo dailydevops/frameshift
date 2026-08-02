@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Execution;
+namespace NetEvolve.FrameShift.Execution.Tests.Unit;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;

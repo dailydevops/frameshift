@@ -1,10 +1,11 @@
-namespace NetEvolve.FrameShift.Tests.Execution;
+namespace NetEvolve.FrameShift.Execution.Tests.Integration;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Execution;
+using NetEvolve.FrameShift.Execution.Tests.Unit;
 using NetEvolve.FrameShift.Mutations;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;

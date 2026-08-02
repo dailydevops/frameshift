@@ -27,7 +27,10 @@
   </ItemGroup>
   <ItemGroup Label="Test visibility">
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Tests.Execution</_Parameter1>
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Integration</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 </Project>

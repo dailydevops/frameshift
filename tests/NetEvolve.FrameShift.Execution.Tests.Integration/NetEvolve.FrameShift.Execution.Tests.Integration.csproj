@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- Matches the net10.0-only NetEvolve.FrameShift.Execution project this exercises. -->
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+    <PackageReference Include="NetEvolve.Extensions.TUnit" />
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="Verify.TUnit" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />
+    <ProjectReference Include="../../src/NetEvolve.FrameShift.Execution/NetEvolve.FrameShift.Execution.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Shared test infrastructure">
+    <Compile Include="..\NetEvolve.FrameShift.Execution.Tests.Unit\RuntimeReferences.cs" Link="RuntimeReferences.cs" />
+  </ItemGroup>
+  <ItemGroup Label="Test categorisation">
+    <AssemblyAttribute Include="NetEvolve.Extensions.TUnit.IntegrationTestAttribute" />
+  </ItemGroup>
+</Project>

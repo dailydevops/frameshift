@@ -1,0 +1,12 @@
+﻿Usage: frameshift-execute --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>]
+
+  --test-output         The build output directory of the test project (contains the test
+                           assembly, the production assembly and every dependency of both).
+  --production-dll       The file name of the production assembly inside that directory,
+                           e.g. MyApp.dll. Recompiled fresh from --source; the copy already in
+                           the output directory is never read.
+  --test-dll             The file name of the test assembly inside that directory.
+  --source              A production source file to compile and generate mutations from.
+                           Repeatable.
+  --timeout-seconds    How long to wait for the test host of a single mutant before it is
+                           killed and the mutant is reported as timed out. Defaults to 60.

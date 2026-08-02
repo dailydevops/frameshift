@@ -1,10 +1,11 @@
-namespace NetEvolve.FrameShift.Tests.Execution;
+namespace NetEvolve.FrameShift.Execution.Tests.Integration;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Execution;
+using NetEvolve.FrameShift.Execution.Tests.Unit;
 using NetEvolve.FrameShift.Mutations;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -126,6 +127,35 @@ public class MutationExecutionEngineTests
             _ = await Assert.That(score.Survived).IsEqualTo(1);
             _ = await Assert.That(score.BuildFailed).IsEqualTo(0);
             _ = await Assert.That(score.Score).IsEqualTo(0.5);
+        }
+    }
+
+    /// <summary>
+    /// A mutation whose <see cref="Mutation.Original" /> node does not belong to the tree it is applied
+    /// to cannot be built at all: <see cref="Mutation.ApplyTo" /> rejects it before there is ever a
+    /// mutated compilation to emit. This is reported the same way a mutant that emits but fails is, not
+    /// as an exception the caller has to guard against.
+    /// </summary>
+    [Test]
+    public async Task Execute_MutationNotBelongingToTheTree_IsReportedAsBuildFailed()
+    {
+        var (compilation, tree, _) = CreateFixture();
+        var unrelatedNode = SyntaxFactory.ClassDeclaration("Unrelated");
+
+        var mutation = new Mutation(
+            MutationKind.ArithmeticOperator,
+            "test.unrelated-node",
+            "unrelated",
+            unrelatedNode,
+            unrelatedNode
+        );
+
+        var result = MutationExecutionEngine.Execute(compilation, mutation, tree, TestTypeFullName, TestMethodName);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Verdict).IsEqualTo(MutantVerdict.BuildFailed);
+            _ = await Assert.That(result.Failure).IsNull();
         }
     }
 

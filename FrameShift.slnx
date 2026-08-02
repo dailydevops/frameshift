@@ -26,7 +26,8 @@
     <Project Path="src/NetEvolve.FrameShift.Execution/NetEvolve.FrameShift.Execution.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/NetEvolve.FrameShift.Tests.Execution/NetEvolve.FrameShift.Tests.Execution.csproj" />
+    <Project Path="tests/NetEvolve.FrameShift.Execution.Tests.Integration/NetEvolve.FrameShift.Execution.Tests.Integration.csproj" />
+    <Project Path="tests/NetEvolve.FrameShift.Execution.Tests.Unit/NetEvolve.FrameShift.Execution.Tests.Unit.csproj" />
     <Project Path="tests/NetEvolve.FrameShift.Tests.Integration/NetEvolve.FrameShift.Tests.Integration.csproj" />
     <Project Path="tests/NetEvolve.FrameShift.Tests.Unit/NetEvolve.FrameShift.Tests.Unit.csproj" />
   </Folder>
