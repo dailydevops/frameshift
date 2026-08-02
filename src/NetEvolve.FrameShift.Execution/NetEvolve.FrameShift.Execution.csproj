@@ -1,6 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>$(_NetTargetFrameworks)</TargetFrameworks>
+    <!--
+      net10.0 only, deliberately narrower than $(_NetTargetFrameworks): execution-based mutation
+      verification needs a collectible, unloadable AssemblyLoadContext, which every net6.0+ runtime
+      already has, but this tool otherwise has no consumer yet and no compatibility promise to keep, so
+      it tracks the newest supported runtime instead of the widest one. Broadening the matrix is only a
+      TargetFrameworks edit away once there is a reason to.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
     <!--
       This is an internal engineering tool for execution-based mutation verification, not (yet) a
       published package: there is no CLI or MSBuild integration wired up for it yet, see the remarks of
@@ -8,20 +15,6 @@
     -->
     <IsPackable>false</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
-    <!--
-      Microsoft.CodeAnalysis.CSharp's transitive dependencies (System.Collections.Immutable,
-      System.Reflection.Metadata) do not list net6.0/net7.0 as supported anymore at their current
-      version; they still work correctly there; NetEvolve.FrameShift.Tests.Unit already suppresses the
-      same warning for the same reason.
-    -->
-    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
-    <!--
-      Execution-based mutation verification needs a collectible, unloadable AssemblyLoadContext to load
-      and discard one mutant assembly after another without leaking them for the lifetime of the
-      process. That type is CoreCLR-only, so this library - unlike the analyzer itself - never targets
-      netstandard2.0 or a .NET Framework target: those hosts have no equivalent primitive, only the
-      heavier, process-level isolation of a separate AppDomain, which is out of scope for now.
-    -->
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
