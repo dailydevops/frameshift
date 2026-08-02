@@ -39,4 +39,11 @@ internal static class DiagnosticIds
     /// <see cref="Microsoft.CodeAnalysis.DiagnosticDescriptor" /> nor tracked as an analyzer release.
     /// </remarks>
     public const string SingleTestCaseMutationPoint = "FSH0006";
+
+    /// <summary>
+    /// <c>FSH0007</c>: a mutation point is reachable, but only through references that carry no
+    /// credible basis for believing a mutation would be observed - a reachability-only, bridge-style
+    /// test without a behavioral assertion.
+    /// </summary>
+    public const string ReachabilityOnlyMutationPoint = "FSH0007";
 }

@@ -133,8 +133,9 @@ internal static class TestSurfaceManifestReader
 
         var isTestLine = marker[0] == TestSurfaceManifestFormat.TestPrefix;
         var isReferenceLine = marker[0] == TestSurfaceManifestFormat.ReferencePrefix;
+        var isBehavioralReferenceLine = marker[0] == TestSurfaceManifestFormat.BehavioralReferencePrefix;
 
-        if (!isTestLine && !isReferenceLine)
+        if (!isTestLine && !isReferenceLine && !isBehavioralReferenceLine)
         {
             return true;
         }
@@ -148,9 +149,14 @@ internal static class TestSurfaceManifestReader
             return false;
         }
 
-        return isTestLine
-            ? TryReadTest(arguments, lineNumber, blocks, out error)
-            : TryReadReference(arguments, lineNumber, blocks, out error);
+        if (isTestLine)
+        {
+            return TryReadTest(arguments, lineNumber, blocks, out error);
+        }
+
+        return isReferenceLine
+            ? TryReadReference(arguments, lineNumber, blocks, out error)
+            : TryReadBehavioralReference(arguments, lineNumber, blocks, out error);
     }
 
     /// <summary>
@@ -222,6 +228,36 @@ internal static class TestSurfaceManifestReader
         return true;
     }
 
+    /// <summary>
+    /// Reads a <c>B</c> line, which marks a referenced production member of the enclosing block as
+    /// behaviorally verified.
+    /// </summary>
+    /// <param name="arguments">The trimmed part of the line following the marker.</param>
+    /// <param name="lineNumber">The 1-based number of the line.</param>
+    /// <param name="blocks">The builder collecting the per-test blocks.</param>
+    /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
+    /// <returns><see langword="true" /> if the line is well-formed; otherwise <see langword="false" />.</returns>
+    private static bool TryReadBehavioralReference(
+        string arguments,
+        int lineNumber,
+        BlockBuilder blocks,
+        out string? error
+    )
+    {
+        if (!blocks.TryAddBehavioralReference(arguments))
+        {
+            error =
+                $"Line {lineNumber}: the '{TestSurfaceManifestFormat.BehavioralReferencePrefix}' entry appears "
+                + $"before any '{TestSurfaceManifestFormat.TestPrefix}' entry.";
+
+            return false;
+        }
+
+        error = null;
+
+        return true;
+    }
+
     private static int IndexOfWhiteSpace(string value)
     {
         for (var index = 0; index < value.Length; index++)
@@ -243,7 +279,9 @@ internal static class TestSurfaceManifestReader
     {
         private readonly ImmutableDictionary<string, TestCaseCount>.Builder _counts;
         private readonly Dictionary<string, ImmutableHashSet<string>.Builder> _references;
+        private readonly Dictionary<string, ImmutableHashSet<string>.Builder> _behavioralReferences;
         private ImmutableHashSet<string>.Builder? _current;
+        private ImmutableHashSet<string>.Builder? _currentBehavioral;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BlockBuilder" /> class.
@@ -252,6 +290,7 @@ internal static class TestSurfaceManifestReader
         {
             _counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
             _references = new Dictionary<string, ImmutableHashSet<string>.Builder>(StringComparer.Ordinal);
+            _behavioralReferences = new Dictionary<string, ImmutableHashSet<string>.Builder>(StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -273,6 +312,8 @@ internal static class TestSurfaceManifestReader
             _counts[testMethodId] = count;
             _current = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
             _references[testMethodId] = _current;
+            _currentBehavioral = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            _behavioralReferences[testMethodId] = _currentBehavioral;
 
             return true;
         }
@@ -298,6 +339,26 @@ internal static class TestSurfaceManifestReader
         }
 
         /// <summary>
+        /// Marks a referenced production member of the currently open block as behaviorally verified.
+        /// </summary>
+        /// <param name="referencedMemberId">The documentation comment id of the production member.</param>
+        /// <returns>
+        /// <see langword="true" /> if the member was recorded; <see langword="false" /> if no block is
+        /// open yet, which is malformed.
+        /// </returns>
+        public bool TryAddBehavioralReference(string referencedMemberId)
+        {
+            if (_currentBehavioral is null)
+            {
+                return false;
+            }
+
+            _ = _currentBehavioral.Add(referencedMemberId);
+
+            return true;
+        }
+
+        /// <summary>
         /// Builds the parsed manifest from the collected blocks.
         /// </summary>
         /// <returns>The parsed manifest.</returns>
@@ -312,7 +373,20 @@ internal static class TestSurfaceManifestReader
                 references[entry.Key] = entry.Value.ToImmutable();
             }
 
-            return new TestSurfaceManifest(_counts.ToImmutable(), references.ToImmutable());
+            var behavioralReferences = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+                StringComparer.Ordinal
+            );
+
+            foreach (var entry in _behavioralReferences)
+            {
+                behavioralReferences[entry.Key] = entry.Value.ToImmutable();
+            }
+
+            return new TestSurfaceManifest(
+                _counts.ToImmutable(),
+                references.ToImmutable(),
+                behavioralReferences.ToImmutable()
+            );
         }
     }
 }

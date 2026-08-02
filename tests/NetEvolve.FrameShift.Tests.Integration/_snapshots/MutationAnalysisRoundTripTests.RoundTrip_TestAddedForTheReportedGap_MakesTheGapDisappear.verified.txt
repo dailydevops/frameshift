@@ -4,7 +4,22 @@ frameshift-test-surface/1
 T M:Tests.CalculatorTests.Add_ReturnsTheSum 1
 R M:Fixture.Calculator.#ctor
 R M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+R M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+R M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+R M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+R M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
 R T:Fixture.Calculator
+R T:System.Int32
+R T:TUnit.Assertions.Assert
+B M:Fixture.Calculator.#ctor
+B M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+B M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+B M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+B M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+B M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
+B T:Fixture.Calculator
+B T:System.Int32
+B T:TUnit.Assertions.Assert
 
 --- diagnostics ---
 FSH0006 Production.cs(7,16): Mutation '+ => %' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Add_ReturnsTheSum'; a mutant that only differs for other inputs would survive
@@ -26,11 +41,41 @@ frameshift-test-surface/1
 T M:Tests.CalculatorTests.Add_ReturnsTheSum 1
 R M:Fixture.Calculator.#ctor
 R M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+R M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+R M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+R M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+R M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
 R T:Fixture.Calculator
+R T:System.Int32
+R T:TUnit.Assertions.Assert
+B M:Fixture.Calculator.#ctor
+B M:Fixture.Calculator.Add(System.Int32,System.Int32)~System.Int32
+B M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+B M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+B M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+B M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
+B T:Fixture.Calculator
+B T:System.Int32
+B T:TUnit.Assertions.Assert
 T M:Tests.CalculatorTests.Subtract_ReturnsTheDifference 1
 R M:Fixture.Calculator.#ctor
 R M:Fixture.Calculator.Subtract(System.Int32,System.Int32)~System.Int32
+R M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+R M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+R M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+R M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
 R T:Fixture.Calculator
+R T:System.Int32
+R T:TUnit.Assertions.Assert
+B M:Fixture.Calculator.#ctor
+B M:Fixture.Calculator.Subtract(System.Int32,System.Int32)~System.Int32
+B M:System.Runtime.CompilerServices.TaskAwaiter`1.GetResult~`0
+B M:TUnit.Assertions.Assert.That``1(``0,System.String)~TUnit.Assertions.Sources.ValueAssertion{``0}
+B M:TUnit.Assertions.Core.Assertion`1.GetAwaiter~System.Runtime.CompilerServices.TaskAwaiter{`0}
+B M:TUnit.Assertions.Extensions.IntEqualsAssertionExtensions.IsEqualTo(TUnit.Assertions.Core.IAssertionSource{System.Int32},System.Int32,System.String)~TUnit.Assertions.Conditions.IntEqualsAssertion
+B T:Fixture.Calculator
+B T:System.Int32
+B T:TUnit.Assertions.Assert
 
 --- diagnostics ---
 FSH0006 Production.cs(7,16): Mutation '+ => %' is reached by a single test case, the one of test method 'Tests.CalculatorTests.Add_ReturnsTheSum'; a mutant that only differs for other inputs would survive

@@ -29,6 +29,21 @@ internal static class TestSurfaceManifestFormat
     public const char ReferencePrefix = 'R';
 
     /// <summary>
+    /// The line prefix marking the documentation comment id of a production member that the test method
+    /// of the enclosing block references with a credible basis for believing a mutation of it would be
+    /// observed: the reference is an actual invocation (not a bare method-group conversion) and the test
+    /// method, or a member it reaches, also calls a recognised, non-trivial assertion API. Such a line
+    /// belongs to the preceding <see cref="TestPrefix" /> line, exactly like <see cref="ReferencePrefix" />,
+    /// and is a subset of that block's references.
+    /// </summary>
+    /// <remarks>
+    /// An older reader that does not know this marker ignores the line, exactly as it ignores any other
+    /// unknown marker, so a manifest carrying it stays readable by an older analyzer version - it simply
+    /// falls back to reachability-only precision for every mutation point.
+    /// </remarks>
+    public const char BehavioralReferencePrefix = 'B';
+
+    /// <summary>
     /// The line prefix marking a comment line, which is ignored while parsing.
     /// </summary>
     public const char CommentPrefix = '#';

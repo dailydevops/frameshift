@@ -650,6 +650,18 @@ public class CultureMutationTests
                 .Append('\n');
         }
 
+        // These tests are about which mutation points are reachable, not about the behavioral
+        // classification, so every reference is also written as behaviorally verified to keep FSH0007
+        // out of a diagnostic set that is meant to be a statement about the culture operators alone.
+        foreach (var referencedMemberId in referencedMemberIds)
+        {
+            _ = builder
+                .Append(TestSurfaceManifestFormat.BehavioralReferencePrefix)
+                .Append(TestSurfaceManifestFormat.FieldSeparator)
+                .Append(referencedMemberId)
+                .Append('\n');
+        }
+
         return new InMemoryAdditionalText(builder.ToString());
     }
 

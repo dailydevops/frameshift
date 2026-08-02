@@ -251,6 +251,53 @@ public class TestSurfaceManifestTests
         }
     }
 
+    [Test]
+    public async Task Constructor_ThreeArgumentForm_DerivesBehavioralReferencedMemberIdsAsTheUnion()
+    {
+        var manifest = BlocksWithBehavioral(
+            (TestId, TestCaseCount.Exact(3), [MemberId], [MemberId]),
+            (OtherTestId, TestCaseCount.AtLeast(1), [MemberId, OtherMemberId], [OtherMemberId])
+        );
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(Join(manifest.BehavioralReferencedMemberIds))
+                .IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert.That(Join(manifest.BehavioralReferencesByTest[TestId])).IsEqualTo(MemberId);
+            _ = await Assert.That(Join(manifest.BehavioralReferencesByTest[OtherTestId])).IsEqualTo(OtherMemberId);
+        }
+    }
+
+    /// <summary>
+    /// The type does not enforce that a behavioral reference also appears as a plain reference: the two
+    /// maps are stored independently.
+    /// </summary>
+    [Test]
+    public async Task Constructor_ABehavioralReferenceNotPresentInTheReferences_IsNotRejected()
+    {
+        var counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+        counts[TestId] = TestCaseCount.Exact(1);
+        var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+        references[TestId] = Ids(MemberId);
+        var behavioralReferences = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+        behavioralReferences[TestId] = Ids(OtherMemberId);
+
+        var manifest = new TestSurfaceManifest(
+            counts.ToImmutable(),
+            references.ToImmutable(),
+            behavioralReferences.ToImmutable()
+        );
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(MemberId);
+            _ = await Assert.That(Join(manifest.BehavioralReferencesByTest[TestId])).IsEqualTo(OtherMemberId);
+        }
+    }
+
     /// <summary>
     /// Two frameworks contributing to the same compilation produce one manifest each, and the merged
     /// result has to keep the blocks apart: a shared member is reached by both tests, which is exactly
@@ -292,6 +339,23 @@ public class TestSurfaceManifestTests
             _ = await Assert.That(Join(merged.TestMethodIds)).IsEqualTo(TestId);
             _ = await Assert.That(merged.TestCaseCounts[TestId]).IsEqualTo(TestCaseCount.Exact(3));
             _ = await Assert.That(Join(merged.ReferencesByTest[TestId])).IsEqualTo(MemberId + "|" + OtherMemberId);
+        }
+    }
+
+    [Test]
+    public async Task Merge_ManifestsWithBehavioralReferences_UnionsThemAcrossManifests()
+    {
+        var first = BlocksWithBehavioral((TestId, TestCaseCount.Exact(3), [MemberId], [MemberId]));
+        var second = BlocksWithBehavioral((TestId, TestCaseCount.Exact(3), [OtherMemberId], [OtherMemberId]));
+
+        var merged = TestSurfaceManifest.Merge([first, second]);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Join(merged.BehavioralReferencedMemberIds)).IsEqualTo(MemberId + "|" + OtherMemberId);
+            _ = await Assert
+                .That(Join(merged.BehavioralReferencesByTest[TestId]))
+                .IsEqualTo(MemberId + "|" + OtherMemberId);
         }
     }
 
@@ -353,6 +417,35 @@ public class TestSurfaceManifestTests
         }
 
         return new TestSurfaceManifest(counts.ToImmutable(), references.ToImmutable());
+    }
+
+    private static TestSurfaceManifest BlocksWithBehavioral(
+        params (
+            string TestMethodId,
+            TestCaseCount Count,
+            string[] ReferencedMemberIds,
+            string[] BehavioralReferencedMemberIds
+        )[] blocks
+    )
+    {
+        var counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+        var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+        var behavioralReferences = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+
+        foreach (var (testMethodId, count, referencedMemberIds, behavioralReferencedMemberIds) in blocks)
+        {
+            counts[testMethodId] = count;
+            references[testMethodId] = Ids(referencedMemberIds);
+            behavioralReferences[testMethodId] = Ids(behavioralReferencedMemberIds);
+        }
+
+        return new TestSurfaceManifest(
+            counts.ToImmutable(),
+            references.ToImmutable(),
+            behavioralReferences.ToImmutable()
+        );
     }
 
     private static ImmutableHashSet<string> Ids(params string[] ids) =>

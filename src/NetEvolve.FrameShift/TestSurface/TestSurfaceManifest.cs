@@ -14,6 +14,9 @@ using System.Collections.Immutable;
 /// </remarks>
 internal sealed class TestSurfaceManifest
 {
+    private static readonly ImmutableDictionary<string, ImmutableHashSet<string>> _noBehavioralReferences =
+        ImmutableDictionary<string, ImmutableHashSet<string>>.Empty;
+
     private static readonly TestSurfaceManifest _empty = new TestSurfaceManifest(
         ImmutableDictionary<string, TestCaseCount>.Empty,
         ImmutableDictionary<string, ImmutableHashSet<string>>.Empty
@@ -44,7 +47,40 @@ internal sealed class TestSurfaceManifest
         ImmutableDictionary<string, TestCaseCount> testCaseCounts,
         ImmutableDictionary<string, ImmutableHashSet<string>> referencesByTest
     )
-        : this(testCaseCounts, referencesByTest, ImmutableHashSet<string>.Empty) { }
+        : this(testCaseCounts, referencesByTest, _noBehavioralReferences) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="TestSurfaceManifest" /> class from the per-test
+    /// blocks of a manifest, including which of the references carry a credible basis for believing a
+    /// mutation would be observed.
+    /// </summary>
+    /// <param name="testCaseCounts">
+    /// The test case count of every discovered test method, keyed by its documentation comment id.
+    /// </param>
+    /// <param name="referencesByTest">
+    /// The documentation comment ids of the production members every discovered test method
+    /// references, keyed by the documentation comment id of the test method.
+    /// </param>
+    /// <param name="behavioralReferencesByTest">
+    /// The subset of <paramref name="referencesByTest" /> that was reached through an actual invocation
+    /// and whose enclosing test also calls a recognised, non-trivial assertion, keyed the same way. A
+    /// test method absent from this map contributes no behavioral reference at all.
+    /// </param>
+    /// <exception cref="ArgumentNullException">
+    /// Any argument is <see langword="null" />.
+    /// </exception>
+    public TestSurfaceManifest(
+        ImmutableDictionary<string, TestCaseCount> testCaseCounts,
+        ImmutableDictionary<string, ImmutableHashSet<string>> referencesByTest,
+        ImmutableDictionary<string, ImmutableHashSet<string>> behavioralReferencesByTest
+    )
+        : this(
+            testCaseCounts,
+            referencesByTest,
+            ImmutableHashSet<string>.Empty,
+            behavioralReferencesByTest,
+            ImmutableHashSet<string>.Empty
+        ) { }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TestSurfaceManifest" /> class from the flat unions
@@ -70,13 +106,17 @@ internal sealed class TestSurfaceManifest
         : this(
             BuildCounts(testMethodIds),
             BuildReferences(testMethodIds, referencedMemberIds),
-            Ordinal(referencedMemberIds)
+            Ordinal(referencedMemberIds),
+            _noBehavioralReferences,
+            ImmutableHashSet<string>.Empty
         ) { }
 
     private TestSurfaceManifest(
         ImmutableDictionary<string, TestCaseCount> testCaseCounts,
         ImmutableDictionary<string, ImmutableHashSet<string>> referencesByTest,
-        ImmutableHashSet<string> additionalReferencedMemberIds
+        ImmutableHashSet<string> additionalReferencedMemberIds,
+        ImmutableDictionary<string, ImmutableHashSet<string>> behavioralReferencesByTest,
+        ImmutableHashSet<string> additionalBehavioralReferencedMemberIds
     )
     {
         if (testCaseCounts is null)
@@ -89,14 +129,25 @@ internal sealed class TestSurfaceManifest
             throw new ArgumentNullException(nameof(referencesByTest));
         }
 
+        if (behavioralReferencesByTest is null)
+        {
+            throw new ArgumentNullException(nameof(behavioralReferencesByTest));
+        }
+
         var testMethodIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
         testMethodIds.UnionWith(testCaseCounts.Keys);
         testMethodIds.UnionWith(referencesByTest.Keys);
+        testMethodIds.UnionWith(behavioralReferencesByTest.Keys);
 
         TestMethodIds = testMethodIds.ToImmutable();
         TestCaseCounts = NormalizeCounts(testCaseCounts, TestMethodIds);
         ReferencesByTest = NormalizeReferences(referencesByTest, TestMethodIds);
         ReferencedMemberIds = UnionReferences(ReferencesByTest, additionalReferencedMemberIds);
+        BehavioralReferencesByTest = NormalizeReferences(behavioralReferencesByTest, TestMethodIds);
+        BehavioralReferencedMemberIds = UnionReferences(
+            BehavioralReferencesByTest,
+            additionalBehavioralReferencedMemberIds
+        );
     }
 
     /// <summary>
@@ -128,6 +179,21 @@ internal sealed class TestSurfaceManifest
     /// test methods, compared ordinally. This is the union over <see cref="ReferencesByTest" />.
     /// </summary>
     public ImmutableHashSet<string> ReferencedMemberIds { get; }
+
+    /// <summary>
+    /// Gets the subset of <see cref="ReferencesByTest" /> that each discovered test method references
+    /// with a credible basis for believing a mutation of it would be observed, keyed ordinally by the
+    /// documentation comment id of the test method. The keys are exactly <see cref="TestMethodIds" />,
+    /// and a test method without a behavioral reference maps to an empty set.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableHashSet<string>> BehavioralReferencesByTest { get; }
+
+    /// <summary>
+    /// Gets the documentation comment ids of the production members behaviorally referenced by the
+    /// discovered test methods, compared ordinally. This is the union over
+    /// <see cref="BehavioralReferencesByTest" /> and is always a subset of <see cref="ReferencedMemberIds" />.
+    /// </summary>
+    public ImmutableHashSet<string> BehavioralReferencedMemberIds { get; }
 
     /// <summary>
     /// Gets a value indicating whether the manifest contains neither a test method nor a referenced
@@ -163,6 +229,10 @@ internal sealed class TestSurfaceManifest
         var counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
         var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
         var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+        var behavioralReferences = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+        var behavioralReferencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
 
         foreach (var manifest in manifests)
         {
@@ -171,13 +241,22 @@ internal sealed class TestSurfaceManifest
                 throw new ArgumentException("One of the manifests to merge is null.", nameof(manifests));
             }
 
-            MergeOne(manifest, counts, references, referencedMemberIds);
+            MergeOne(
+                manifest,
+                counts,
+                references,
+                referencedMemberIds,
+                behavioralReferences,
+                behavioralReferencedMemberIds
+            );
         }
 
         return new TestSurfaceManifest(
             counts.ToImmutable(),
             references.ToImmutable(),
-            referencedMemberIds.ToImmutable()
+            referencedMemberIds.ToImmutable(),
+            behavioralReferences.ToImmutable(),
+            behavioralReferencedMemberIds.ToImmutable()
         );
     }
 
@@ -185,10 +264,13 @@ internal sealed class TestSurfaceManifest
         TestSurfaceManifest manifest,
         ImmutableDictionary<string, TestCaseCount>.Builder counts,
         ImmutableDictionary<string, ImmutableHashSet<string>>.Builder references,
-        ImmutableHashSet<string>.Builder referencedMemberIds
+        ImmutableHashSet<string>.Builder referencedMemberIds,
+        ImmutableDictionary<string, ImmutableHashSet<string>>.Builder behavioralReferences,
+        ImmutableHashSet<string>.Builder behavioralReferencedMemberIds
     )
     {
         referencedMemberIds.UnionWith(manifest.ReferencedMemberIds);
+        behavioralReferencedMemberIds.UnionWith(manifest.BehavioralReferencedMemberIds);
 
         foreach (var testMethodId in manifest.TestMethodIds)
         {
@@ -200,6 +282,13 @@ internal sealed class TestSurfaceManifest
             references[testMethodId] = references.TryGetValue(testMethodId, out var existing)
                 ? existing.Union(manifest.ReferencesByTest[testMethodId])
                 : manifest.ReferencesByTest[testMethodId];
+
+            behavioralReferences[testMethodId] = behavioralReferences.TryGetValue(
+                testMethodId,
+                out var existingBehavioral
+            )
+                ? existingBehavioral.Union(manifest.BehavioralReferencesByTest[testMethodId])
+                : manifest.BehavioralReferencesByTest[testMethodId];
         }
     }
 

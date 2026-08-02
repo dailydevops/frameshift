@@ -342,6 +342,85 @@ public class TestSurfaceManifestReaderTests
         }
     }
 
+    [Test]
+    public async Task TryRead_BehavioralReferenceLine_ParsesIntoBehavioralReferencesByTest()
+    {
+        var text = Build("\n", Header, "T " + TestId + " 1", "R " + ReferenceId, "B " + ReferenceId);
+
+        var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.BehavioralReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+            _ = await Assert.That(Join(manifest.BehavioralReferencedMemberIds)).IsEqualTo(ReferenceId);
+        }
+    }
+
+    /// <summary>
+    /// The references and the behavioral references are independent sets: a member behaviorally verified
+    /// without also appearing as a plain reference is still recorded.
+    /// </summary>
+    [Test]
+    public async Task TryRead_BehavioralReferenceForAnIdNotAlsoAReference_IsAcceptedAsAnIndependentSet()
+    {
+        var text = Build("\n", Header, "T " + TestId + " 1", "R " + ReferenceId, "B " + OtherReferenceId);
+
+        var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(Join(manifest.ReferencesByTest[TestId])).IsEqualTo(ReferenceId);
+            _ = await Assert.That(Join(manifest.BehavioralReferencesByTest[TestId])).IsEqualTo(OtherReferenceId);
+        }
+    }
+
+    [Test]
+    public async Task TryRead_BehavioralReferenceBeforeAnyTest_IsMalformed()
+    {
+        var text = Build("\n", Header, "B " + ReferenceId, "T " + TestId + " 1");
+
+        var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(manifest.IsEmpty).IsTrue();
+            _ = await Assert.That(error).IsEqualTo("Line 2: the 'B' entry appears before any 'T' entry.");
+        }
+    }
+
+    /// <summary>
+    /// An older manifest carries no <c>B</c> lines at all, and every test still has to expose an empty
+    /// behavioral set instead of a missing key.
+    /// </summary>
+    [Test]
+    public async Task TryRead_OldFormatManifestWithoutBehavioralLines_ParsesWithEmptyBehavioralData()
+    {
+        var text = Build(
+            "\n",
+            Header,
+            "T " + TestId + " 1",
+            "R " + ReferenceId,
+            "T " + OtherTestId + " 2",
+            "R " + OtherReferenceId
+        );
+
+        var parsed = TestSurfaceManifestReader.TryRead(text, out var manifest, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert.That(manifest.BehavioralReferencesByTest[TestId]).IsEmpty();
+            _ = await Assert.That(manifest.BehavioralReferencesByTest[OtherTestId]).IsEmpty();
+            _ = await Assert.That(manifest.BehavioralReferencedMemberIds).IsEmpty();
+        }
+    }
+
     /// <summary>
     /// A reference without an enclosing block belongs to nothing, and guessing an owner for it would
     /// invent an attribution the writer never produced.
