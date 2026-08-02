@@ -9,10 +9,13 @@
     -->
     <TargetFramework>net10.0</TargetFramework>
     <!--
-      This is an internal engineering tool for execution-based mutation verification, not (yet) a
-      published package: there is no CLI or MSBuild integration wired up for it yet, see the remarks of
-      MutationExecutionEngine. Packing is switched off until that story exists.
+      This ships as a runnable tool (Program.cs), not only a library other code links against: the
+      assembly this produces can be invoked directly with `dotnet exec` or `dotnet run`, so a mutation
+      run can be started from a shell or a CI step instead of only from a caller that references the
+      library API. It is still not packaged as an installable dotnet tool or wired into an MSBuild
+      target - that remains follow-up work.
     -->
+    <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
   </PropertyGroup>
