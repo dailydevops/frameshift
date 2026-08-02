@@ -24,4 +24,12 @@ internal enum MutantVerdict
     /// <see cref="Mutations.MutantViability.DoesNotCompile" /> ever reaches classification for.
     /// </summary>
     BuildFailed,
+
+    /// <summary>
+    /// The test host was killed for exceeding its timeout before it reported an exit code. This is not a
+    /// kill: an infinite loop a mutation introduced is a real gap, but this runner cannot currently tell
+    /// that apart from the host being slow or stuck for an unrelated reason, so a timeout is excluded
+    /// from the mutation score the same way a mutant that never became a real program is.
+    /// </summary>
+    Timeout,
 }

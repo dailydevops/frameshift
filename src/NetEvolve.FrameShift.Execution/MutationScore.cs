@@ -32,6 +32,11 @@ internal sealed class MutationScore
     public int BuildFailed => Results.Count(result => result.Verdict == MutantVerdict.BuildFailed);
 
     /// <summary>
+    /// Gets the number of mutants whose test host had to be killed for exceeding its timeout.
+    /// </summary>
+    public int TimedOut => Results.Count(result => result.Verdict == MutantVerdict.Timeout);
+
+    /// <summary>
     /// Gets the mutation score: <see cref="Killed" /> divided by the number of mutants that were real
     /// programs at all (<see cref="Killed" /> plus <see cref="Survived" />), excluding
     /// <see cref="BuildFailed" /> mutants the same way the analyzer never classifies a mutant that does

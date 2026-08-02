@@ -14,13 +14,24 @@ internal sealed class MutantExecutionResult
     /// <param name="verdict">The verdict the execution reached.</param>
     /// <param name="failure">
     /// The exception the test method threw, when <paramref name="verdict" /> is
-    /// <see cref="MutantVerdict.Killed" />; otherwise <see langword="null" />.
+    /// <see cref="MutantVerdict.Killed" /> and the mutant was run in-process; otherwise
+    /// <see langword="null" />.
     /// </param>
-    public MutantExecutionResult(Mutation mutation, MutantVerdict verdict, Exception? failure)
+    /// <param name="diagnostics">
+    /// The captured standard output and standard error of the test host, when the mutant was run as a
+    /// subprocess; otherwise <see langword="null" />.
+    /// </param>
+    public MutantExecutionResult(
+        Mutation mutation,
+        MutantVerdict verdict,
+        Exception? failure,
+        string? diagnostics = null
+    )
     {
         Mutation = mutation ?? throw new ArgumentNullException(nameof(mutation));
         Verdict = verdict;
         Failure = failure;
+        Diagnostics = diagnostics;
     }
 
     /// <summary>
@@ -34,8 +45,14 @@ internal sealed class MutantExecutionResult
     public MutantVerdict Verdict { get; }
 
     /// <summary>
-    /// Gets the exception the test method threw when the mutant was killed, or <see langword="null" />
-    /// otherwise.
+    /// Gets the exception the test method threw when the mutant was killed running in-process, or
+    /// <see langword="null" /> otherwise.
     /// </summary>
     public Exception? Failure { get; }
+
+    /// <summary>
+    /// Gets the captured standard output and standard error of the test host, when the mutant was run as
+    /// a subprocess through <see cref="ProcessTestHostRunner" />; otherwise <see langword="null" />.
+    /// </summary>
+    public string? Diagnostics { get; }
 }
