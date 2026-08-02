@@ -34,6 +34,18 @@
                                                          Enabling it turns on $(EmitCompilerGeneratedFiles).
       FrameShiftTestSurfaceManifestFile     path         The manifest file that is written. Default:
                                                          $(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests.
+      FrameShiftTestAnalyzers               list         A ';'-separated list of the test-surface analyzers
+                                                         allowed to run, by token: TUnit, XunitV2, XunitV3,
+                                                         NUnit, MSTest. Default: Discovery, which runs every
+                                                         framework's analyzer exactly as if this property did
+                                                         not exist - each awake purely by its own probe's
+                                                         detection. Naming one or more specific tokens turns
+                                                         the property into an allow-list instead: every other
+                                                         framework's analyzer reports nothing at all, even if
+                                                         its package is referenced and it would otherwise have
+                                                         detected tests. Does not affect MutationCoverageAnalyzer,
+                                                         which is framework-neutral and controlled by
+                                                         FrameShiftEnabled alone.
   -->
 
   <PropertyGroup Label="FrameShift defaults">
@@ -43,6 +55,7 @@
     <FrameShiftMaxMutantsPerMember Condition=" '$(FrameShiftMaxMutantsPerMember)' == '' ">64</FrameShiftMaxMutantsPerMember>
     <FrameShiftReportTrivialMutants Condition=" '$(FrameShiftReportTrivialMutants)' == '' ">true</FrameShiftReportTrivialMutants>
     <FrameShiftEnableRegexPatternMutations Condition=" '$(FrameShiftEnableRegexPatternMutations)' == '' ">true</FrameShiftEnableRegexPatternMutations>
+    <FrameShiftTestAnalyzers Condition=" '$(FrameShiftTestAnalyzers)' == '' ">Discovery</FrameShiftTestAnalyzers>
   </PropertyGroup>
 
   <PropertyGroup Label="FrameShift item defaults">
@@ -60,6 +73,7 @@
     <CompilerVisibleProperty Include="FrameShiftMaxMutantsPerMember" />
     <CompilerVisibleProperty Include="FrameShiftReportTrivialMutants" />
     <CompilerVisibleProperty Include="FrameShiftEnableRegexPatternMutations" />
+    <CompilerVisibleProperty Include="FrameShiftTestAnalyzers" />
   </ItemGroup>
 
   <PropertyGroup Label="FrameShift manifest exclusions">

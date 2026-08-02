@@ -187,7 +187,7 @@ internal static class TestSurfaceAnalysis
     {
         var options = FrameShiftOptions.Read(context.Options.AnalyzerConfigOptionsProvider.GlobalOptions);
 
-        if (!options.IsEnabled)
+        if (!options.IsEnabled || !options.IsTestAnalyzerEnabled(probe.ConfigurationToken))
         {
             return;
         }
@@ -206,7 +206,7 @@ internal static class TestSurfaceAnalysis
             return;
         }
 
-        var awake = FindAwakeFrameworks(context, probe, recognizer, testMethods);
+        var awake = FindAwakeFrameworks(context, probe, recognizer, testMethods, options);
 
         ReportTestsWithoutProductionReference(context, probe, recognizer, awake);
 
@@ -232,6 +232,12 @@ internal static class TestSurfaceAnalysis
     /// The test methods already discovered for <paramref name="currentRecognizer" />, reused instead of
     /// being rediscovered for the matching registry entry.
     /// </param>
+    /// <param name="options">
+    /// The configuration deciding which framework analyzers are allowed to run at all. A candidate this
+    /// configuration disables is never treated as awake, so it can neither lead the manifest comparison
+    /// nor have its tests deferred to by an enabled framework that would otherwise expect it to report
+    /// them.
+    /// </param>
     /// <returns>
     /// The awake frameworks together with their recognisers, in the order of
     /// <see cref="TestFrameworkProbeRegistry.All" />.
@@ -240,7 +246,8 @@ internal static class TestSurfaceAnalysis
         CompilationAnalysisContext context,
         ITestFrameworkProbe currentProbe,
         ITestMethodRecognizer currentRecognizer,
-        ImmutableArray<IMethodSymbol> currentTestMethods
+        ImmutableArray<IMethodSymbol> currentTestMethods,
+        FrameShiftOptions options
     )
     {
         var builder = ImmutableArray.CreateBuilder<AwakeFramework>();
@@ -248,6 +255,11 @@ internal static class TestSurfaceAnalysis
         foreach (var candidate in TestFrameworkProbeRegistry.All)
         {
             context.CancellationToken.ThrowIfCancellationRequested();
+
+            if (!options.IsTestAnalyzerEnabled(candidate.ConfigurationToken))
+            {
+                continue;
+            }
 
             if (IsSameFramework(candidate, currentProbe))
             {

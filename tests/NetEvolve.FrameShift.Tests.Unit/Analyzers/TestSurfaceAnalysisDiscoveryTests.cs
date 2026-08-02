@@ -8,6 +8,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NetEvolve.FrameShift.Analyzers;
+using NetEvolve.FrameShift.Configuration;
 using NetEvolve.FrameShift.Tests.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
@@ -118,7 +119,7 @@ public class TestSurfaceAnalysisDiscoveryTests
             typeof(TestSurfaceAnalysis).GetMethod("FindAwakeFrameworks", BindingFlags.NonPublic | BindingFlags.Static)
             ?? throw new InvalidOperationException("TestSurfaceAnalysis.FindAwakeFrameworks was not found.");
 
-        var result = method.Invoke(null, [context, probe, recognizer, testMethods]);
+        var result = method.Invoke(null, [context, probe, recognizer, testMethods, FrameShiftOptions.Default]);
 
         return (IEnumerable)result!;
     }

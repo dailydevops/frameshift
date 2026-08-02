@@ -1,5 +1,6 @@
-namespace NetEvolve.FrameShift.Configuration;
+﻿namespace NetEvolve.FrameShift.Configuration;
 
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis.Diagnostics;
 using NetEvolve.FrameShift.Mutations;
@@ -40,12 +41,29 @@ internal sealed class FrameShiftOptions
     /// </summary>
     public const bool DefaultEnableRegexPatternMutations = true;
 
+    /// <summary>
+    /// The token of <see cref="TestAnalyzers" /> that stands for every test-surface analyzer running
+    /// exactly as it would without this option, i.e. awake purely by its own probe's detection.
+    /// </summary>
+    public const string DiscoveryToken = "Discovery";
+
+    /// <summary>
+    /// The default of <see cref="TestAnalyzers" />, as a raw MSBuild property value.
+    /// </summary>
+    public const string DefaultTestAnalyzers = DiscoveryToken;
+
+    private static readonly ImmutableHashSet<string> _defaultTestAnalyzers = ImmutableHashSet.Create(
+        StringComparer.OrdinalIgnoreCase,
+        DiscoveryToken
+    );
+
     private FrameShiftOptions(
         bool isEnabled,
         bool verifyMutantCompilation,
         int maxMutantsPerMember,
         bool reportTrivialMutants,
-        bool enableRegexPatternMutations
+        bool enableRegexPatternMutations,
+        ImmutableHashSet<string> testAnalyzers
     )
     {
         IsEnabled = isEnabled;
@@ -54,6 +72,7 @@ internal sealed class FrameShiftOptions
             maxMutantsPerMember < MinimumMaxMutantsPerMember ? MinimumMaxMutantsPerMember : maxMutantsPerMember;
         ReportTrivialMutants = reportTrivialMutants;
         EnableRegexPatternMutations = enableRegexPatternMutations;
+        TestAnalyzers = testAnalyzers;
     }
 
     /// <summary>
@@ -65,7 +84,8 @@ internal sealed class FrameShiftOptions
             DefaultVerifyMutantCompilation,
             DefaultMaxMutantsPerMember,
             DefaultReportTrivialMutants,
-            DefaultEnableRegexPatternMutations
+            DefaultEnableRegexPatternMutations,
+            _defaultTestAnalyzers
         );
 
     /// <summary>
@@ -104,6 +124,28 @@ internal sealed class FrameShiftOptions
     public bool EnableRegexPatternMutations { get; }
 
     /// <summary>
+    /// Gets the configured tokens of <c>FrameShiftTestAnalyzers</c>, compared ordinally and ignoring
+    /// case. Never empty: an absent, blank or entirely unparseable property falls back to
+    /// <see cref="DiscoveryToken" />, exactly like every other option here falls back to its default.
+    /// </summary>
+    public ImmutableHashSet<string> TestAnalyzers { get; }
+
+    /// <summary>
+    /// Determines whether the test-surface analyzer identified by <paramref name="configurationToken" />
+    /// is allowed to run at all under this configuration.
+    /// </summary>
+    /// <param name="configurationToken">
+    /// The <see cref="TestSurface.ITestFrameworkProbe.ConfigurationToken" /> of the analyzer asking.
+    /// </param>
+    /// <returns>
+    /// <see langword="true" /> when <see cref="TestAnalyzers" /> contains <see cref="DiscoveryToken" /> —
+    /// which is both the default and an explicit "run everything" — or names
+    /// <paramref name="configurationToken" /> itself; otherwise <see langword="false" />.
+    /// </returns>
+    public bool IsTestAnalyzerEnabled(string configurationToken) =>
+        TestAnalyzers.Contains(DiscoveryToken) || TestAnalyzers.Contains(configurationToken);
+
+    /// <summary>
     /// Reads the options from the analyzer configuration of the current compilation.
     /// </summary>
     /// <param name="options">The analyzer configuration holding the visible MSBuild properties.</param>
@@ -124,7 +166,8 @@ internal sealed class FrameShiftOptions
             ReadBoolean(options, FrameShiftOptionKeys.VerifyMutantCompilation, DefaultVerifyMutantCompilation),
             ReadInt32(options, FrameShiftOptionKeys.MaxMutantsPerMember, DefaultMaxMutantsPerMember),
             ReadBoolean(options, FrameShiftOptionKeys.ReportTrivialMutants, DefaultReportTrivialMutants),
-            ReadBoolean(options, FrameShiftOptionKeys.EnableRegexPatternMutations, DefaultEnableRegexPatternMutations)
+            ReadBoolean(options, FrameShiftOptionKeys.EnableRegexPatternMutations, DefaultEnableRegexPatternMutations),
+            ReadTestAnalyzers(options, FrameShiftOptionKeys.TestAnalyzers)
         );
     }
 
@@ -192,5 +235,30 @@ internal sealed class FrameShiftOptions
         return int.TryParse(value?.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
             ? parsed
             : fallback;
+    }
+
+    /// <summary>
+    /// Reads the semicolon-separated <c>FrameShiftTestAnalyzers</c> option, trimming and discarding any
+    /// blank entry. Falls back to <see cref="DiscoveryToken" /> - the same outcome as every other option
+    /// here on an absent or unparseable value - whenever nothing usable remains, which covers the
+    /// property being entirely absent, empty, made only of separators, or made only of whitespace.
+    /// </summary>
+    /// <param name="options">The analyzer configuration holding the visible MSBuild properties.</param>
+    /// <param name="key">The key of the option.</param>
+    /// <returns>The configured tokens, compared ordinally and ignoring case; never empty.</returns>
+    private static ImmutableHashSet<string> ReadTestAnalyzers(AnalyzerConfigOptions options, string key)
+    {
+        if (!options.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            return _defaultTestAnalyzers;
+        }
+
+        var tokens = value
+            .Split(';')
+            .Select(token => token.Trim())
+            .Where(token => token.Length > 0)
+            .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return tokens.IsEmpty ? _defaultTestAnalyzers : tokens;
     }
 }

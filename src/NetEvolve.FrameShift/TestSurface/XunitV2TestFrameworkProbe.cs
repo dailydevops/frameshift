@@ -69,6 +69,9 @@ internal sealed class XunitV2TestFrameworkProbe : ITestFrameworkProbe
     public string FrameworkName => Name;
 
     /// <inheritdoc />
+    public string ConfigurationToken => "XunitV2";
+
+    /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="compilation" /> is <see langword="null" />.</exception>
     public ITestMethodRecognizer? TryCreateRecognizer(Compilation compilation)
     {

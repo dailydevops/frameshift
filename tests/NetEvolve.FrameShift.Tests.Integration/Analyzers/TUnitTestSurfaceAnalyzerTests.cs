@@ -598,6 +598,48 @@ public class TUnitTestSurfaceAnalyzerTests
     }
 
     /// <summary>
+    /// <c>FrameShiftTestAnalyzers</c> naming a framework other than TUnit must silence this analyzer
+    /// completely, exactly like <see cref="Analyzer_Disabled_ReportsNothing" /> - even though the
+    /// compilation genuinely carries TUnit tests and an additional file that would otherwise be reported
+    /// as a malformed manifest.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_TestAnalyzersNamesADifferentFramework_ReportsNothing()
+    {
+        var options = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["build_property.FrameShiftTestAnalyzers"] = "XunitV2",
+        };
+
+        var diagnostics = await RunAllAsync(CreateTest(), MalformedManifest, options).ConfigureAwait(false);
+
+        _ = await Assert.That(DiagnosticAssertions.Describe(diagnostics)).IsEqualTo(DiagnosticAssertions.NoDiagnostics);
+    }
+
+    /// <summary>
+    /// <c>FrameShiftTestAnalyzers</c> naming TUnit itself - alongside frameworks that are not in play - must
+    /// leave the analyzer exactly as active as it would be without the property at all.
+    /// </summary>
+    [Test]
+    public async Task Analyzer_TestAnalyzersNamesItsOwnFramework_StillReports()
+    {
+        var options = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["build_property.FrameShiftTestAnalyzers"] = "NUnit;TUnit;MSTest",
+        };
+
+        var diagnostics = await RunAllAsync(CreateTest(), MalformedManifest, options).ConfigureAwait(false);
+
+        _ = await Assert
+            .That(
+                DiagnosticAssertions
+                    .Ids(diagnostics)
+                    .Contains(DiagnosticIds.InvalidTestSurfaceManifest, StringComparer.Ordinal)
+            )
+            .IsTrue();
+    }
+
+    /// <summary>
     /// The analyzer must be down whenever it recognises no test of its own framework, and being down has
     /// to mean absolute silence: not a single diagnostic, not even the manifest complaint that the very
     /// same additional file provokes on a compilation whose tests it does recognise. Judging a
@@ -986,6 +1028,8 @@ public class TUnitTestSurfaceAnalyzerTests
     private sealed class UnregisteredFrameworkProbe : ITestFrameworkProbe
     {
         public string FrameworkName => UnregisteredFrameworkName;
+
+        public string ConfigurationToken => UnregisteredFrameworkName;
 
         public ITestMethodRecognizer? TryCreateRecognizer(Compilation compilation) =>
             compilation.GetTypeByMetadataName(CaseAttributeMetadataName) is null ? null : new CaseAttributeRecognizer();

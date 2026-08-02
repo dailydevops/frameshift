@@ -257,6 +257,69 @@ public class FrameShiftOptionsTests
         _ = await Assert.That(Describe(options)).IsEqualTo(DocumentedDefaults);
     }
 
+    [Test]
+    public async Task Default_TestAnalyzers_IsDiscoveryOnlyAndEnablesEveryToken()
+    {
+        var options = FrameShiftOptions.Default;
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(options.TestAnalyzers.Count).IsEqualTo(1);
+            _ = await Assert.That(options.TestAnalyzers.Contains(FrameShiftOptions.DiscoveryToken)).IsTrue();
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("TUnit")).IsTrue();
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("XunitV2")).IsTrue();
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("anything at all")).IsTrue();
+        }
+    }
+
+    [Test]
+    [Arguments("", true, true, true)]
+    [Arguments("   ", true, true, true)]
+    [Arguments(";;;", true, true, true)]
+    [Arguments("nonsense", false, false, false)]
+    [Arguments("Discovery", true, true, true)]
+    [Arguments("TUnit", true, false, false)]
+    [Arguments("tunit", true, false, false)]
+    [Arguments("TUnit;NUnit", true, false, true)]
+    [Arguments(" TUnit ; NUnit ", true, false, true)]
+    [Arguments("TUnit;Discovery", true, true, true)]
+    public async Task Read_TestAnalyzers_GatesEachFrameworkTokenIndependently(
+        string value,
+        bool tunit,
+        bool xunitV2,
+        bool nunit
+    )
+    {
+        var options = Read(FrameShiftOptionKeys.TestAnalyzers, value);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("TUnit")).IsEqualTo(tunit);
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("XunitV2")).IsEqualTo(xunitV2);
+            _ = await Assert.That(options.IsTestAnalyzerEnabled("NUnit")).IsEqualTo(nunit);
+        }
+    }
+
+    [Test]
+    public async Task Read_TestAnalyzersAbsent_FallsBackToDiscovery()
+    {
+        var options = FrameShiftOptions.Read(TestAnalyzerConfigOptions.Empty);
+
+        _ = await Assert.That(options.TestAnalyzers.Contains(FrameShiftOptions.DiscoveryToken)).IsTrue();
+    }
+
+    [Test]
+    public async Task Read_TestAnalyzersPresentWithoutAValue_FallsBackToDiscovery()
+    {
+        var options = FrameShiftOptions.Read(
+            new TestAnalyzerConfigOptions(
+                new Dictionary<string, string>(StringComparer.Ordinal) { [FrameShiftOptionKeys.TestAnalyzers] = null! }
+            )
+        );
+
+        _ = await Assert.That(options.TestAnalyzers.Contains(FrameShiftOptions.DiscoveryToken)).IsTrue();
+    }
+
     private static FrameShiftOptions Read(string key, string value) =>
         FrameShiftOptions.Read(
             new TestAnalyzerConfigOptions(new Dictionary<string, string>(StringComparer.Ordinal) { [key] = value })

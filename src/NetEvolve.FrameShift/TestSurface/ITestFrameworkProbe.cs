@@ -80,6 +80,15 @@ internal interface ITestFrameworkProbe
     string FrameworkName { get; }
 
     /// <summary>
+    /// Gets the identifier this probe's framework version is selected by in the
+    /// <c>FrameShiftTestAnalyzers</c> MSBuild property, e.g. <c>"XunitV2"</c> for the framework whose
+    /// <see cref="FrameworkName" /> is <c>"xUnit v2"</c>. Unlike <see cref="FrameworkName" />, which is
+    /// meant to be read by a person in a diagnostic message, this is meant to be typed into a
+    /// semicolon-separated MSBuild property value and therefore carries no space.
+    /// </summary>
+    string ConfigurationToken { get; }
+
+    /// <summary>
     /// Creates the recogniser for <paramref name="compilation" /> if the probed framework version is
     /// present.
     /// </summary>

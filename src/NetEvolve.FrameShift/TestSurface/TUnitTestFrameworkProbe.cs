@@ -42,6 +42,9 @@ internal sealed class TUnitTestFrameworkProbe : ITestFrameworkProbe
     public string FrameworkName => Name;
 
     /// <inheritdoc />
+    public string ConfigurationToken => Name;
+
+    /// <inheritdoc />
     /// <exception cref="ArgumentNullException"><paramref name="compilation" /> is <see langword="null" />.</exception>
     public ITestMethodRecognizer? TryCreateRecognizer(Compilation compilation)
     {

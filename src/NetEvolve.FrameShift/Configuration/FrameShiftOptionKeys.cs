@@ -47,4 +47,12 @@ internal static class FrameShiftOptionKeys
     /// without touching any other operator. Defaults to <see langword="true" />.
     /// </summary>
     public const string EnableRegexPatternMutations = BuildPropertyPrefix + "FrameShiftEnableRegexPatternMutations";
+
+    /// <summary>
+    /// MSBuild property <c>FrameShiftTestAnalyzers</c>: a semicolon-separated list of the test-surface
+    /// analyzers (by <see cref="TestSurface.ITestFrameworkProbe.ConfigurationToken" />) allowed to run.
+    /// Defaults to <c>Discovery</c>, which runs every framework's analyzer exactly as before this
+    /// property existed.
+    /// </summary>
+    public const string TestAnalyzers = BuildPropertyPrefix + "FrameShiftTestAnalyzers";
 }
