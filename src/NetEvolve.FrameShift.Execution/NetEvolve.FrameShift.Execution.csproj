@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>$(_NetTargetFrameworks)</TargetFrameworks>
+    <!--
+      This is an internal engineering tool for execution-based mutation verification, not (yet) a
+      published package: there is no CLI or MSBuild integration wired up for it yet, see the remarks of
+      MutationExecutionEngine. Packing is switched off until that story exists.
+    -->
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <!--
+      Microsoft.CodeAnalysis.CSharp's transitive dependencies (System.Collections.Immutable,
+      System.Reflection.Metadata) do not list net6.0/net7.0 as supported anymore at their current
+      version; they still work correctly there; NetEvolve.FrameShift.Tests.Unit already suppresses the
+      same warning for the same reason.
+    -->
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <!--
+      Execution-based mutation verification needs a collectible, unloadable AssemblyLoadContext to load
+      and discard one mutant assembly after another without leaking them for the lifetime of the
+      process. That type is CoreCLR-only, so this library - unlike the analyzer itself - never targets
+      netstandard2.0 or a .NET Framework target: those hosts have no equivalent primitive, only the
+      heavier, process-level isolation of a separate AppDomain, which is out of scope for now.
+    -->
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NetEvolve.FrameShift\NetEvolve.FrameShift.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Test visibility">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Tests.Execution</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
