@@ -492,6 +492,156 @@ public class MutationCoverageAnalyzerTests
     }
 
     /// <summary>
+    /// This is the acceptance criterion of the reachability-only diagnostic at the analyzer's own
+    /// boundary: a manifest that records a member as reachable but never as behaviorally referenced -
+    /// exactly what a real manifest looks like for a test that only takes a method reference and asserts
+    /// <c>IsNotNull</c> on it - must not be silently treated as covered. FSH0001 has to stay silent,
+    /// because the member really is reachable, but FSH0007 has to fire in its place.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsReachableButNeverBehaviorallyReferenced_ReportsFSH0007InsteadOfSilence()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+        var manifest = CreateTestManifestAt(
+            InMemoryAdditionalText.DefaultPath,
+            behavioral: false,
+            (AnonymousTestId, LowerBoundCount, [CoveredMemberId])
+        );
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+        var gaps = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.UnreachableMutationPoint);
+        var reachabilityOnly = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.ReachabilityOnlyMutationPoint);
+        var reachabilityOnlyLines = DiagnosticAssertions.Summarise(reachabilityOnly).Select(summary => summary.Line);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Errors(compilation)).IsEmpty();
+            _ = await Assert
+                .That(gaps.Where(gap => gap.Location.GetLineSpan().StartLinePosition.Line + 1 == CoveredMemberLine))
+                .IsEmpty();
+            _ = await Assert.That(reachabilityOnlyLines.Distinct()).IsEquivalentTo([CoveredMemberLine]);
+        }
+    }
+
+    /// <summary>
+    /// FSH0007 takes precedence over FSH0006: a member reached by exactly one test case is reported as
+    /// FSH0006 only when it is also behaviorally reachable. This is the same manifest shape as
+    /// <see cref="Analyze_MemberIsReachableButNeverBehaviorallyReferenced_ReportsFSH0007InsteadOfSilence" />,
+    /// with the one difference that matters: <c>behavioral: true</c>.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberIsBehaviorallyReferencedByASingleTestCase_ReportsSingleTestCaseHintNotFSH0007()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+        var manifest = CreateTestManifestAt(
+            InMemoryAdditionalText.DefaultPath,
+            behavioral: true,
+            (AnonymousTestId, SingleCaseCount, [CoveredMemberId])
+        );
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert
+                .That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.ReachabilityOnlyMutationPoint))
+                .IsEmpty();
+            _ = await Assert.That(SingleTestCaseDiagnostics(diagnostics)).IsNotEmpty();
+        }
+    }
+
+    /// <summary>
+    /// Behavioral reachability is aggregated per member, over every test that reaches it, not per test.
+    /// A member reached by one test that only captures a bare reference and by a second test that
+    /// actually invokes it and asserts on the result is behaviorally reachable overall: FSH0007 asks
+    /// "is there a credible basis at all", and the second test alone already answers that.
+    /// </summary>
+    [Test]
+    public async Task Analyze_MemberReachedByOneReachabilityOnlyTestAndOneBehavioralTest_IsNotReachabilityOnly()
+    {
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+        var builder = new StringBuilder();
+        _ = builder.Append(TestSurfaceManifestFormat.Header).Append('\n');
+        _ = builder
+            .Append(TestSurfaceManifestFormat.TestPrefix)
+            .Append(' ')
+            .Append(AnonymousTestId)
+            .Append(' ')
+            .Append(LowerBoundCount)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.ReferencePrefix)
+            .Append(' ')
+            .Append(CoveredMemberId)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.TestPrefix)
+            .Append(' ')
+            .Append(FirstAddTestId)
+            .Append(' ')
+            .Append(LowerBoundCount)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.ReferencePrefix)
+            .Append(' ')
+            .Append(CoveredMemberId)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.BehavioralReferencePrefix)
+            .Append(' ')
+            .Append(CoveredMemberId)
+            .Append('\n');
+        var manifest = new InMemoryAdditionalText(builder.ToString());
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+
+        _ = await Assert.That(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.ReachabilityOnlyMutationPoint)).IsEmpty();
+    }
+
+    /// <summary>
+    /// The counter-example to the previous test: behavioral reachability recorded for one member never
+    /// leaks into a different member, even one declared right next to it. <c>Uncovered.Shrink</c> is
+    /// reached, but only ever as a bare reference, while <c>Covered.Scale</c> is the behaviorally
+    /// verified one - each member keeps its own verdict.
+    /// </summary>
+    [Test]
+    public async Task Analyze_BehavioralReferenceOfOneMember_DoesNotCoverAnUnrelatedMember()
+    {
+        const string uncoveredMemberId = "M:Fixture.Uncovered.Shrink(System.Int32)~System.Int32";
+
+        var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
+        var builder = new StringBuilder();
+        _ = builder.Append(TestSurfaceManifestFormat.Header).Append('\n');
+        _ = builder
+            .Append(TestSurfaceManifestFormat.TestPrefix)
+            .Append(' ')
+            .Append(AnonymousTestId)
+            .Append(' ')
+            .Append(LowerBoundCount)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.ReferencePrefix)
+            .Append(' ')
+            .Append(CoveredMemberId)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.BehavioralReferencePrefix)
+            .Append(' ')
+            .Append(CoveredMemberId)
+            .Append('\n')
+            .Append(TestSurfaceManifestFormat.ReferencePrefix)
+            .Append(' ')
+            .Append(uncoveredMemberId)
+            .Append('\n');
+        var manifest = new InMemoryAdditionalText(builder.ToString());
+
+        var diagnostics = await RunAsync(compilation, [manifest]).ConfigureAwait(false);
+        var reachabilityOnlyLines = DiagnosticAssertions
+            .Summarise(AnalyzerRunner.OfId(diagnostics, DiagnosticIds.ReachabilityOnlyMutationPoint))
+            .Select(summary => summary.Line);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(reachabilityOnlyLines.Distinct()).IsEquivalentTo([UncoveredMemberLine]);
+            _ = await Assert.That(reachabilityOnlyLines.Where(line => line == CoveredMemberLine)).IsEmpty();
+        }
+    }
+
+    /// <summary>
     /// The manifest names <c>Pipeline.Run</c> and nothing else, and that member calls the private
     /// <c>Pipeline.Normalize</c> on line 12. The snapshot states both halves of "transitively reached
     /// counts as covered" at once: not one line of the helper is reported, and <c>Orphan.Ignore</c> on
@@ -1111,8 +1261,21 @@ public class MutationCoverageAnalyzerTests
         params (string TestMethodId, string Count, string[] ReferencedMemberIds)[] tests
     ) => CreateTestManifestAt(InMemoryAdditionalText.DefaultPath, tests);
 
+    /// <summary>
+    /// Builds a hand-written manifest exactly like the three-argument overload of this method, but every
+    /// reference is also written as a <c>B</c> line: this is the harness used by every test of this file
+    /// that is not itself about the behavioral classification, so that those tests keep asserting on
+    /// reachability and on <c>FSH0006</c> without also having to state a behavioral assertion. The
+    /// FSH0007 tests build their manifest without this helper, deliberately.
+    /// </summary>
     private static InMemoryAdditionalText CreateTestManifestAt(
         string path,
+        params (string TestMethodId, string Count, string[] ReferencedMemberIds)[] tests
+    ) => CreateTestManifestAt(path, behavioral: true, tests);
+
+    private static InMemoryAdditionalText CreateTestManifestAt(
+        string path,
+        bool behavioral,
         params (string TestMethodId, string Count, string[] ReferencedMemberIds)[] tests
     )
     {
@@ -1133,6 +1296,20 @@ public class MutationCoverageAnalyzerTests
             {
                 _ = builder
                     .Append(TestSurfaceManifestFormat.ReferencePrefix)
+                    .Append(' ')
+                    .Append(referencedMemberId)
+                    .Append('\n');
+            }
+
+            if (!behavioral)
+            {
+                continue;
+            }
+
+            foreach (var referencedMemberId in referencedMemberIds)
+            {
+                _ = builder
+                    .Append(TestSurfaceManifestFormat.BehavioralReferencePrefix)
                     .Append(' ')
                     .Append(referencedMemberId)
                     .Append('\n');

@@ -3,6 +3,7 @@ namespace NetEvolve.FrameShift.TestSurface;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using NetEvolve.FrameShift.TestSurface.Bridges;
 
 /// <summary>
 /// Builds a <see cref="TestSurfaceManifest" /> for a test compilation by walking the code that is
@@ -88,6 +89,10 @@ internal static class TestSurfaceCollector
             StringComparer.Ordinal
         );
 
+        var behavioralReferencesByTest = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+
         foreach (var entry in entries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,9 +108,51 @@ internal static class TestSurfaceCollector
             referencesByTest[testMethodId!] = referencesByTest.TryGetValue(testMethodId!, out var known)
                 ? known.Union(entry.ReferencedMemberIds)
                 : entry.ReferencedMemberIds;
+            behavioralReferencesByTest[testMethodId!] = behavioralReferencesByTest.TryGetValue(
+                testMethodId!,
+                out var knownBehavioral
+            )
+                ? knownBehavioral.Union(entry.BehavioralReferencedMemberIds)
+                : entry.BehavioralReferencedMemberIds;
         }
 
-        return new TestSurfaceManifest(testCaseCounts.ToImmutable(), referencesByTest.ToImmutable());
+        return new TestSurfaceManifest(
+            testCaseCounts.ToImmutable(),
+            referencesByTest.ToImmutable(),
+            behavioralReferencesByTest.ToImmutable()
+        );
+    }
+
+    /// <summary>
+    /// Every recognised invocation bridge, tried in this order for every candidate invocation of every
+    /// compilation.
+    /// </summary>
+    private static readonly IInvocationBridge[] _bridges = [GeneratorDriverBridge.Instance];
+
+    /// <summary>
+    /// Resolves the context of every registered bridge for <paramref name="compilation" /> once, keeping
+    /// only the ones that are actually applicable so that a compilation matching none of them - the
+    /// overwhelming majority - walks every invocation without a single bridge check.
+    /// </summary>
+    /// <param name="compilation">The test compilation to resolve the bridges against.</param>
+    /// <returns>The applicable bridges, each paired with its resolved context.</returns>
+    private static ImmutableArray<(IInvocationBridge Bridge, object? Context)> CreateApplicableBridges(
+        Compilation compilation
+    )
+    {
+        var builder = ImmutableArray.CreateBuilder<(IInvocationBridge Bridge, object? Context)>(_bridges.Length);
+
+        foreach (var bridge in _bridges)
+        {
+            var context = bridge.CreateContext(compilation);
+
+            if (bridge.IsApplicable(context))
+            {
+                builder.Add((bridge, context));
+            }
+        }
+
+        return builder.ToImmutable();
     }
 
     /// <summary>
@@ -129,20 +176,24 @@ internal static class TestSurfaceCollector
         var testMethods = TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken);
         var entries = new List<TestSurfaceEntry>(testMethods.Length);
         var semanticModels = new Dictionary<SyntaxTree, SemanticModel>();
+        var bridges = CreateApplicableBridges(compilation);
 
         foreach (var testMethod in testMethods)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var referencedMemberIds = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+            var accumulator = new SurfaceAccumulator();
 
-            WalkReachableCode(compilation, testMethod, semanticModels, referencedMemberIds, cancellationToken);
+            WalkReachableCode(compilation, testMethod, semanticModels, accumulator, bridges, cancellationToken);
 
             entries.Add(
                 new TestSurfaceEntry(
                     testMethod,
                     recognizer.GetTestCaseCount(testMethod),
-                    referencedMemberIds.ToImmutable()
+                    accumulator.ReferencedMemberIds.ToImmutable(),
+                    accumulator.HasNonTrivialAssertion
+                        ? accumulator.InvokedMemberIds.ToImmutable()
+                        : ImmutableHashSet<string>.Empty
                 )
             );
         }
@@ -154,7 +205,8 @@ internal static class TestSurfaceCollector
         Compilation compilation,
         IMethodSymbol testMethod,
         Dictionary<SyntaxTree, SemanticModel> semanticModels,
-        ImmutableHashSet<string>.Builder referencedMemberIds,
+        SurfaceAccumulator accumulator,
+        ImmutableArray<(IInvocationBridge Bridge, object? Context)> bridges,
         CancellationToken cancellationToken
     )
     {
@@ -191,7 +243,8 @@ internal static class TestSurfaceCollector
                         executableNode,
                         visited,
                         pending,
-                        referencedMemberIds,
+                        accumulator,
+                        bridges,
                         cancellationToken
                     );
                 }
@@ -205,7 +258,8 @@ internal static class TestSurfaceCollector
         SyntaxNode executableNode,
         HashSet<ISymbol> visited,
         Stack<ISymbol> pending,
-        ImmutableHashSet<string>.Builder referencedMemberIds,
+        SurfaceAccumulator accumulator,
+        ImmutableArray<(IInvocationBridge Bridge, object? Context)> bridges,
         CancellationToken cancellationToken
     )
     {
@@ -231,16 +285,46 @@ internal static class TestSurfaceCollector
                 continue;
             }
 
-            HandleSymbol(compilation, symbol, visited, pending, referencedMemberIds);
+            if (node is InvocationExpressionSyntax invocation && symbol is IMethodSymbol invokedMethod)
+            {
+                if (AssertionRecognition.IsNonTrivialAssertion(invokedMethod.Name))
+                {
+                    accumulator.HasNonTrivialAssertion = true;
+                }
+
+                // Every bridge in this list already proved itself applicable to this compilation, so a
+                // compilation matching none of them - the overwhelming majority - runs this loop zero
+                // times instead of paying for a check per registered bridge.
+                foreach (var (bridge, context) in bridges)
+                {
+                    foreach (
+                        var bridgedMember in bridge.FindBridgedMembers(
+                            semanticModel,
+                            invocation,
+                            invokedMethod,
+                            context,
+                            cancellationToken
+                        )
+                    )
+                    {
+                        HandleSymbol(compilation, bridgedMember, isInvocation: true, visited, pending, accumulator);
+                    }
+                }
+            }
+
+            var isInvocation = node is InvocationExpressionSyntax or ObjectCreationExpressionSyntax;
+
+            HandleSymbol(compilation, symbol, isInvocation, visited, pending, accumulator);
         }
     }
 
     private static void HandleSymbol(
         Compilation compilation,
         ISymbol symbol,
+        bool isInvocation,
         HashSet<ISymbol> visited,
         Stack<ISymbol> pending,
-        ImmutableHashSet<string>.Builder referencedMemberIds
+        SurfaceAccumulator accumulator
     )
     {
         var definition = Normalize(symbol);
@@ -269,10 +353,56 @@ internal static class TestSurfaceCollector
 
         var declarationId = DocumentationCommentId.CreateDeclarationId(definition);
 
-        if (!string.IsNullOrEmpty(declarationId))
+        if (string.IsNullOrEmpty(declarationId))
         {
-            _ = referencedMemberIds.Add(declarationId!);
+            return;
         }
+
+        _ = accumulator.ReferencedMemberIds.Add(declarationId!);
+
+        // A method referenced only as a bare method-group conversion - a captured delegate that is
+        // never called from the test's own reachable code - gives no basis for believing a mutation of
+        // it would be observed, so it only counts as invoked when this very reference is a call or an
+        // object creation. Every other kind of member (a field, a property, an event) is recorded as
+        // invoked unconditionally: there is no bare-reference shape for them that this analysis can
+        // distinguish from an actual read or write.
+        if (isInvocation || definition.Kind != SymbolKind.Method)
+        {
+            _ = accumulator.InvokedMemberIds.Add(declarationId!);
+        }
+    }
+
+    /// <summary>
+    /// Accumulates the outcome of walking the reachable code of a single test method: every referenced
+    /// production member, the subset of those references that were actual invocations, and whether the
+    /// walked code calls a recognised, non-trivial assertion at all.
+    /// </summary>
+    /// <remarks>
+    /// The three pieces only combine into a behavioral verdict once the whole test method has been
+    /// walked, because a helper method reached late in the walk can still supply the assertion that an
+    /// earlier reference needs: <see cref="HasNonTrivialAssertion" /> gates <see cref="InvokedMemberIds" />
+    /// as a whole, rather than per reference site.
+    /// </remarks>
+    private sealed class SurfaceAccumulator
+    {
+        /// <summary>
+        /// Gets every production member referenced from the walked code, regardless of how it was used.
+        /// </summary>
+        public ImmutableHashSet<string>.Builder ReferencedMemberIds { get; } =
+            ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Gets the subset of <see cref="ReferencedMemberIds" /> that was reached through an actual
+        /// invocation, an object creation, or a field, property or event access.
+        /// </summary>
+        public ImmutableHashSet<string>.Builder InvokedMemberIds { get; } =
+            ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the walked code calls a recognised, non-trivial
+        /// assertion anywhere at all.
+        /// </summary>
+        public bool HasNonTrivialAssertion { get; set; }
     }
 
     private static ISymbol Normalize(ISymbol symbol) =>
@@ -439,15 +569,21 @@ internal static class TestSurfaceCollector
         /// <param name="referencedMemberIds">
         /// The documentation comment ids of the production members reachable from the method.
         /// </param>
+        /// <param name="behavioralReferencedMemberIds">
+        /// The documentation comment ids of the production members reachable from the method with a
+        /// credible basis for believing a mutation of them would be observed.
+        /// </param>
         public TestSurfaceEntry(
             IMethodSymbol testMethod,
             TestCaseCount caseCount,
-            ImmutableHashSet<string> referencedMemberIds
+            ImmutableHashSet<string> referencedMemberIds,
+            ImmutableHashSet<string> behavioralReferencedMemberIds
         )
         {
             TestMethod = testMethod;
             CaseCount = caseCount;
             ReferencedMemberIds = referencedMemberIds;
+            BehavioralReferencedMemberIds = behavioralReferencedMemberIds;
         }
 
         /// <summary>
@@ -464,5 +600,11 @@ internal static class TestSurfaceCollector
         /// Gets the documentation comment ids of the production members reachable from the method.
         /// </summary>
         public ImmutableHashSet<string> ReferencedMemberIds { get; }
+
+        /// <summary>
+        /// Gets the documentation comment ids of the production members reachable from the method with a
+        /// credible basis for believing a mutation of them would be observed.
+        /// </summary>
+        public ImmutableHashSet<string> BehavioralReferencedMemberIds { get; }
     }
 }

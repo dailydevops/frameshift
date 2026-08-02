@@ -115,6 +115,8 @@ public class MutationAnalysisRoundTripTests
     private const string AddCoveredSource = """
         namespace Tests;
 
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -124,7 +126,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Add(2, 3);
+                int result = calculator.Add(2, 3);
+
+                Assert.That(result).IsEqualTo(7).GetAwaiter().GetResult();
             }
         }
         """;
@@ -132,6 +136,8 @@ public class MutationAnalysisRoundTripTests
     private const string SubtractCoveredSource = """
         namespace Tests;
 
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -141,7 +147,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Subtract(5, 2);
+                int result = calculator.Subtract(5, 2);
+
+                Assert.That(result).IsEqualTo(3).GetAwaiter().GetResult();
             }
         }
         """;
@@ -149,6 +157,8 @@ public class MutationAnalysisRoundTripTests
     private const string BothCoveredSource = """
         namespace Tests;
 
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -158,7 +168,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Add(2, 3);
+                int result = calculator.Add(2, 3);
+
+                Assert.That(result).IsEqualTo(7).GetAwaiter().GetResult();
             }
 
             [Test]
@@ -166,7 +178,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Subtract(5, 2);
+                int result = calculator.Subtract(5, 2);
+
+                Assert.That(result).IsEqualTo(3).GetAwaiter().GetResult();
             }
         }
         """;
@@ -208,6 +222,8 @@ public class MutationAnalysisRoundTripTests
     private const string SharedHelperSource = """
         namespace Tests;
 
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -217,13 +233,17 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Add(2, 3);
+                int result = calculator.Add(2, 3);
+
+                Assert.That(result).IsEqualTo(7).GetAwaiter().GetResult();
             }
 
             [Test]
             public void Twice_DoublesTheValue()
             {
-                _ = Fixture.Doubler.Twice(4);
+                int result = Fixture.Doubler.Twice(4);
+
+                Assert.That(result).IsEqualTo(8).GetAwaiter().GetResult();
             }
         }
         """;
@@ -235,6 +255,8 @@ public class MutationAnalysisRoundTripTests
     private const string ThreeCaseSource = """
         namespace Tests;
 
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -247,7 +269,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Add(left, right);
+                int result = calculator.Add(left, right);
+
+                Assert.That(result).IsEqualTo((left * 2) + right).GetAwaiter().GetResult();
             }
         }
         """;
@@ -260,6 +284,8 @@ public class MutationAnalysisRoundTripTests
         namespace Tests;
 
         using System.Collections.Generic;
+        using TUnit.Assertions;
+        using TUnit.Assertions.Extensions;
         using TUnit.Core;
 
         public class CalculatorTests
@@ -275,7 +301,9 @@ public class MutationAnalysisRoundTripTests
             {
                 Fixture.Calculator calculator = new Fixture.Calculator();
 
-                _ = calculator.Add(left, right);
+                int result = calculator.Add(left, right);
+
+                Assert.That(result).IsEqualTo((left * 2) + right).GetAwaiter().GetResult();
             }
         }
         """;
@@ -609,7 +637,11 @@ public class MutationAnalysisRoundTripTests
             source,
             TestAssemblyName,
             includeTUnit: true,
-            additionalReferences: [production.ToMetadataReference()],
+            additionalReferences:
+            [
+                production.ToMetadataReference(),
+                MetadataReference.CreateFromFile(typeof(TUnit.Assertions.Assert).Assembly.Location),
+            ],
             filePath: TestPath
         );
 

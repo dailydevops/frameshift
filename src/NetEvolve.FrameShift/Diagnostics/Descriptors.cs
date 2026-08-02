@@ -53,6 +53,19 @@ internal static class Descriptors
         defaultSeverity: DiagnosticSeverity.Info
     );
 
+    private static readonly DiagnosticDescriptor _reachabilityOnlyMutationPoint = Create(
+        id: DiagnosticIds.ReachabilityOnlyMutationPoint,
+        title: "Mutation point is reachable without a behavioral assertion",
+        messageFormat: "Mutation '{0}' at this location is only reached by tests that carry no credible "
+            + "basis for believing a mutant here would be noticed; the reachable member is called, but "
+            + "no discovered test asserts on its behaviour",
+        description: "A test reaches the analyzed member, but only through a bare method-group reference "
+            + "without a call, or without calling a recognised, non-trivial assertion afterwards. Such a "
+            + "'reachability-only' test can clear the FSH0001 gap without a surviving mutant here ever "
+            + "being noticed, so this is reported separately from full coverage.",
+        defaultSeverity: DiagnosticSeverity.Warning
+    );
+
     /// <summary>
     /// Gets the descriptor for <see cref="DiagnosticIds.UnreachableMutationPoint" /> (<c>FSH0001</c>).
     /// </summary>
@@ -77,6 +90,11 @@ internal static class Descriptors
     /// Gets the descriptor for <see cref="DiagnosticIds.SingleTestCaseMutationPoint" /> (<c>FSH0006</c>).
     /// </summary>
     public static DiagnosticDescriptor SingleTestCaseMutationPoint => _singleTestCaseMutationPoint;
+
+    /// <summary>
+    /// Gets the descriptor for <see cref="DiagnosticIds.ReachabilityOnlyMutationPoint" /> (<c>FSH0007</c>).
+    /// </summary>
+    public static DiagnosticDescriptor ReachabilityOnlyMutationPoint => _reachabilityOnlyMutationPoint;
 
     private static DiagnosticDescriptor Create(
         string id,

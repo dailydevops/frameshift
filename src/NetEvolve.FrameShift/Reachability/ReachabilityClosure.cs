@@ -135,6 +135,57 @@ internal static class ReachabilityClosure
     }
 
     /// <summary>
+    /// Computes the behaviorally reachable set of <paramref name="compilation" /> for the surface
+    /// recorded in <paramref name="manifest" />: the transitive closure seeded only from the references
+    /// that carry a credible basis for believing a mutation of them would be observed, instead of from
+    /// every reference a test happens to touch.
+    /// </summary>
+    /// <param name="compilation">The production compilation that owns the syntax trees to walk.</param>
+    /// <param name="manifest">The manifest produced by a previous pass over the test compilation.</param>
+    /// <param name="cancellationToken">A token observed on every iteration of the walk.</param>
+    /// <returns>
+    /// The transitively closed set of behaviorally reachable members, attributed to the test methods
+    /// that reach them, or <see cref="ReachableSymbolSet.Empty" /> if the manifest records no behavioral
+    /// reference at all.
+    /// </returns>
+    /// <remarks>
+    /// The closure re-uses the same expansion as <see cref="Compute(Compilation, TestSurfaceManifest, CancellationToken)" />:
+    /// once a member is known to be invoked with a credible assertion behind it, everything that member
+    /// calls is approximated as exercised along the very same path. This is the same approximation the
+    /// plain reachability closure already makes for the call graph, applied to the narrower seed.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">
+    /// <paramref name="compilation" /> or <paramref name="manifest" /> is <see langword="null" />.
+    /// </exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was cancelled.</exception>
+    public static ReachableSymbolSet ComputeBehavioral(
+        Compilation compilation,
+        TestSurfaceManifest manifest,
+        CancellationToken cancellationToken
+    )
+    {
+        if (compilation is null)
+        {
+            throw new ArgumentNullException(nameof(compilation));
+        }
+
+        if (manifest is null)
+        {
+            throw new ArgumentNullException(nameof(manifest));
+        }
+
+        var attribution = InvertReferences(manifest.BehavioralReferencesByTest, cancellationToken);
+        var referencedMemberIds = manifest.BehavioralReferencedMemberIds.Union(attribution.Keys);
+
+        if (referencedMemberIds.IsEmpty)
+        {
+            return ReachableSymbolSet.Empty;
+        }
+
+        return Compute(compilation, referencedMemberIds, attribution, cancellationToken);
+    }
+
+    /// <summary>
     /// Computes the reachable set of <paramref name="compilation" /> for a test-to-references map,
     /// without going through a manifest.
     /// </summary>

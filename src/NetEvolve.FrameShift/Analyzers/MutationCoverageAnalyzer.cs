@@ -93,11 +93,12 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         Descriptors.TrivialMutant,
         Descriptors.InvalidTestSurfaceManifest,
         Descriptors.SingleTestCaseMutationPoint,
+        Descriptors.ReachabilityOnlyMutationPoint,
     ];
 
     /// <summary>
     /// Gets the diagnostics this analyzer can report, which are <c>FSH0001</c>, <c>FSH0002</c>,
-    /// <c>FSH0003</c> and <c>FSH0006</c>.
+    /// <c>FSH0003</c>, <c>FSH0006</c> and <c>FSH0007</c>.
     /// </summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => _supportedDiagnostics;
 
@@ -143,6 +144,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
 
         var result = ReadManifests(manifestFiles, context.CancellationToken);
         var reachable = ReachabilityClosure.Compute(context.Compilation, result.Manifest, context.CancellationToken);
+        var behaviorallyReachable = new LazyBehavioralReachability(context.Compilation, result.Manifest);
         var problems = CollectProblems(result, reachable);
 
         if (!problems.IsEmpty)
@@ -168,6 +170,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
             AnalyzeSemanticModel(
                 modelContext,
                 reachable,
+                behaviorallyReachable,
                 attribution,
                 compiler,
                 unreachableCodeDiagnosticsCache,
@@ -194,6 +197,9 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// </summary>
     /// <param name="context">The semantic model context of the analysed file.</param>
     /// <param name="reachable">The reachable set computed once for the whole compilation.</param>
+    /// <param name="behaviorallyReachable">
+    /// The behaviorally reachable set computed once for the whole compilation.
+    /// </param>
     /// <param name="attribution">The per-test attribution shared by all files, which memoises its results.</param>
     /// <param name="compiler">The mutant compiler shared by all files, which memoises its results.</param>
     /// <param name="unreachableCodeDiagnosticsCache">
@@ -203,6 +209,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeSemanticModel(
         SemanticModelAnalysisContext context,
         ReachableSymbolSet reachable,
+        LazyBehavioralReachability behaviorallyReachable,
         TestCaseAttribution attribution,
         MutantCompiler compiler,
         UnreachableCodeDiagnosticsCache unreachableCodeDiagnosticsCache,
@@ -225,7 +232,7 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
                 continue;
             }
 
-            var state = GetOrCreateState(states, member, reachable, attribution);
+            var state = GetOrCreateState(states, member, reachable, behaviorallyReachable, attribution);
             if (!state.TryConsume(options.MaxMutantsPerMember))
             {
                 // The member has exhausted its budget. Skipping before the expensive verification
@@ -306,6 +313,15 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
             return;
         }
 
+        if (!state.IsBehaviorallyReachable(cancellationToken))
+        {
+            context.ReportDiagnostic(
+                Diagnostic.Create(Descriptors.ReachabilityOnlyMutationPoint, mutation.Location, mutation.DisplayName)
+            );
+
+            return;
+        }
+
         ReportSingleTestCase(context, mutation, state, cancellationToken);
     }
 
@@ -348,18 +364,22 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     /// <param name="states">The per-file state map.</param>
     /// <param name="member">The member enclosing the current mutation point.</param>
     /// <param name="reachable">The reachable set computed once for the whole compilation.</param>
+    /// <param name="behaviorallyReachable">
+    /// The lazily computed behavioral reachability of the whole compilation.
+    /// </param>
     /// <param name="attribution">The per-test attribution of the whole compilation.</param>
     /// <returns>The state of the member.</returns>
     private static MemberState GetOrCreateState(
         Dictionary<ISymbol, MemberState> states,
         ISymbol member,
         ReachableSymbolSet reachable,
+        LazyBehavioralReachability behaviorallyReachable,
         TestCaseAttribution attribution
     )
     {
         if (!states.TryGetValue(member, out var state))
         {
-            state = new MemberState(member, reachable.ContainsEnclosing(member), attribution);
+            state = new MemberState(member, reachable.ContainsEnclosing(member), behaviorallyReachable, attribution);
             states.Add(member, state);
         }
 
@@ -486,21 +506,32 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
     private sealed class MemberState
     {
         private readonly ISymbol _member;
+        private readonly LazyBehavioralReachability _behaviorallyReachable;
         private readonly TestCaseAttribution _attribution;
 
         private int _considered;
         private bool _isAttributed;
         private string? _singleTestMethodId;
+        private bool? _isBehaviorallyReachable;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="MemberState" /> class.
         /// </summary>
         /// <param name="member">The member enclosing the mutation points this state belongs to.</param>
         /// <param name="isReachable">Whether the member, or a member enclosing it, is reachable.</param>
+        /// <param name="behaviorallyReachable">
+        /// The lazily computed behavioral reachability of the whole compilation.
+        /// </param>
         /// <param name="attribution">The per-test attribution of the whole compilation.</param>
-        public MemberState(ISymbol member, bool isReachable, TestCaseAttribution attribution)
+        public MemberState(
+            ISymbol member,
+            bool isReachable,
+            LazyBehavioralReachability behaviorallyReachable,
+            TestCaseAttribution attribution
+        )
         {
             _member = member;
+            _behaviorallyReachable = behaviorallyReachable;
             _attribution = attribution;
             IsReachable = isReachable;
         }
@@ -510,6 +541,28 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         /// discovered test.
         /// </summary>
         public bool IsReachable { get; }
+
+        /// <summary>
+        /// Determines whether the member, or a member enclosing it, is reachable through a reference that
+        /// carries a credible basis for believing a mutation of it would be observed.
+        /// </summary>
+        /// <param name="cancellationToken">A token observed while the behavioral closure is built.</param>
+        /// <returns>
+        /// <see langword="true" /> if the member is behaviorally reachable; otherwise
+        /// <see langword="false" />.
+        /// </returns>
+        /// <remarks>
+        /// Computed and cached the first time it is asked, exactly like <see cref="GetSingleTestMethodId" />.
+        /// This is only ever asked for a member already known to be reachable, so an unreachable member -
+        /// the common case a healthy build stays silent about - never triggers the behavioral closure at
+        /// all.
+        /// </remarks>
+        public bool IsBehaviorallyReachable(CancellationToken cancellationToken)
+        {
+            _isBehaviorallyReachable ??= _behaviorallyReachable.ContainsEnclosing(_member, cancellationToken);
+
+            return _isBehaviorallyReachable.Value;
+        }
 
         /// <summary>
         /// Consumes one unit of the mutation budget of the member.
@@ -593,6 +646,64 @@ public sealed class MutationCoverageAnalyzer : DiagnosticAnalyzer
         /// Gets one diagnostic per file that could not be used.
         /// </summary>
         public ImmutableArray<Diagnostic> Problems { get; }
+    }
+
+    /// <summary>
+    /// Wraps the behavioral reachability closure of a whole compilation so that it is computed at most
+    /// once, the first time some mutation point actually needs the answer, instead of unconditionally for
+    /// every compilation this analyzer runs against.
+    /// </summary>
+    /// <remarks>
+    /// The closure is exactly as expensive as the plain reachability closure <c>FSH0001</c> already pays
+    /// for every compilation: a second transitive walk of the whole production call graph. Building it
+    /// eagerly would double that cost even for a compilation where every mutation point turns out to be
+    /// either unreachable or trivial, and the behavioral answer is never consulted at all. Instances are
+    /// shared by the concurrently running per-file callbacks, so the lazy build is guarded by a lock,
+    /// exactly like <see cref="TestCaseAttribution" /> guards its own lazily built closures.
+    /// </remarks>
+    private sealed class LazyBehavioralReachability
+    {
+        private readonly Compilation _compilation;
+        private readonly TestSurfaceManifest _manifest;
+        private readonly object _gate = new object();
+
+        private ReachableSymbolSet? _value;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="LazyBehavioralReachability" /> class.
+        /// </summary>
+        /// <param name="compilation">The production compilation the closure is computed over.</param>
+        /// <param name="manifest">The merged manifest the closure is seeded from.</param>
+        public LazyBehavioralReachability(Compilation compilation, TestSurfaceManifest manifest)
+        {
+            _compilation = compilation;
+            _manifest = manifest;
+        }
+
+        /// <summary>
+        /// Determines whether <paramref name="member" /> or a member enclosing it is behaviorally
+        /// reachable, building the closure on first use.
+        /// </summary>
+        /// <param name="member">The member to look up.</param>
+        /// <param name="cancellationToken">A token observed while the closure is built.</param>
+        /// <returns><see langword="true" /> if the member is behaviorally reachable; otherwise <see langword="false" />.</returns>
+        public bool ContainsEnclosing(ISymbol? member, CancellationToken cancellationToken) =>
+            EnsureBuilt(cancellationToken).ContainsEnclosing(member);
+
+        private ReachableSymbolSet EnsureBuilt(CancellationToken cancellationToken)
+        {
+            if (_value is { } built)
+            {
+                return built;
+            }
+
+            lock (_gate)
+            {
+                _value ??= ReachabilityClosure.ComputeBehavioral(_compilation, _manifest, cancellationToken);
+            }
+
+            return _value;
+        }
     }
 
     /// <summary>

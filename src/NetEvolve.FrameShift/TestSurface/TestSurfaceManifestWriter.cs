@@ -65,5 +65,16 @@ internal static class TestSurfaceManifestWriter
                 .Append(referencedMemberId)
                 .Append(LineFeed);
         }
+
+        var behavioralReferencedMemberIds = manifest.BehavioralReferencesByTest[testMethodId];
+
+        foreach (var referencedMemberId in behavioralReferencedMemberIds.OrderBy(id => id, StringComparer.Ordinal))
+        {
+            _ = builder
+                .Append(TestSurfaceManifestFormat.BehavioralReferencePrefix)
+                .Append(TestSurfaceManifestFormat.FieldSeparator)
+                .Append(referencedMemberId)
+                .Append(LineFeed);
+        }
     }
 }

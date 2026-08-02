@@ -156,6 +156,49 @@ public class TestSurfaceManifestWriterTests
     }
 
     [Test]
+    public async Task Write_Manifest_WritesBehavioralReferenceLinesAfterReferencesAndOrdinally()
+    {
+        var manifest = BlocksWithBehavioral(
+            (
+                "M:Tests.A.First",
+                TestCaseCount.Exact(2),
+                ["M:Production.A.Alpha", "M:Production.B.Beta"],
+                ["M:Production.B.Beta", "M:Production.A.Alpha"]
+            )
+        );
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        _ = await Assert
+            .That(written)
+            .IsEqualTo(
+                Header
+                    + "\n"
+                    + "T M:Tests.A.First 2\n"
+                    + "R M:Production.A.Alpha\n"
+                    + "R M:Production.B.Beta\n"
+                    + "B M:Production.A.Alpha\n"
+                    + "B M:Production.B.Beta\n"
+            );
+    }
+
+    [Test]
+    public async Task Write_ManifestWithoutAnyBehavioralReference_WritesNoBehavioralLines()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), ["M:Production.A.Alpha"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(written.Contains('B', StringComparison.Ordinal)).IsFalse();
+            _ = await Assert
+                .That(written)
+                .IsEqualTo(Header + "\n" + "T M:Tests.A.First 1\n" + "R M:Production.A.Alpha\n");
+        }
+    }
+
+    [Test]
     public async Task Write_ManifestIsNull_ThrowsArgumentNullException()
     {
         var threw = ThrowsArgumentNull(() => _ = TestSurfaceManifestWriter.Write(null!));
@@ -243,6 +286,41 @@ public class TestSurfaceManifestWriterTests
         _ = await Assert.That(TestSurfaceManifestWriter.Write(roundTripped)).IsEqualTo(written);
     }
 
+    [Test]
+    public async Task RoundTrip_ManifestWithBehavioralReferences_PreservesBehavioralData()
+    {
+        var manifest = BlocksWithBehavioral(
+            (
+                "M:Tests.CalculatorTests.Add",
+                TestCaseCount.Exact(3),
+                ["M:Production.Calculator.Add(System.Int32,System.Int32)", "P:Production.Calculator.Factor"],
+                ["M:Production.Calculator.Add(System.Int32,System.Int32)"]
+            ),
+            ("M:Tests.CalculatorTests.Subtract", TestCaseCount.AtLeast(1), ["P:Production.Calculator.Factor"], [])
+        );
+
+        var parsed = TestSurfaceManifestReader.TryRead(
+            SourceText.From(TestSurfaceManifestWriter.Write(manifest)),
+            out var roundTripped,
+            out var error
+        );
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+            _ = await Assert
+                .That(Join(roundTripped.BehavioralReferencedMemberIds))
+                .IsEqualTo(Join(manifest.BehavioralReferencedMemberIds));
+            _ = await Assert
+                .That(Join(roundTripped.BehavioralReferencesByTest["M:Tests.CalculatorTests.Add"]))
+                .IsEqualTo(Join(manifest.BehavioralReferencesByTest["M:Tests.CalculatorTests.Add"]));
+            _ = await Assert
+                .That(roundTripped.BehavioralReferencesByTest["M:Tests.CalculatorTests.Subtract"])
+                .IsEmpty();
+        }
+    }
+
     private static async Task<bool> AssertSameSurface(TestSurfaceManifest expected, TestSurfaceManifest actual)
     {
         using (Assert.Multiple())
@@ -279,6 +357,38 @@ public class TestSurfaceManifestWriterTests
         }
 
         return new TestSurfaceManifest(counts.ToImmutable(), references.ToImmutable());
+    }
+
+    private static TestSurfaceManifest BlocksWithBehavioral(
+        params (
+            string TestMethodId,
+            TestCaseCount Count,
+            string[] ReferencedMemberIds,
+            string[] BehavioralReferencedMemberIds
+        )[] blocks
+    )
+    {
+        var counts = ImmutableDictionary.CreateBuilder<string, TestCaseCount>(StringComparer.Ordinal);
+        var references = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
+        var behavioralReferences = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(
+            StringComparer.Ordinal
+        );
+
+        foreach (var (testMethodId, count, referencedMemberIds, behavioralReferencedMemberIds) in blocks)
+        {
+            counts[testMethodId] = count;
+            references[testMethodId] = ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds);
+            behavioralReferences[testMethodId] = ImmutableHashSet.Create(
+                StringComparer.Ordinal,
+                behavioralReferencedMemberIds
+            );
+        }
+
+        return new TestSurfaceManifest(
+            counts.ToImmutable(),
+            references.ToImmutable(),
+            behavioralReferences.ToImmutable()
+        );
     }
 
     private static string Join(IEnumerable<string> ids) =>
