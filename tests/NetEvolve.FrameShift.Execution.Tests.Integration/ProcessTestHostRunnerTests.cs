@@ -147,7 +147,9 @@ public class ProcessTestHostRunnerTests
         /// A killed process's runtime does not always release its file handles by the moment
         /// <see cref="ProcessTestHostRunner.RunAsync" /> returns, so the very first delete attempt of a
         /// timed-out host's directory can genuinely race an OS handle that has not closed yet. Retrying
-        /// briefly absorbs that race instead of making the test flaky.
+        /// briefly absorbs that race instead of making the test flaky. Windows reports that race as
+        /// either an <see cref="IOException" /> or an <see cref="UnauthorizedAccessException" /> depending
+        /// on exactly when the handle closes, so both are treated the same way.
         /// </summary>
         public void Dispose()
         {
@@ -159,7 +161,8 @@ public class ProcessTestHostRunnerTests
 
                     return;
                 }
-                catch (IOException) when (attempt < MaxDeleteAttempts)
+                catch (Exception exception)
+                    when (attempt < MaxDeleteAttempts && exception is IOException or UnauthorizedAccessException)
                 {
                     Thread.Sleep(DeleteRetryDelay);
                 }
