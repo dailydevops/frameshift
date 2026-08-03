@@ -1,4 +1,4 @@
-﻿Usage: frameshift-execute --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>]
+﻿Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>]
 
   --test-output         The build output directory of the test project (contains the test
                            assembly, the production assembly and every dependency of both).

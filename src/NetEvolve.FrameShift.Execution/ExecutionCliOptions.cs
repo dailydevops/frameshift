@@ -66,7 +66,7 @@ internal sealed class ExecutionCliOptions
     /// </summary>
     public static string Usage =>
         $"""
-            Usage: frameshift-execute {TestOutputFlag} <dir> {ProductionAssemblyFlag} <file.dll> {TestAssemblyFlag} <file.dll> {SourceFlag} <file.cs> [{SourceFlag} <file.cs> ...] [{TimeoutFlag} <seconds>]
+            Usage: frameshift {TestOutputFlag} <dir> {ProductionAssemblyFlag} <file.dll> {TestAssemblyFlag} <file.dll> {SourceFlag} <file.cs> [{SourceFlag} <file.cs> ...] [{TimeoutFlag} <seconds>]
 
               {TestOutputFlag}         The build output directory of the test project (contains the test
                                        assembly, the production assembly and every dependency of both).

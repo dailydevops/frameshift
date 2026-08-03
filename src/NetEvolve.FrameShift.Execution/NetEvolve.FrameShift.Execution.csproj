@@ -12,12 +12,14 @@
       This ships as a runnable tool (Program.cs), not only a library other code links against: the
       assembly this produces can be invoked directly with `dotnet exec` or `dotnet run`, so a mutation
       run can be started from a shell or a CI step instead of only from a caller that references the
-      library API. It is still not packaged as an installable dotnet tool or wired into an MSBuild
-      target - that remains follow-up work.
+      library API. It is still not wired into an MSBuild target - that remains follow-up work.
     -->
     <OutputType>Exe</OutputType>
-    <IsPackable>false</IsPackable>
-    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <PropertyGroup Label="Tool packaging">
+    <Description>A command-line tool that runs execution-based mutation verification: it mutates a compiled assembly, re-runs the referencing test project against every mutant, and reports the resulting mutation score.</Description>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>frameshift</ToolCommandName>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
