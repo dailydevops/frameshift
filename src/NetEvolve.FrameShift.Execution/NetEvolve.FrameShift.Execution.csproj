@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!--
+      net10.0 only, deliberately narrower than $(_NetTargetFrameworks): execution-based mutation
+      verification needs a collectible, unloadable AssemblyLoadContext, which every net6.0+ runtime
+      already has, but this tool otherwise has no consumer yet and no compatibility promise to keep, so
+      it tracks the newest supported runtime instead of the widest one. Broadening the matrix is only a
+      TargetFrameworks edit away once there is a reason to.
+    -->
+    <TargetFramework>net10.0</TargetFramework>
+    <!--
+      This ships as a runnable tool (Program.cs), not only a library other code links against: the
+      assembly this produces can be invoked directly with `dotnet exec` or `dotnet run`, so a mutation
+      run can be started from a shell or a CI step instead of only from a caller that references the
+      library API. It is still not packaged as an installable dotnet tool or wired into an MSBuild
+      target - that remains follow-up work.
+    -->
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NetEvolve.FrameShift\NetEvolve.FrameShift.csproj" />
+  </ItemGroup>
+  <ItemGroup Label="Test visibility">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Integration</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+</Project>
