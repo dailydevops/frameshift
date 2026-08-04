@@ -7,7 +7,7 @@
       1. It tells the user when the analysis cannot do anything because no test-surface manifest reached
          the compiler (FSH0005).
       2. It turns the manifest the TestSurfaceManifestGenerator emits into the checked-in
-         '<ProjectName>.frameshift-tests' file next to the test project.
+         '<ProjectName>.frameshift' file next to the test project.
 
     Set 'FrameShiftSuppressSetupWarning' to 'true' to silence FSH0005, for example for projects that are
     deliberately not covered, or while the manifest of the first pass does not exist yet:
@@ -31,13 +31,13 @@
                       AND '$(FrameShiftIsTestProject)' != 'true' "
   >
     <ItemGroup>
-      <_FrameShiftTestSurfaceManifest Include="@(AdditionalFiles)" Condition=" '%(Extension)' == '.frameshift-tests' " />
+      <_FrameShiftTestSurfaceManifest Include="@(AdditionalFiles)" Condition=" '%(Extension)' == '.frameshift' " />
     </ItemGroup>
 
     <Warning
       Code="FSH0005"
       Condition=" '@(_FrameShiftTestSurfaceManifest)' == '' "
-      Text="FrameShift found no test-surface manifest for '$(MSBuildProjectName)', so every mutation point is reported as unreachable. Build the TUnit test project first and add its generated '*.frameshift-tests' manifest to this project, or set 'FrameShiftSuppressSetupWarning' to 'true' to silence this warning. See https://github.com/dailydevops/frameshift for the documented setup."
+      Text="FrameShift found no test-surface manifest for '$(MSBuildProjectName)', so every mutation point is reported as unreachable. Build the TUnit test project first and add its generated '*.frameshift' manifest to this project, or set 'FrameShiftSuppressSetupWarning' to 'true' to silence this warning. See https://github.com/dailydevops/frameshift for the documented setup."
     />
 
     <ItemGroup>
@@ -90,8 +90,7 @@
       <CompilerGeneratedFilesOutputPath Condition=" '$(_FrameShiftIsManifestWriter)' == 'true' AND '$(CompilerGeneratedFilesOutputPath)' == '' "
         >$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
 
-      <FrameShiftTestSurfaceManifestFile Condition=" '$(FrameShiftTestSurfaceManifestFile)' == '' "
-        >$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests</FrameShiftTestSurfaceManifestFile>
+      <FrameShiftTestSurfaceManifestFile Condition=" '$(FrameShiftTestSurfaceManifestFile)' == '' ">$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift</FrameShiftTestSurfaceManifestFile>
     </PropertyGroup>
 
     <!--
@@ -104,7 +103,7 @@
     <MakeDir Condition=" '$(_FrameShiftIsManifestWriter)' == 'true' " Directories="$(CompilerGeneratedFilesOutputPath)" />
 
     <!--
-      The manifest is written into this project's own directory, so the default '**/*.frameshift-tests'
+      The manifest is written into this project's own directory, so the default '**/*.frameshift'
       glob in NetEvolve.FrameShift.props picks it up again on the next build and hands the test project
       its own manifest. The production side would then judge the test assembly against a manifest that
       records members of the assemblies under test, find none of them declared here, and report FSH0001
