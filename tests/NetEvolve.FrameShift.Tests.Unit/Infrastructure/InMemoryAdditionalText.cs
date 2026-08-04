@@ -8,7 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 /// test-surface manifest to an analyzer without touching the file system.
 /// </summary>
 /// <remarks>
-/// The default path ends in <c>.frameshift-tests</c>, because that suffix is what both analyzers use to
+/// The default path ends in <c>.frameshift</c>, because that suffix is what both analyzers use to
 /// recognise a manifest among the additional files. A test that wants to be ignored on purpose passes a
 /// path with a different suffix.
 /// </remarks>
@@ -17,7 +17,7 @@ internal sealed class InMemoryAdditionalText : AdditionalText
     /// <summary>
     /// The path an instance gets when the caller does not choose one.
     /// </summary>
-    public const string DefaultPath = "TestSurface.frameshift-tests";
+    public const string DefaultPath = "TestSurface.frameshift";
 
     private readonly SourceText? _text;
 

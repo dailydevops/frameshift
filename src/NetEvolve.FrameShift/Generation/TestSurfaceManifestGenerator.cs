@@ -22,7 +22,7 @@ using NetEvolve.FrameShift.TestSurface;
 /// analyzer collects, and emits it as a generated source file. The MSBuild target
 /// <c>FrameShiftWriteTestSurfaceManifest</c>, shipped in <c>NetEvolve.FrameShift.targets</c>, picks that
 /// file up after <c>CoreCompile</c> and turns it back into
-/// <c>$(MSBuildProjectName).frameshift-tests</c> next to the project file. The production project then
+/// <c>$(MSBuildProjectName).frameshift</c> next to the project file. The production project then
 /// consumes that manifest as an <c>AdditionalFiles</c> entry, exactly as before.
 /// </para>
 /// <para>

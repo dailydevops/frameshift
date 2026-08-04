@@ -22,7 +22,7 @@
                                                          the RegexOptions one. Default: true.
       FrameShiftSuppressSetupWarning        true|false   Silences the FSH0005 setup warning emitted by
                                                          NetEvolve.FrameShift.targets. Default: false.
-      FrameShiftEnableDefaultManifestItems  true|false   Adds every '**/*.frameshift-tests' file of the
+      FrameShiftEnableDefaultManifestItems  true|false   Adds every '**/*.frameshift' file of the
                                                          project to @(AdditionalFiles). Default: true,
                                                          unless $(EnableDefaultItems) is false.
       FrameShiftWriteTestSurfaceManifest    true|false   Writes the generated test-surface manifest of a
@@ -33,7 +33,7 @@
                                                          (TUnit, xunit, NUnit, MSTest), false otherwise.
                                                          Enabling it turns on $(EmitCompilerGeneratedFiles).
       FrameShiftTestSurfaceManifestFile     path         The manifest file that is written. Default:
-                                                         $(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests.
+                                                         $(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift.
       FrameShiftTestAnalyzers               list         A ';'-separated list of the test-surface analyzers
                                                          allowed to run, by token: TUnit, XunitV2, XunitV3,
                                                          NUnit, MSTest. Default: Discovery, which runs every
@@ -80,12 +80,12 @@
     <!--
       Output and intermediate directories are excluded, otherwise a manifest that was copied to the
       output would be picked up a second time. The custom directories are only appended when they are
-      actually defined, because an empty value would expand to '**/*.frameshift-tests' and exclude
+      actually defined, because an empty value would expand to '**/*.frameshift' and exclude
       everything.
     -->
-    <_FrameShiftManifestExclude>$(MSBuildProjectDirectory)/bin/**/*.frameshift-tests;$(MSBuildProjectDirectory)/obj/**/*.frameshift-tests</_FrameShiftManifestExclude>
-    <_FrameShiftManifestExclude Condition=" '$(BaseOutputPath)' != '' ">$(_FrameShiftManifestExclude);$(BaseOutputPath)**/*.frameshift-tests</_FrameShiftManifestExclude>
-    <_FrameShiftManifestExclude Condition=" '$(BaseIntermediateOutputPath)' != '' ">$(_FrameShiftManifestExclude);$(BaseIntermediateOutputPath)**/*.frameshift-tests</_FrameShiftManifestExclude>
+    <_FrameShiftManifestExclude>$(MSBuildProjectDirectory)/bin/**/*.frameshift;$(MSBuildProjectDirectory)/obj/**/*.frameshift</_FrameShiftManifestExclude>
+    <_FrameShiftManifestExclude Condition=" '$(BaseOutputPath)' != '' ">$(_FrameShiftManifestExclude);$(BaseOutputPath)**/*.frameshift</_FrameShiftManifestExclude>
+    <_FrameShiftManifestExclude Condition=" '$(BaseIntermediateOutputPath)' != '' ">$(_FrameShiftManifestExclude);$(BaseIntermediateOutputPath)**/*.frameshift</_FrameShiftManifestExclude>
   </PropertyGroup>
 
   <ItemGroup Label="FrameShift test-surface manifests" Condition=" '$(FrameShiftEnableDefaultManifestItems)' == 'true' ">
@@ -93,6 +93,6 @@
       The production side of the analysis reads the manifest as an AdditionalText, so the manifests have
       to reach the compiler.
     -->
-    <AdditionalFiles Include="$(MSBuildProjectDirectory)/**/*.frameshift-tests" Exclude="$(_FrameShiftManifestExclude)" />
+    <AdditionalFiles Include="$(MSBuildProjectDirectory)/**/*.frameshift" Exclude="$(_FrameShiftManifestExclude)" />
   </ItemGroup>
 </Project>
