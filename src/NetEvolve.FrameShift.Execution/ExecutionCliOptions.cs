@@ -17,15 +17,23 @@ internal sealed class ExecutionCliOptions
     private const string TestAssemblyFlag = "--test-dll";
     private const string SourceFlag = "--source";
     private const string TimeoutFlag = "--timeout-seconds";
+    private const string ReportFormatFlag = "--report-format";
+    private const string ReportPathFlag = "--report-path";
 
     private const int DefaultTimeoutSeconds = 60;
+    private const string ConsoleReportFormatValue = "console";
+    private const string HtmlReportFormatValue = "html";
+    private const string MarkdownReportFormatValue = "markdown";
+    private const string GitHubSummaryReportFormatValue = "github-summary";
 
     private ExecutionCliOptions(
         string testOutputDirectory,
         string productionAssemblyFileName,
         string testAssemblyFileName,
         ImmutableArray<string> sourceFilePaths,
-        TimeSpan timeout
+        TimeSpan timeout,
+        ReportFormat reportFormat,
+        string? reportPath
     )
     {
         TestOutputDirectory = testOutputDirectory;
@@ -33,6 +41,8 @@ internal sealed class ExecutionCliOptions
         TestAssemblyFileName = testAssemblyFileName;
         SourceFilePaths = sourceFilePaths;
         Timeout = timeout;
+        ReportFormat = reportFormat;
+        ReportPath = reportPath;
     }
 
     /// <summary>
@@ -63,11 +73,25 @@ internal sealed class ExecutionCliOptions
     public TimeSpan Timeout { get; }
 
     /// <summary>
+    /// Gets the format the end-of-run report is written in. Defaults to <see cref="ReportFormat.Console" />.
+    /// </summary>
+    public ReportFormat ReportFormat { get; }
+
+    /// <summary>
+    /// Gets the file the end-of-run report is written to, or <see langword="null" /> to write a console
+    /// or Markdown report to the same <see cref="TextWriter" /> the run's progress is written to. Required
+    /// when <see cref="ReportFormat" /> is <see cref="ReportFormat.Html" />. Ignored when
+    /// <see cref="ReportFormat" /> is <see cref="ReportFormat.GitHubSummary" />, which always appends to
+    /// the file named by the <c>GITHUB_STEP_SUMMARY</c> environment variable instead.
+    /// </summary>
+    public string? ReportPath { get; }
+
+    /// <summary>
     /// The usage text printed on a parse failure or an explicit <c>--help</c>.
     /// </summary>
     public static string Usage =>
         $"""
-            Usage: frameshift {TestOutputFlag} <dir> {ProductionAssemblyFlag} <file.dll> {TestAssemblyFlag} <file.dll> {SourceFlag} <file.cs> [{SourceFlag} <file.cs> ...] [{TimeoutFlag} <seconds>]
+            Usage: frameshift {TestOutputFlag} <dir> {ProductionAssemblyFlag} <file.dll> {TestAssemblyFlag} <file.dll> {SourceFlag} <file.cs> [{SourceFlag} <file.cs> ...] [{TimeoutFlag} <seconds>] [{ReportFormatFlag} <console|html|markdown|github-summary>] [{ReportPathFlag} <file>]
 
               {TestOutputFlag}         The build output directory of the test project (contains the test
                                        assembly, the production assembly and every dependency of both).
@@ -79,6 +103,12 @@ internal sealed class ExecutionCliOptions
                                        Repeatable.
               {TimeoutFlag}    How long to wait for the test host of a single mutant before it is
                                        killed and the mutant is reported as timed out. Defaults to {DefaultTimeoutSeconds}.
+              {ReportFormatFlag}      The format of the end-of-run report: '{ConsoleReportFormatValue}', '{HtmlReportFormatValue}',
+                                       '{MarkdownReportFormatValue}' or '{GitHubSummaryReportFormatValue}'. Defaults to '{ConsoleReportFormatValue}'.
+              {ReportPathFlag}        The file the end-of-run report is written to. Required for
+                                       '{HtmlReportFormatValue}'; optional for '{ConsoleReportFormatValue}' and '{MarkdownReportFormatValue}', which write
+                                       to the console when omitted; ignored for '{GitHubSummaryReportFormatValue}', which always
+                                       appends to the file named by the GITHUB_STEP_SUMMARY environment variable.
             """;
 
     /// <summary>
@@ -113,7 +143,9 @@ internal sealed class ExecutionCliOptions
             raw.ProductionAssemblyFileName!,
             raw.TestAssemblyFileName!,
             raw.SourceFilePaths.ToImmutable(),
-            TimeSpan.FromSeconds(raw.TimeoutSeconds)
+            TimeSpan.FromSeconds(raw.TimeoutSeconds),
+            raw.ReportFormat,
+            raw.ReportPath
         );
 
         return true;
@@ -125,6 +157,7 @@ internal sealed class ExecutionCliOptions
         {
             SourceFilePaths = ImmutableArray.CreateBuilder<string>(),
             TimeoutSeconds = DefaultTimeoutSeconds,
+            ReportFormat = ReportFormat.Console,
         };
 
         var index = 0;
@@ -167,11 +200,59 @@ internal sealed class ExecutionCliOptions
 
                     raw.TimeoutSeconds = timeoutSeconds;
                     break;
+                case ReportFormatFlag:
+                    if (!TryParseReportFormat(value, out var reportFormat, out error))
+                    {
+                        return false;
+                    }
+
+                    raw.ReportFormat = reportFormat;
+                    break;
+                case ReportPathFlag:
+                    raw.ReportPath = value;
+                    break;
                 default:
                     error = $"Unrecognised argument '{flag}'.";
 
                     return false;
             }
+        }
+
+        error = null;
+
+        return true;
+    }
+
+    private static bool TryParseReportFormat(
+        string value,
+        out ReportFormat reportFormat,
+        [NotNullWhen(false)] out string? error
+    )
+    {
+        if (string.Equals(value, ConsoleReportFormatValue, StringComparison.OrdinalIgnoreCase))
+        {
+            reportFormat = ReportFormat.Console;
+        }
+        else if (string.Equals(value, HtmlReportFormatValue, StringComparison.OrdinalIgnoreCase))
+        {
+            reportFormat = ReportFormat.Html;
+        }
+        else if (string.Equals(value, MarkdownReportFormatValue, StringComparison.OrdinalIgnoreCase))
+        {
+            reportFormat = ReportFormat.Markdown;
+        }
+        else if (string.Equals(value, GitHubSummaryReportFormatValue, StringComparison.OrdinalIgnoreCase))
+        {
+            reportFormat = ReportFormat.GitHubSummary;
+        }
+        else
+        {
+            reportFormat = default;
+            error =
+                $"'{value}' is not a valid report format. Expected '{ConsoleReportFormatValue}', "
+                + $"'{HtmlReportFormatValue}', '{MarkdownReportFormatValue}' or '{GitHubSummaryReportFormatValue}'.";
+
+            return false;
         }
 
         error = null;
@@ -225,6 +306,13 @@ internal sealed class ExecutionCliOptions
             return false;
         }
 
+        if (raw.ReportFormat == ReportFormat.Html && string.IsNullOrEmpty(raw.ReportPath))
+        {
+            error = $"'{ReportPathFlag}' is required when '{ReportFormatFlag}' is '{HtmlReportFormatValue}'.";
+
+            return false;
+        }
+
         error = null;
 
         return true;
@@ -245,6 +333,10 @@ internal sealed class ExecutionCliOptions
         public required ImmutableArray<string>.Builder SourceFilePaths { get; init; }
 
         public int TimeoutSeconds { get; set; }
+
+        public ReportFormat ReportFormat { get; set; }
+
+        public string? ReportPath { get; set; }
     }
 
     private static bool TryReadValue(string[] args, ref int index, out string value)
