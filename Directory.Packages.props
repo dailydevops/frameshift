@@ -37,6 +37,12 @@
     -->
     <PackageVersion Include="System.Memory" Version="4.6.3" />
     <!--
+      .NET Framework never shipped ValueTask/ValueTask{T}; this package is what gives the classic
+      target frameworks the real types, so a fixture using them binds and resolves the same way it
+      does on .NET instead of leaving the test compilation with an unresolved type.
+    -->
+    <PackageVersion Include="System.Threading.Tasks.Extensions" Version="4.6.3" />
+    <!--
       Supplies the compiler-required attributes that older frameworks do not ship, most notably
       `ModuleInitializerAttribute`, which TUnit's source generator emits into every test assembly, and
       a public `NotNullWhenAttribute`, which .NET Framework keeps internal.

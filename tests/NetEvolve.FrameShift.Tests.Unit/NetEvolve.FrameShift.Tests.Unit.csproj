@@ -45,6 +45,8 @@
   <ItemGroup Condition=" '$(TargetFramework)' == 'net472' or '$(TargetFramework)' == 'net48' or '$(TargetFramework)' == 'net481' ">
     <!-- Gives the Span/ReadOnlySpan fixtures of CollectionInitializerMutatorTests the real types on .NET Framework. -->
     <PackageReference Include="System.Memory" />
+    <!-- Gives the ValueTask/ValueTask<T> fixtures of EquivalenceClassifierTests the real types on .NET Framework, which never shipped them in mscorlib. -->
+    <PackageReference Include="System.Threading.Tasks.Extensions" />
   </ItemGroup>
   <ItemGroup Label="Test framework metadata, compile-time only">
     <PackageReference Include="MSTest.TestFramework" PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />

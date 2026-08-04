@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using MSTestFramework = Microsoft.VisualStudio.TestTools.UnitTesting;
 #if NETFRAMEWORK
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.CSharp;
 #endif
 
@@ -290,10 +291,11 @@ internal static class ReferenceAssemblies
 
     private static ImmutableArray<MetadataReference> CreateDefault() =>
 #if NETFRAMEWORK
-        // .NET Framework never shipped Span{T}/ReadOnlySpan{T}; the System.Memory package is what a
-        // fixture using either type needs to resolve them the same way it does on .NET, where they are
-        // already part of the runtime the trusted-platform-assemblies path picks up.
-        CreateWith(SystemMemoryAnchors);
+        // .NET Framework never shipped Span{T}/ReadOnlySpan{T} or ValueTask/ValueTask{TResult}; the
+        // System.Memory and System.Threading.Tasks.Extensions packages are what a fixture using any of
+        // them needs to resolve them the same way it does on .NET, where they are already part of the
+        // runtime the trusted-platform-assemblies path picks up.
+        CreateWith([.. SystemMemoryAnchors, .. SystemValueTaskAnchors]);
 #else
         CreateReferences(_frameworkPaths.Value);
 #endif
@@ -362,6 +364,13 @@ internal static class ReferenceAssemblies
     /// on .NET Framework the same way it does on .NET.
     /// </summary>
     private static Type[] SystemMemoryAnchors => [typeof(Span<int>)];
+
+    /// <summary>
+    /// The seed of the .NET Framework <c>System.Threading.Tasks.Extensions</c> reference, added to
+    /// <see cref="Default" /> so that a fixture declaring a <see cref="ValueTask" /> or
+    /// <see cref="ValueTask{TResult}" /> member resolves on .NET Framework the same way it does on .NET.
+    /// </summary>
+    private static Type[] SystemValueTaskAnchors => [typeof(ValueTask)];
 #endif
 
     /// <summary>
