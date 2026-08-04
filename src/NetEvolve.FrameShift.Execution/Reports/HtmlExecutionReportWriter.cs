@@ -2,6 +2,7 @@
 
 using System.Collections.Immutable;
 using System.Globalization;
+using System.Linq;
 using System.Net;
 using System.Text;
 
@@ -144,9 +145,9 @@ internal static class HtmlExecutionReportWriter
             .Append(WebUtility.HtmlEncode(description))
             .Append("</p><table><thead><tr><th>File</th><th>Line</th><th>Mutation</th></tr></thead><tbody>");
 
-        foreach (var result in results)
+        foreach (var mutation in results.Select(result => result.Mutation))
         {
-            var lineSpan = result.Mutation.Location.GetLineSpan();
+            var lineSpan = mutation.Location.GetLineSpan();
             var fileName = Path.GetFileName(lineSpan.Path);
             var line = lineSpan.StartLinePosition.Line + 1;
 
@@ -156,7 +157,7 @@ internal static class HtmlExecutionReportWriter
                 .Append("</td><td>")
                 .Append(line)
                 .Append("</td><td>")
-                .Append(WebUtility.HtmlEncode(result.Mutation.DisplayName))
+                .Append(WebUtility.HtmlEncode(mutation.DisplayName))
                 .Append("</td></tr>");
         }
 

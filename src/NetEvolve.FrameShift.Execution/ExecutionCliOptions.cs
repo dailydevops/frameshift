@@ -173,49 +173,77 @@ internal sealed class ExecutionCliOptions
                 return false;
             }
 
-            switch (flag)
+            if (!TryApplyFlag(raw, flag, value, out error))
             {
-                case TestOutputFlag:
-                    raw.TestOutputDirectory = value;
-                    break;
-                case ProductionAssemblyFlag:
-                    raw.ProductionAssemblyFileName = value;
-                    break;
-                case TestAssemblyFlag:
-                    raw.TestAssemblyFileName = value;
-                    break;
-                case SourceFlag:
-                    raw.SourceFilePaths.Add(value);
-                    break;
-                case TimeoutFlag:
-                    if (
-                        !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var timeoutSeconds)
-                        || timeoutSeconds <= 0
-                    )
-                    {
-                        error = $"'{value}' is not a positive number of seconds.";
-
-                        return false;
-                    }
-
-                    raw.TimeoutSeconds = timeoutSeconds;
-                    break;
-                case ReportFormatFlag:
-                    if (!TryParseReportFormat(value, out var reportFormat, out error))
-                    {
-                        return false;
-                    }
-
-                    raw.ReportFormat = reportFormat;
-                    break;
-                case ReportPathFlag:
-                    raw.ReportPath = value;
-                    break;
-                default:
-                    error = $"Unrecognised argument '{flag}'.";
-
-                    return false;
+                return false;
             }
+        }
+
+        error = null;
+
+        return true;
+    }
+
+    private static bool TryApplyFlag(RawOptions raw, string flag, string value, [NotNullWhen(false)] out string? error)
+    {
+        switch (flag)
+        {
+            case TestOutputFlag:
+                raw.TestOutputDirectory = value;
+                break;
+            case ProductionAssemblyFlag:
+                raw.ProductionAssemblyFileName = value;
+                break;
+            case TestAssemblyFlag:
+                raw.TestAssemblyFileName = value;
+                break;
+            case SourceFlag:
+                raw.SourceFilePaths.Add(value);
+                break;
+            case TimeoutFlag:
+                if (!TryParseTimeoutSeconds(value, out var timeoutSeconds, out error))
+                {
+                    return false;
+                }
+
+                raw.TimeoutSeconds = timeoutSeconds;
+                break;
+            case ReportFormatFlag:
+                if (!TryParseReportFormat(value, out var reportFormat, out error))
+                {
+                    return false;
+                }
+
+                raw.ReportFormat = reportFormat;
+                break;
+            case ReportPathFlag:
+                raw.ReportPath = value;
+                break;
+            default:
+                error = $"Unrecognised argument '{flag}'.";
+
+                return false;
+        }
+
+        error = null;
+
+        return true;
+    }
+
+    private static bool TryParseTimeoutSeconds(
+        string value,
+        out int timeoutSeconds,
+        [NotNullWhen(false)] out string? error
+    )
+    {
+        if (
+            !int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out timeoutSeconds)
+            || timeoutSeconds <= 0
+        )
+        {
+            error = $"'{value}' is not a positive number of seconds.";
+
+            return false;
         }
 
         error = null;
