@@ -118,6 +118,44 @@ public class MutationExecutionEngineTestHostTests
     }
 
     [Test]
+    public async Task ExecuteViaTestHostAsync_MutationThatFailsToBind_ReportsTheDiagnosticsInsteadOfDiscardingThem()
+    {
+        var (compilation, tree, _) = CreateProduction();
+        var root = await tree.GetRootAsync().ConfigureAwait(false);
+        var originalLiteral = root.DescendantNodes()
+            .OfType<LiteralExpressionSyntax>()
+            .Single(literal => string.Equals(literal.Token.ValueText, "0", StringComparison.Ordinal));
+        var unboundReplacement = SyntaxFactory.IdentifierName("ThisSymbolDoesNotExistAnywhere");
+
+        var mutation = new Mutation(
+            MutationKind.NumericLiteral,
+            "test.unbound-replacement",
+            "0 => ThisSymbolDoesNotExistAnywhere",
+            originalLiteral,
+            unboundReplacement
+        );
+
+        var result = await MutationExecutionEngine
+            .ExecuteViaTestHostAsync(
+                compilation,
+                mutation,
+                tree,
+                Path.GetTempPath(),
+                ProductionAssemblyFileName,
+                TestHostAssemblyFileName,
+                DefaultTimeout
+            )
+            .ConfigureAwait(false);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Verdict).IsEqualTo(MutantVerdict.BuildFailed);
+            _ = await Assert.That(result.Diagnostics).IsNotNull();
+            _ = await Assert.That(result.Diagnostics!).Contains("ThisSymbolDoesNotExistAnywhere");
+        }
+    }
+
+    [Test]
     public async Task RunViaTestHostAsync_BothMutations_AggregatesIntoTheExpectedScore()
     {
         const string testHostSource = """

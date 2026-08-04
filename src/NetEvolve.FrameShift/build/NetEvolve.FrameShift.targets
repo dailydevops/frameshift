@@ -2,12 +2,16 @@
   <!--
     NetEvolve.FrameShift - build assets.
 
-    This file does two things:
+    This file does three things:
 
       1. It tells the user when the analysis cannot do anything because no test-surface manifest reached
          the compiler (FSH0005).
-      2. It turns the manifest the TestSurfaceManifestGenerator emits into the checked-in
-         '<ProjectName>.frameshift' file next to the test project.
+      2. It has the manifest written directly into the directory of the production project a test
+         project's ProjectReference exercises, instead of next to the test project - for every
+         reference by default; opt a specific one out with the metadata 'DisableFrameShift="true"'.
+      3. It turns the manifest the TestSurfaceManifestGenerator emits into the checked-in
+         '<ProjectName>.<TargetFramework>.frameshift' file next to the test project, or into the
+         referenced production project's directory when metadata 2 applies.
 
     Set 'FrameShiftSuppressSetupWarning' to 'true' to silence FSH0005, for example for projects that are
     deliberately not covered, or while the manifest of the first pass does not exist yet:
@@ -42,6 +46,87 @@
 
     <ItemGroup>
       <_FrameShiftTestSurfaceManifest Remove="@(_FrameShiftTestSurfaceManifest)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Reports whether the current project is itself a test project, by the very same rule
+    'FrameShiftWarnOnMissingTestSurfaceManifest' uses to exempt one from FSH0005. Called on a
+    referenced project through the MSBuild task by 'FrameShiftResolveManifestFileFromReference', so
+    that target can tell a genuine production reference apart from a reference to another test
+    project - for example a shared test-infrastructure project - which must not receive a manifest.
+  -->
+  <Target Name="FrameShiftReportIsTestProject" Returns="@(_FrameShiftIsTestProjectMarker)">
+    <ItemGroup>
+      <_FrameShiftIsTestProjectMarker
+        Include="IsTestProject"
+        Condition=" '$(IsTestProject)' == 'true' OR '$(IsTestableProject)' == 'true' OR '$(IsTestingPlatformApplication)' == 'true' OR '$(FrameShiftIsTestProject)' == 'true' "
+      />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Every test project's ProjectReference to a project that actually contributes an assembly is a
+    candidate to have the manifest written directly into the referenced project's directory, instead
+    of next to the test project with an explicit AdditionalFiles entry pointing back to it - opt out
+    of a specific reference with the metadata 'DisableFrameShift="true"'. The production project then
+    picks the manifest up again through its own default '**/*.frameshift' glob in
+    NetEvolve.FrameShift.props.
+
+    A reference with 'ReferenceOutputAssembly="false"' or 'OutputItemType="Analyzer"' is excluded
+    outright, unconditionally: such a reference exists for a build-time asset - most commonly the
+    FrameShift analyzer project itself, referenced exactly that way by a test project working against
+    a local checkout instead of the package - never for the production code under test, and its own
+    directory is never a sensible manifest destination.
+
+    A candidate that turns out to point at another test project - for instance a shared
+    test-infrastructure project referenced by more than one test project - is dropped instead of
+    honoured: such a project has no manifest of its own to receive, and misdirecting one into its
+    directory would only confuse its own build. 'FrameShiftReportIsTestProject' answers that question
+    on the referenced project itself; 'SkipNonexistentTargets' keeps a reference to a project that
+    does not import these build assets at all from failing the build, treating it like any other
+    production reference instead.
+
+    Runs before 'FrameShiftConfigureTestSurfaceManifest', so the manifest location it resolves is
+    already in place once that target reads '$(FrameShiftTestSurfaceManifestFile)'. Only fills in
+    what the consuming project has not already decided for itself. A project with more than one
+    surviving candidate - more than one production ProjectReference, none of them opted out - sets
+    the property once per candidate and the last one silently wins; disable every reference except
+    the one actually under test with 'DisableFrameShift="true"', or set
+    '$(FrameShiftTestSurfaceManifestFile)' itself instead.
+  -->
+  <Target Name="FrameShiftResolveManifestFileFromReference" BeforeTargets="FrameShiftConfigureTestSurfaceManifest" Condition=" '$(FrameShiftEnabled)' == 'true' AND '$(DesignTimeBuild)' != 'true' ">
+    <ItemGroup>
+      <_FrameShiftManifestProjectReference
+        Include="@(ProjectReference)"
+        Condition="
+          '%(ProjectReference.DisableFrameShift)' != 'true'
+          AND '%(ProjectReference.ReferenceOutputAssembly)' != 'false'
+          AND '%(ProjectReference.OutputItemType)' != 'Analyzer' "
+      />
+    </ItemGroup>
+
+    <MSBuild
+      Projects="@(_FrameShiftManifestProjectReference)"
+      Targets="FrameShiftReportIsTestProject"
+      Properties="Configuration=$(Configuration);Platform=$(Platform)"
+      SkipNonexistentTargets="true"
+      Condition=" '@(_FrameShiftManifestProjectReference)' != '' "
+    >
+      <Output TaskParameter="TargetOutputs" ItemName="_FrameShiftReferencedProjectIsTestProject" />
+    </MSBuild>
+
+    <PropertyGroup
+      Condition=" '$(FrameShiftTestSurfaceManifestFile)' == ''
+                                            AND '@(_FrameShiftManifestProjectReference)' != ''
+                                            AND '@(_FrameShiftReferencedProjectIsTestProject)' == '' "
+    >
+      <FrameShiftTestSurfaceManifestFile>%(_FrameShiftManifestProjectReference.RootDir)%(_FrameShiftManifestProjectReference.Directory)$(MSBuildProjectName).$(TargetFramework).frameshift</FrameShiftTestSurfaceManifestFile>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <_FrameShiftManifestProjectReference Remove="@(_FrameShiftManifestProjectReference)" />
+      <_FrameShiftReferencedProjectIsTestProject Remove="@(_FrameShiftReferencedProjectIsTestProject)" />
     </ItemGroup>
   </Target>
 
@@ -90,7 +175,8 @@
       <CompilerGeneratedFilesOutputPath Condition=" '$(_FrameShiftIsManifestWriter)' == 'true' AND '$(CompilerGeneratedFilesOutputPath)' == '' "
         >$(IntermediateOutputPath)generated</CompilerGeneratedFilesOutputPath>
 
-      <FrameShiftTestSurfaceManifestFile Condition=" '$(FrameShiftTestSurfaceManifestFile)' == '' ">$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift</FrameShiftTestSurfaceManifestFile>
+      <FrameShiftTestSurfaceManifestFile Condition=" '$(FrameShiftTestSurfaceManifestFile)' == '' "
+        >$(MSBuildProjectDirectory)\$(MSBuildProjectName).$(TargetFramework).frameshift</FrameShiftTestSurfaceManifestFile>
     </PropertyGroup>
 
     <!--

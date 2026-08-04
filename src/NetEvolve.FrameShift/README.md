@@ -67,7 +67,7 @@ next to every other compiler diagnostic.
   machine and fail under another locale, and every one of them is a place a test can pin the intent
   instead of inheriting the ambient culture. Each of these operators resolves the framework type it
   mutates through the compilation, so a same-named type of your own is never mistaken for it.
-- A regular-expression pattern operator family of eight operators that mutate the *pattern text* rather
+- A regular-expression pattern operator family of eight operators that mutate the _pattern text_ rather
   than the flags around it - anchors (`^`, `$`, `\A`, `\z`, `\Z` removed, `\b` swapped for `\B`),
   quantifiers (`*` for `+`, an optional `?` removed, greedy for lazy, the bounds of `{n,m}` shifted),
   groups (a capturing group turned into `(?:` and back), alternation (a branch removed, two
@@ -101,7 +101,7 @@ next to every other compiler diagnostic.
   time is analysed by both and every test is attributed to the version that actually marks it.
 - A self-maintaining test-surface manifest: a source generator produces it from the test project and
   a packaged MSBuild target writes it next to the project file, so it never has to be edited by hand.
-  It records the referenced members *per test method*, together with the number of test cases that
+  It records the referenced members _per test method_, together with the number of test cases that
   method contributes.
 - Thin coverage is reported too, not only missing coverage (`FSH0006`): a mutation point that is
   reached, but reached by tests contributing exactly one input combination in total, is flagged as
@@ -153,7 +153,9 @@ The test project - the project whose tests are discovered and whose manifest is 
 
 1. Reference `NetEvolve.FrameShift` in the production project and in the test project.
 2. Build the test project once. This writes
-   `$(MSBuildProjectName).frameshift` next to the test project file.
+   `$(MSBuildProjectName).$(TargetFramework).frameshift` next to the test project file - the target
+   framework moniker in the name is the one inner build elected to write the manifest, not
+   necessarily the one you happened to build.
 3. Point the production project at that manifest and build it. The `FSH0001` warnings are the gaps.
 4. Commit the manifest - it is the input of the next build of the production project.
 
@@ -161,17 +163,31 @@ Step 3, in the production project:
 
 ```xml
 <ItemGroup>
-  <AdditionalFiles Include="..\..\tests\Calculator.Tests\Calculator.Tests.frameshift" />
+  <AdditionalFiles Include="..\..\tests\Calculator.Tests\Calculator.Tests.net10.0.frameshift" />
 </ItemGroup>
 ```
 
 Alternatively, let the test project write its manifest directly into the production project
-directory, where the package picks it up automatically:
+directory, where the package picks it up automatically - either by pointing at the location
+yourself:
 
 ```xml
 <PropertyGroup>
-  <FrameShiftTestSurfaceManifestFile>$(MSBuildThisFileDirectory)..\..\src\Calculator\Calculator.frameshift</FrameShiftTestSurfaceManifestFile>
+  <FrameShiftTestSurfaceManifestFile>$(MSBuildThisFileDirectory)..\..\src\Calculator\Calculator.net10.0.frameshift</FrameShiftTestSurfaceManifestFile>
 </PropertyGroup>
+```
+
+or simply relying on the default: every `ProjectReference` of the test project is a candidate for
+this already, so an ordinary reference to the production project resolves the very same location
+without any metadata at all. Opt a specific reference out with `DisableFrameShift="true"` -
+necessary once a test project references more than one production project, since every surviving
+candidate sets the property and the last one silently wins:
+
+```xml
+<ItemGroup>
+  <ProjectReference Include="..\..\src\Calculator\Calculator.csproj" />
+  <ProjectReference Include="..\..\src\Shared\Shared.csproj" DisableFrameShift="true" />
+</ItemGroup>
 ```
 
 ### Worked example
@@ -202,14 +218,16 @@ public sealed class RatesTests
 }
 ```
 
-Building the test project writes `tests/Calculator.Tests/Calculator.Tests.frameshift`. The
-format is plain text and grouped per test: a mandatory header line, then one block per discovered test
+Building the test project writes `tests/Calculator.Tests/Calculator.Tests.net10.0.frameshift`. The
+format is plain text and grouped per test: a mandatory header line, then an optional comment line
+naming the target framework the manifest was collected under, then one block per discovered test
 method - a `T` line naming the method and its test-case count, followed by one `R` line per member
-*that* test references. The ids are documentation comment ids, the blocks and the lines within a block
+_that_ test references. The ids are documentation comment ids, the blocks and the lines within a block
 are sorted ordinally, and lines starting with `#` are comments:
 
 ```text
 frameshift-test-surface/1
+# targetframework: net10.0
 T M:Calculator.Tests.RatesTests.WithTax_AddsNineteenPercent 1
 R M:Calculator.Rates.#ctor
 R M:Calculator.Rates.WithTax(System.Decimal)
@@ -221,13 +239,13 @@ this parameterless test, `3` for a test with three `[Arguments]` rows, `1+` for 
 source whose length cannot be determined without executing it. An `R` line always belongs to the
 closest `T` line above it, so an `R` line before the first `T` line makes the manifest malformed.
 
-This is an excerpt. The real file also records the members the test touched in every *other*
+This is an excerpt. The real file also records the members the test touched in every _other_
 referenced assembly - the test framework, the base class library - because the collector records
 everything that comes from outside the test compilation. Those ids simply do not resolve in the
 production compilation and are ignored there.
 
 Building the production project then reports the untested method. One warning is emitted per
-*mutant*, not per mutation point, so a single expression usually produces several of them at the
+_mutant_, not per mutation point, so a single expression usually produces several of them at the
 same location - the arithmetic operator alone is replaced by each of the four remaining operators.
 Two of the warnings for `WithDiscount`:
 
@@ -261,7 +279,7 @@ grouping and the case count on each `T` line let the production side ask the fin
 answers - how many input combinations reach this mutation point in total.
 
 The reachability closure runs on the production side, and it has to: the manifest only transports the
-*seed*, the members a test touches directly. Expanding that seed into everything those members call
+_seed_, the members a test touches directly. Expanding that seed into everything those members call
 requires the production call graph, which only the production compilation can see. The expansion is a
 breadth-first walk over the declarations in this compilation, with virtual and interface dispatch
 approximated by adding the overrides and implementations declared here.
@@ -272,7 +290,7 @@ flowchart TD
         A["Test methods discovered<br/>TUnit / xUnit v2 / xUnit v3 / NUnit / MSTest"] --> B["Walk code reachable<br/>inside the test assembly"]
         B --> C["Record referenced production<br/>members per test, with its case count"]
         C --> D["Source generator emits<br/>the manifest"]
-        D --> E["MSBuild target writes<br/>ProjectName.frameshift"]
+        D --> E["MSBuild target writes<br/>ProjectName.TargetFramework.frameshift"]
     end
 
     E -->|"committed, then read via AdditionalFiles"| F
@@ -296,18 +314,18 @@ in; the MSBuild assets emit `FSH0005` for the missing setup instead.
 Every property is set in the consuming project, in a `Directory.Build.props`, or on the command line
 via `-p:Name=Value`.
 
-| Property | Default | Effect |
-| --- | --- | --- |
-| `FrameShiftEnabled` | `true` | Runs the analysis at all. `false` disables the analyzers and the manifest generator for the project. |
-| `FrameShiftVerifyMutantCompilation` | `true` | Compiles every mutant before it is reported. `false` skips the verification and reports mutants that may not build. |
-| `FrameShiftMaxMutantsPerMember` | `64` | Caps the mutants considered for a single member. Values below `1` are clamped to `1`. |
-| `FrameShiftReportTrivialMutants` | `true` | Reports mutants without observable effect as `FSH0002`. `false` keeps them out of the build log. |
-| `FrameShiftEnableRegexPatternMutations` | `true` | Runs the eight operators of the regular-expression pattern family - anchors, quantifiers, groups, alternation, character classes, escapes, lookaround, backreferences. `false` switches the family off and leaves every other operator untouched, including the `RegexOptions` one of the culture-sensitivity family. Use it when the pattern mutants of a pattern-heavy project crowd out the mutation points of the surrounding code: the family is skipped before `FrameShiftMaxMutantsPerMember` is consulted, so the budget of a member is then spent on its other mutation points. |
-| `FrameShiftSuppressSetupWarning` | `false` | Silences the `FSH0005` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet. |
-| `FrameShiftIsTestProject` | *(unset)* | Set to `true` to mark a project as a test project, which suppresses `FSH0005` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect. |
-| `FrameShiftEnableDefaultManifestItems` | `true`, or `false` when `$(EnableDefaultItems)` is `false` | Adds every `**/*.frameshift` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories. |
-| `FrameShiftWriteTestSurfaceManifest` | `true` for a project referencing a known test framework package (a `PackageReference` whose id starts, case-insensitively, with `tunit`, `xunit`, `nunit` or `mstest`), `false` otherwise | Writes the generated test-surface manifest next to the project file. Enabling it turns on `$(EmitCompilerGeneratedFiles)`. |
-| `FrameShiftTestSurfaceManifestFile` | `$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift` | The manifest file that is written. |
+| Property                                | Default                                                                                                                                                                                   | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FrameShiftEnabled`                     | `true`                                                                                                                                                                                    | Runs the analysis at all. `false` disables the analyzers and the manifest generator for the project.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `FrameShiftVerifyMutantCompilation`     | `true`                                                                                                                                                                                    | Compiles every mutant before it is reported. `false` skips the verification and reports mutants that may not build.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `FrameShiftMaxMutantsPerMember`         | `64`                                                                                                                                                                                      | Caps the mutants considered for a single member. Values below `1` are clamped to `1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `FrameShiftReportTrivialMutants`        | `true`                                                                                                                                                                                    | Reports mutants without observable effect as `FSH0002`. `false` keeps them out of the build log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `FrameShiftEnableRegexPatternMutations` | `true`                                                                                                                                                                                    | Runs the eight operators of the regular-expression pattern family - anchors, quantifiers, groups, alternation, character classes, escapes, lookaround, backreferences. `false` switches the family off and leaves every other operator untouched, including the `RegexOptions` one of the culture-sensitivity family. Use it when the pattern mutants of a pattern-heavy project crowd out the mutation points of the surrounding code: the family is skipped before `FrameShiftMaxMutantsPerMember` is consulted, so the budget of a member is then spent on its other mutation points. |
+| `FrameShiftSuppressSetupWarning`        | `false`                                                                                                                                                                                   | Silences the `FSH0005` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `FrameShiftIsTestProject`               | _(unset)_                                                                                                                                                                                 | Set to `true` to mark a project as a test project, which suppresses `FSH0005` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect.                                                                                                                                                                                                                                                                                                                                                                   |
+| `FrameShiftEnableDefaultManifestItems`  | `true`, or `false` when `$(EnableDefaultItems)` is `false`                                                                                                                                | Adds every `**/*.frameshift` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories.                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `FrameShiftWriteTestSurfaceManifest`    | `true` for a project referencing a known test framework package (a `PackageReference` whose id starts, case-insensitively, with `tunit`, `xunit`, `nunit` or `mstest`), `false` otherwise | Writes the generated test-surface manifest next to the project file. Enabling it turns on `$(EmitCompilerGeneratedFiles)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `FrameShiftTestSurfaceManifestFile`     | `$(MSBuildProjectDirectory)\$(MSBuildProjectName).$(TargetFramework).frameshift`                                                                                                          | The manifest file that is written.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
 The first four properties are exposed to the analyzers as `build_property.<Name>`; a value that
 cannot be parsed falls back to the documented default. In a multi-targeting test project exactly one
@@ -329,14 +347,14 @@ dotnet_diagnostic.FSH0006.severity = warning
 
 ## Diagnostics
 
-| Id | Default severity | Meaning |
-| --- | --- | --- |
-| [FSH0001](../../docs/rules/FSH0001.md) | Warning | A mutation point is not reachable from any test, so a surviving mutant there would go unnoticed. |
-| [FSH0002](../../docs/rules/FSH0002.md) | Info | The mutant cannot change observable behaviour, so no test could ever distinguish it. |
-| [FSH0003](../../docs/rules/FSH0003.md) | Warning | The test-surface manifest is missing, malformed or stale. |
-| [FSH0004](../../docs/rules/FSH0004.md) | Info | A test method does not reference any production member. |
-| [FSH0005](../../docs/rules/FSH0005.md) | MSBuild warning | The project has no test-surface manifest, so the analysis cannot do anything. |
-| [FSH0006](../../docs/rules/FSH0006.md) | Info | A mutation point is reached, but by tests contributing a single input combination in total. |
+| Id                                     | Default severity | Meaning                                                                                          |
+| -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------ |
+| [FSH0001](../../docs/rules/FSH0001.md) | Warning          | A mutation point is not reachable from any test, so a surviving mutant there would go unnoticed. |
+| [FSH0002](../../docs/rules/FSH0002.md) | Info             | The mutant cannot change observable behaviour, so no test could ever distinguish it.             |
+| [FSH0003](../../docs/rules/FSH0003.md) | Warning          | The test-surface manifest is missing, malformed or stale.                                        |
+| [FSH0004](../../docs/rules/FSH0004.md) | Info             | A test method does not reference any production member.                                          |
+| [FSH0005](../../docs/rules/FSH0005.md) | MSBuild warning  | The project has no test-surface manifest, so the analysis cannot do anything.                    |
+| [FSH0006](../../docs/rules/FSH0006.md) | Info             | A mutation point is reached, but by tests contributing a single input combination in total.      |
 
 ## Limitations
 
@@ -355,21 +373,21 @@ dotnet_diagnostic.FSH0006.severity = warning
   longer resolves against the production compilation at all.
 - Verifying every mutant by recompiling the mutated syntax tree is by far the most expensive step of
   the analysis. Only the mutated tree is re-bound, never the whole compilation, and results are
-  memoised - the price of that shortcut is that a mutation which invalidates code in a *different*
+  memoised - the price of that shortcut is that a mutation which invalidates code in a _different_
   file is accepted as viable. Set `FrameShiftVerifyMutantCompilation` to `false` to trade
   correctness for build time, or lower `FrameShiftMaxMutantsPerMember`.
 - Collecting a test surface means walking every syntax tree of the test project with a semantic
   model, so the generator depends on the whole compilation and re-runs on every build and on every
   keystroke in the IDE. Its cost grows with the size of the test project. Set `FrameShiftEnabled` to
   `false`, or `FrameShiftWriteTestSurfaceManifest` to `false`, if that cost is not wanted.
-- The regular-expression pattern family covers the *structure* of a pattern - anchors, quantifiers,
+- The regular-expression pattern family covers the _structure_ of a pattern - anchors, quantifiers,
   groups, alternation, character classes, escapes, lookaround and backreferences. Equivalence between
   two patterns is not proven, beyond the narrow quantifier-shorthand equivalence `FSH0002` recognises:
   two patterns that happen to match the same language are otherwise reported as a gap rather than
   dismissed, in the same conservative direction as every other classification. A pattern is also only
   recognised where it is written as a literal at the call site; one handed over through a variable or a
   `const` is invisible to the family, because there is no single literal a rewrite could replace.
-- A pattern mutant is never *executed*, only parsed. The analyzer therefore knows that a mutated
+- A pattern mutant is never _executed_, only parsed. The analyzer therefore knows that a mutated
   pattern is still a legal pattern, but not whether the test data of the suite happens to distinguish
   it - a pattern that is exercised by one input still looks fully covered. `FSH0006` is what makes
   that thinness visible, by counting the input combinations rather than the coverage.

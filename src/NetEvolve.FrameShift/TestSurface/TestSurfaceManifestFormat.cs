@@ -49,6 +49,14 @@ internal static class TestSurfaceManifestFormat
     public const char CommentPrefix = '#';
 
     /// <summary>
+    /// The label opening the optional comment line that records the target framework moniker the
+    /// manifest was collected under, as in <c># targetframework: net8.0</c>. Purely informational: the
+    /// reader ignores every comment line regardless of its content, so an older reader stays unaffected
+    /// and the label is never consulted to decide staleness.
+    /// </summary>
+    public const string TargetFrameworkCommentLabel = "targetframework:";
+
+    /// <summary>
     /// The suffix marking a test case count as a lower bound instead of an exact number, as in
     /// <c>1+</c>.
     /// </summary>

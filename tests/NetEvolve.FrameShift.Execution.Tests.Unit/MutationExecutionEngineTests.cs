@@ -158,6 +158,41 @@ public class MutationExecutionEngineTests
         }
     }
 
+    /// <summary>
+    /// A mutation whose replacement node belongs to the tree but binds to nothing at all is only caught
+    /// at emission, unlike the tree-membership failure above. The verdict is the same <c>BuildFailed</c>,
+    /// but this time <see cref="MutantEmitResult.Diagnostics" /> is not empty, and that reason must reach
+    /// the caller instead of being discarded: a <c>BuildFailed</c> a caller cannot investigate is not
+    /// actionable.
+    /// </summary>
+    [Test]
+    public async Task Execute_MutationThatFailsToBind_ReportsTheDiagnosticsInsteadOfDiscardingThem()
+    {
+        var (compilation, tree, _) = CreateFixture();
+        var root = await tree.GetRootAsync().ConfigureAwait(false);
+        var originalLiteral = root.DescendantNodes()
+            .OfType<LiteralExpressionSyntax>()
+            .Single(literal => string.Equals(literal.Token.ValueText, "0", StringComparison.Ordinal));
+        var unboundReplacement = SyntaxFactory.IdentifierName("ThisSymbolDoesNotExistAnywhere");
+
+        var mutation = new Mutation(
+            MutationKind.NumericLiteral,
+            "test.unbound-replacement",
+            "0 => ThisSymbolDoesNotExistAnywhere",
+            originalLiteral,
+            unboundReplacement
+        );
+
+        var result = MutationExecutionEngine.Execute(compilation, mutation, tree, TestTypeFullName, TestMethodName);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(result.Verdict).IsEqualTo(MutantVerdict.BuildFailed);
+            _ = await Assert.That(result.Diagnostics).IsNotNull();
+            _ = await Assert.That(result.Diagnostics!).Contains("ThisSymbolDoesNotExistAnywhere");
+        }
+    }
+
     private static (CSharpCompilation Compilation, SyntaxTree Tree, SemanticModel SemanticModel) CreateFixture()
     {
         var tree = CSharpSyntaxTree.ParseText(Source, path: "Fixture.cs");

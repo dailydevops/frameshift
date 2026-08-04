@@ -18,6 +18,15 @@ internal static class TestSurfaceManifestWriter
     /// separated by a single line feed and the result ends with a line feed.
     /// </summary>
     /// <param name="manifest">The manifest to serialize.</param>
+    /// <param name="targetFramework">
+    /// The target framework moniker the manifest was collected under, written as a comment line right
+    /// after the header - for example <c># targetframework: net8.0</c>. Omitted entirely when
+    /// <see langword="null" />, empty or made only of whitespace, which keeps every existing manifest
+    /// and every caller that does not pass it unchanged. Purely informational: a multi-targeting test
+    /// project writes its manifest from a single elected inner build, so the label documents which
+    /// framework's compilation actually produced the surface, without the reader treating a mismatch
+    /// as malformed or stale - it is a comment line like any other.
+    /// </param>
     /// <returns>The serialized manifest.</returns>
     /// <remarks>
     /// A referenced production member that belongs to no test method at all cannot be expressed by the
@@ -26,7 +35,7 @@ internal static class TestSurfaceManifestWriter
     /// without a single test method, which no manifest collected from a compilation ever is.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="manifest" /> is <see langword="null" />.</exception>
-    public static string Write(TestSurfaceManifest manifest)
+    public static string Write(TestSurfaceManifest manifest, string? targetFramework = null)
     {
         if (manifest is null)
         {
@@ -36,6 +45,17 @@ internal static class TestSurfaceManifestWriter
         var builder = new StringBuilder();
 
         _ = builder.Append(TestSurfaceManifestFormat.Header).Append(LineFeed);
+
+        if (!string.IsNullOrWhiteSpace(targetFramework))
+        {
+            _ = builder
+                .Append(TestSurfaceManifestFormat.CommentPrefix)
+                .Append(TestSurfaceManifestFormat.FieldSeparator)
+                .Append(TestSurfaceManifestFormat.TargetFrameworkCommentLabel)
+                .Append(TestSurfaceManifestFormat.FieldSeparator)
+                .Append(targetFramework)
+                .Append(LineFeed);
+        }
 
         foreach (var testMethodId in manifest.TestMethodIds.OrderBy(id => id, StringComparer.Ordinal))
         {

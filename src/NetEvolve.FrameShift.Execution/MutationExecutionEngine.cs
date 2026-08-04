@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Execution;
 
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using NetEvolve.FrameShift.Mutations;
 
@@ -57,7 +58,12 @@ internal static class MutationExecutionEngine
 
         if (!emitResult.Success)
         {
-            return new MutantExecutionResult(mutation, MutantVerdict.BuildFailed, failure: null);
+            return new MutantExecutionResult(
+                mutation,
+                MutantVerdict.BuildFailed,
+                failure: null,
+                DescribeDiagnostics(emitResult.Diagnostics)
+            );
         }
 
         var executionResult = IsolatedAssemblyRunner.InvokeParameterlessTest(
@@ -146,7 +152,12 @@ internal static class MutationExecutionEngine
 
         if (!emitResult.Success)
         {
-            return new MutantExecutionResult(mutation, MutantVerdict.BuildFailed, failure: null);
+            return new MutantExecutionResult(
+                mutation,
+                MutantVerdict.BuildFailed,
+                failure: null,
+                DescribeDiagnostics(emitResult.Diagnostics)
+            );
         }
 
         using var workspace = MutantSwapWorkspace.Prepare(
@@ -219,6 +230,20 @@ internal static class MutationExecutionEngine
 
         return MutationScore.FromResults(results);
     }
+
+    /// <summary>
+    /// Renders the diagnostics <c>Compilation.Emit</c> reported for a mutant that failed to build, so a
+    /// <c>BuildFailed</c> verdict carries the reason instead of only the fact.
+    /// </summary>
+    /// <param name="diagnostics">The diagnostics reported for the mutant, possibly empty.</param>
+    /// <returns>
+    /// One line per diagnostic, or <see langword="null" /> when there is nothing to show - either the
+    /// mutant did not even reach emission, or emission reported no diagnostics at all.
+    /// </returns>
+    private static string? DescribeDiagnostics(ImmutableArray<Diagnostic> diagnostics) =>
+        diagnostics.IsDefaultOrEmpty
+            ? null
+            : string.Join('\n', diagnostics.Select(diagnostic => diagnostic.ToString()));
 
     /// <summary>
     /// Turns a test host's process run into a verdict: <c>0</c> means every test passed, so the mutant
