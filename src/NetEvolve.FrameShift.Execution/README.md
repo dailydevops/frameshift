@@ -12,6 +12,26 @@ against each mutant, and reports whether the test suite actually kills it. Where
 tool answers the stronger question - "does the test suite actually fail" - by running the tests
 for real, against every generated mutant.
 
+## Features
+
+- Real execution, not static reachability - every mutant is recompiled and its already-built test
+  project's own test host is run against it as a real subprocess, so the verdict is "did a test
+  actually fail", not an approximation.
+- Test-framework agnostic - the test host is run exactly as its own runner would, and only its
+  process exit code is read, so any framework the test project already uses works unmodified.
+- No project re-evaluation - only the production source files given on the command line are
+  recompiled, referencing whatever already sits in the test project's build output, so a full run
+  needs no MSBuild or SDK resolution step of its own.
+- Reuses the same mutation operators as the [`NetEvolve.FrameShift`](https://www.nuget.org/packages/NetEvolve.FrameShift/)
+  analyzer, so a mutant produced here is the same mutant that analyzer would have reported as a
+  gap.
+- A mutant that fails to recompile is reported as its own outcome (`Build failed`) instead of being
+  silently skipped or counted as killed.
+- A configurable per-mutant timeout reports a hung test host as `Timed out` instead of blocking the
+  run indefinitely.
+- Aggregates every mutant's verdict into a single mutation score, alongside the per-mutant
+  breakdown that produced it.
+
 ## Installation
 
 ### .NET CLI (global tool)
@@ -25,6 +45,22 @@ dotnet tool install --global NetEvolve.FrameShift.Execution
 ```bash
 dotnet tool install --local NetEvolve.FrameShift.Execution
 ```
+
+## Quick Start
+
+1. Build the test project whose test host should run against every mutant, for example
+   `dotnet build tests/Calculator.Tests`.
+2. Run `frameshift` against that build output, naming the production source file to mutate:
+
+   ```bash
+   frameshift \
+     --test-output tests/Calculator.Tests/bin/Debug/net10.0 \
+     --production-dll Calculator.dll \
+     --test-dll Calculator.Tests.dll \
+     --source src/Calculator/Rates.cs
+   ```
+
+3. Read the per-mutant verdicts and the aggregated mutation score from the console output.
 
 ## Usage
 
@@ -46,7 +82,9 @@ Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <fi
                            killed and the mutant is reported as timed out. Defaults to 60.
 ```
 
-Example, run after `dotnet build` has produced `bin/Debug/net10.0` for the test project:
+### Basic Example
+
+Run after `dotnet build` has produced `bin/Debug/net10.0` for the test project:
 
 ```bash
 frameshift \
@@ -56,10 +94,37 @@ frameshift \
   --source src/Calculator/Rates.cs
 ```
 
+### Advanced Example
+
+Mutating several source files in one run and lowering the per-mutant timeout for a fast-failing
+test suite:
+
+```bash
+frameshift \
+  --test-output tests/Calculator.Tests/bin/Debug/net10.0 \
+  --production-dll Calculator.dll \
+  --test-dll Calculator.Tests.dll \
+  --source src/Calculator/Rates.cs \
+  --source src/Calculator/Discounts.cs \
+  --timeout-seconds 15
+```
+
 The exit code answers "did the run complete", not "did the code pass mutation testing": `0` means
 a score was produced, whatever it is, and a non-zero code means the invocation itself was wrong or
 the run was interrupted. Gating a build on a minimum mutation score is a policy decision this tool
 deliberately does not make on a caller's behalf.
+
+## Requirements
+
+- .NET 10.0 or higher - the tool itself targets `net10.0` and needs a collectible, unloadable
+  `AssemblyLoadContext` to isolate every mutant it runs.
+- A test project already built with `dotnet build`, whose output directory contains the test
+  assembly, the production assembly, and every dependency of both.
+
+## Related Packages
+
+- [**NetEvolve.FrameShift**](https://www.nuget.org/packages/NetEvolve.FrameShift/) - the Roslyn
+  analyzer that reports mutation-testing gaps at build time, without executing a single test.
 
 ## Documentation
 
