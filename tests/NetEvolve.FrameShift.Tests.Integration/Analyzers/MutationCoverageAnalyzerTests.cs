@@ -71,9 +71,9 @@ public class MutationCoverageAnalyzerTests
     /// </summary>
     private const string TestMethodMarker = "the one of test method '";
 
-    private const string BrokenManifestPath = "Broken.frameshift-tests";
-    private const string FirstManifestPath = "First.frameshift-tests";
-    private const string SecondManifestPath = "Second.frameshift-tests";
+    private const string BrokenManifestPath = "Broken.frameshift";
+    private const string FirstManifestPath = "First.frameshift";
+    private const string SecondManifestPath = "Second.frameshift";
     private const string UnrelatedAdditionalFilePath = "Notes.txt";
 
     private const string DiscardedTrivialMessage =
@@ -453,7 +453,7 @@ public class MutationCoverageAnalyzerTests
     {
         var compilation = CompilationFactory.Create(CoverageSource, ProductionAssemblyName);
         var manifest = new InMemoryAdditionalText(
-            "Empty.frameshift-tests",
+            "Empty.frameshift",
             TestSurfaceManifestFormat.Header + "\nT M:Fixture.Tests.ScaleTests.Scale_DoublesTheValue 1\n"
         );
 
@@ -815,8 +815,8 @@ public class MutationCoverageAnalyzerTests
     public async Task Analyze_TwoManifests_UnitesTheirRecordedMembers()
     {
         var compilation = CompilationFactory.Create(MergeSource, ProductionAssemblyName);
-        var first = CreateManifestAt("First.frameshift-tests", AlphaMemberId);
-        var second = CreateManifestAt("Second.frameshift-tests", BetaMemberId);
+        var first = CreateManifestAt("First.frameshift", AlphaMemberId);
+        var second = CreateManifestAt("Second.frameshift", BetaMemberId);
         var single = await RunAsync(compilation, [first]).ConfigureAwait(false);
 
         var merged = await RunAsync(compilation, [first, second]).ConfigureAwait(false);
@@ -1128,7 +1128,7 @@ public class MutationCoverageAnalyzerTests
     {
         var compilation = CompilationFactory.Create(MergeSource, ProductionAssemblyName);
         var broken = new InMemoryAdditionalText(BrokenManifestPath, "not-a-manifest\n");
-        var usable = CreateManifestAt("Usable.frameshift-tests", AlphaMemberId);
+        var usable = CreateManifestAt("Usable.frameshift", AlphaMemberId);
 
         var diagnostics = await RunAsync(compilation, [broken, usable]).ConfigureAwait(false);
         var problems = AnalyzerRunner.OfId(diagnostics, DiagnosticIds.InvalidTestSurfaceManifest);
