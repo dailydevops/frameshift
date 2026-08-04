@@ -28,6 +28,8 @@ public class EquivalenceClassifierTests
     private const string ConstantDeclarationReason = "the mutation only changes a compile-time constant";
     private const string DefaultParameterReason = "the mutation only changes a default parameter value";
     private const string CaseLabelReason = "the mutation only changes a compile-time case label";
+    private const string ConfigureAwaitArgumentReason =
+        "the mutation only flips the captured-context argument of ConfigureAwait, which no test can observe";
     private const string WellKnownMemberReason = "the containing member is a well known infrastructure member";
     private const string ExcludedMemberReason = "the containing member is excluded from coverage";
     private const string ObsoleteMemberReason = "the containing member is marked obsolete";
@@ -230,6 +232,61 @@ public class EquivalenceClassifierTests
     }
 
     [Test]
+    [Arguments("public async Task RunAsync(Task work) => await work.ConfigureAwait(/*!*/false);")]
+    [Arguments("public async Task<int> RunAsync(Task<int> work) => await work.ConfigureAwait(/*!*/false);")]
+    [Arguments("public async ValueTask RunAsync(ValueTask work) => await work.ConfigureAwait(/*!*/false);")]
+    [Arguments("public async ValueTask<int> RunAsync(ValueTask<int> work) => await work.ConfigureAwait(/*!*/false);")]
+    public async Task Classify_MutationOfConfigureAwaitArgument_IsTrivialConfigureAwaitArgument(string member)
+    {
+        var source = WrapTaskMember(member);
+
+        var verdict = ClassifyBooleanLiteral(source);
+
+        await AssertTrivialAsync(verdict, ConfigureAwaitArgumentReason).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The check resolves the invoked method through the semantic model rather than by name, exactly
+    /// like the culture-sensitivity family does, so a type of the caller's own that happens to declare
+    /// a same-named <c>ConfigureAwait(bool)</c> method must not be mistaken for the real one.
+    /// </summary>
+    [Test]
+    public async Task Classify_MutationOfUserDefinedConfigureAwaitArgument_IsNotTrivial()
+    {
+        const string source = """
+            namespace Fixture;
+
+            public sealed class FakeAwaitable
+            {
+                public FakeAwaitable ConfigureAwait(bool continueOnCapturedContext) => this;
+            }
+
+            public sealed class Widget
+            {
+                public FakeAwaitable Compute(FakeAwaitable awaitable) => awaitable.ConfigureAwait(/*!*/false);
+            }
+            """;
+
+        var verdict = ClassifyBooleanLiteral(source);
+
+        await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// A boolean literal outside any argument list is not what this check looks for at all - the
+    /// mutation still has to be classified as a genuine behaviour change through the ordinary path.
+    /// </summary>
+    [Test]
+    public async Task Classify_MutationOfUnrelatedBooleanLiteral_IsNotTrivial()
+    {
+        var source = WrapMember("public bool Compute() => Value > 0 && /*!*/false;");
+
+        var verdict = ClassifyBooleanLiteral(source);
+
+        await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
+    }
+
+    [Test]
     public async Task Classify_BehaviourChangingMutationInNormalMethod_IsNotTrivial()
     {
         var source = WrapMember("public int Add(int left, int right) => /*!*/left + right;");
@@ -350,6 +407,27 @@ public class EquivalenceClassifierTests
         );
     }
 
+    /// <summary>
+    /// Classifies a mutation replacing the marked boolean literal with its opposite.
+    /// </summary>
+    /// <param name="source">The fixture source containing the marker.</param>
+    /// <returns>The verdict.</returns>
+    private static EquivalenceVerdict ClassifyBooleanLiteral(string source)
+    {
+        var (_, model, tree) = CompilationFactory.CreateWithModel(source);
+        var original = SyntaxNodeLocator.FindMarked<LiteralExpressionSyntax>(tree);
+        var replacementKind = original.IsKind(SyntaxKind.TrueLiteralExpression)
+            ? SyntaxKind.FalseLiteralExpression
+            : SyntaxKind.TrueLiteralExpression;
+        var replacement = SyntaxFactory.LiteralExpression(replacementKind);
+
+        return EquivalenceClassifier.Classify(
+            new Mutation(MutationKind.BooleanLiteral, "fixture.mutation", "fixture mutation", original, replacement),
+            model,
+            CancellationToken.None
+        );
+    }
+
     private static BinaryExpressionSyntax Swap(BinaryExpressionSyntax original, SyntaxKind replacementKind) =>
         SyntaxFactory.BinaryExpression(replacementKind, original.Left, original.Right);
 
@@ -374,6 +452,24 @@ public class EquivalenceClassifierTests
             {
                 public int Value { get; set; }
 
+                {{member}}
+            }
+            """;
+
+    /// <summary>
+    /// Wraps a member declaration that awaits a <c>Task</c> or <c>ValueTask</c> parameter, giving the
+    /// <c>ConfigureAwait</c> check something to resolve against.
+    /// </summary>
+    /// <param name="member">The member declaration, containing the marker.</param>
+    /// <returns>The fixture source.</returns>
+    private static string WrapTaskMember(string member) =>
+        $$"""
+            namespace Fixture;
+
+            using System.Threading.Tasks;
+
+            public sealed class Widget
+            {
                 {{member}}
             }
             """;
