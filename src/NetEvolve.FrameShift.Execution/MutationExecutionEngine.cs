@@ -232,11 +232,6 @@ internal static class MutationExecutionEngine
     }
 
     /// <summary>
-    /// Turns a test host's process run into a verdict: <c>0</c> means every test passed, so the mutant
-    /// survived; anything else means a test noticed it, so it was killed; and a timeout is its own
-    /// verdict, because a hung host answers neither question.
-    /// </summary>
-    /// <summary>
     /// Renders the diagnostics <c>Compilation.Emit</c> reported for a mutant that failed to build, so a
     /// <c>BuildFailed</c> verdict carries the reason instead of only the fact.
     /// </summary>
@@ -250,6 +245,11 @@ internal static class MutationExecutionEngine
             ? null
             : string.Join('\n', diagnostics.Select(diagnostic => diagnostic.ToString()));
 
+    /// <summary>
+    /// Turns a test host's process run into a verdict: <c>0</c> means every test passed, so the mutant
+    /// survived; anything else means a test noticed it, so it was killed; and a timeout is its own
+    /// verdict, because a hung host answers neither question.
+    /// </summary>
     private static MutantExecutionResult Classify(Mutation mutation, TestHostRunResult runResult)
     {
         if (runResult.TimedOut)
