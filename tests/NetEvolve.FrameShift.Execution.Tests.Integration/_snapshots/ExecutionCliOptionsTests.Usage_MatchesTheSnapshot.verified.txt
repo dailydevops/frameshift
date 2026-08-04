@@ -1,4 +1,4 @@
-﻿Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>]
+﻿Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>] [--report-format <console|html|markdown|github-summary>] [--report-path <file>]
 
   --test-output         The build output directory of the test project (contains the test
                            assembly, the production assembly and every dependency of both).
@@ -10,3 +10,9 @@
                            Repeatable.
   --timeout-seconds    How long to wait for the test host of a single mutant before it is
                            killed and the mutant is reported as timed out. Defaults to 60.
+  --report-format      The format of the end-of-run report: 'console', 'html',
+                           'markdown' or 'github-summary'. Defaults to 'console'.
+  --report-path        The file the end-of-run report is written to. Required for
+                           'html'; optional for 'console' and 'markdown', which write
+                           to the console when omitted; ignored for 'github-summary', which always
+                           appends to the file named by the GITHUB_STEP_SUMMARY environment variable.
