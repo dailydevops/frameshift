@@ -45,6 +45,8 @@ internal static class EquivalenceClassifier
     private const string ConstantDeclarationReason = "the mutation only changes a compile-time constant";
     private const string DefaultParameterReason = "the mutation only changes a default parameter value";
     private const string CaseLabelReason = "the mutation only changes a compile-time case label";
+    private const string ConfigureAwaitArgumentReason =
+        "the mutation only flips the captured-context argument of ConfigureAwait, which no test can observe";
     private const string WellKnownMemberReason = "the containing member is a well known infrastructure member";
     private const string CompilerGeneratedReason = "the containing member is compiler generated";
     private const string ExcludedMemberReason = "the containing member is excluded from coverage";
@@ -107,6 +109,7 @@ internal static class EquivalenceClassifier
             ?? ClassifyUnreachableCode(mutation, semanticModel, unreachableCodeDiagnosticsCache, cancellationToken)
             ?? ClassifyDiscardedResult(mutation, semanticModel, cancellationToken)
             ?? ClassifyConstantOnlyContext(mutation)
+            ?? ClassifyConfigureAwaitArgument(mutation, semanticModel, cancellationToken)
             ?? ClassifyExcludedMember(mutation, semanticModel, cancellationToken)
             ?? EquivalenceVerdict.NotTrivial;
     }
@@ -1317,6 +1320,68 @@ internal static class EquivalenceClassifier
     /// <param name="modifiers">The modifiers of a declaration.</param>
     /// <returns><see langword="true" /> if the declaration is a constant; otherwise <see langword="false" />.</returns>
     private static bool IsConstant(SyntaxTokenList modifiers) => modifiers.Any(SyntaxKind.ConstKeyword);
+
+    /// <summary>
+    /// Determines whether the mutation flips the captured-context argument of a
+    /// <see cref="System.Threading.Tasks.Task.ConfigureAwait(bool)" /> or
+    /// <see cref="System.Threading.Tasks.ValueTask.ConfigureAwait(bool)" /> call.
+    /// </summary>
+    /// <remarks>
+    /// That argument only decides which synchronization context the continuation resumes on; it
+    /// changes no return value, throws nothing new, and touches no other state a test could assert
+    /// on. Unlike every other check in this classifier, this is not a proof from the shape of a
+    /// particular fixture - it holds for every call site, because the documented contract of the
+    /// parameter itself is scheduling, not behaviour. The method is resolved through the semantic
+    /// model, exactly like the culture-sensitivity family does, so a same-named method on a type of
+    /// your own is never mistaken for it.
+    /// </remarks>
+    /// <param name="mutation">The mutation to inspect.</param>
+    /// <param name="semanticModel">The semantic model of the original tree.</param>
+    /// <param name="cancellationToken">A token to observe.</param>
+    /// <returns>A trivial verdict, or <see langword="null" /> if the check does not apply.</returns>
+    private static EquivalenceVerdict? ClassifyConfigureAwaitArgument(
+        Mutation mutation,
+        SemanticModel semanticModel,
+        CancellationToken cancellationToken
+    )
+    {
+        if (mutation.Kind != MutationKind.BooleanLiteral)
+        {
+            return null;
+        }
+
+        if (
+            mutation.Original.Parent is not ArgumentSyntax { NameColon: null } argument
+            || argument.Parent is not ArgumentListSyntax { Parent: InvocationExpressionSyntax invocation }
+            || !CanQuery(invocation, semanticModel)
+        )
+        {
+            return null;
+        }
+
+        if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+        {
+            return null;
+        }
+
+        return IsConfigureAwaitMethod(method) ? EquivalenceVerdict.Trivial(ConfigureAwaitArgumentReason) : null;
+    }
+
+    /// <summary>
+    /// Determines whether a method is the single-argument <c>ConfigureAwait</c> overload of
+    /// <see cref="System.Threading.Tasks.Task" />, <see cref="System.Threading.Tasks.Task{TResult}" />,
+    /// <see cref="System.Threading.Tasks.ValueTask" /> or <see cref="System.Threading.Tasks.ValueTask{TResult}" />.
+    /// </summary>
+    /// <param name="method">The invoked method to inspect.</param>
+    /// <returns><see langword="true" /> if the method is that overload; otherwise <see langword="false" />.</returns>
+    private static bool IsConfigureAwaitMethod(IMethodSymbol method) =>
+        string.Equals(method.Name, "ConfigureAwait", StringComparison.Ordinal)
+        && method.ContainingType is { Name: "Task" or "ValueTask" } containingType
+        && string.Equals(
+            containingType.ContainingNamespace?.ToDisplayString(),
+            "System.Threading.Tasks",
+            StringComparison.Ordinal
+        );
 
     /// <summary>
     /// Determines whether the member containing the mutation is one FrameShift never treats as a
