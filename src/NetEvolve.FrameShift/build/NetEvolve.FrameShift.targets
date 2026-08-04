@@ -37,7 +37,7 @@
     <Warning
       Code="FSH0005"
       Condition=" '@(_FrameShiftTestSurfaceManifest)' == '' "
-      Text="FrameShift found no test-surface manifest for '$(MSBuildProjectName)', so every mutation point is reported as unreachable. Build the TUnit test project first and add its generated '*.frameshift' manifest to this project, or set 'FrameShiftSuppressSetupWarning' to 'true' to silence this warning. See https://github.com/dailydevops/frameshift for the documented setup."
+      Text="FrameShift found no test-surface manifest for '$(MSBuildProjectName)', so every mutation point is reported as unreachable. Build the test project first and add its generated '*.frameshift' manifest to this project, or set 'FrameShiftSuppressSetupWarning' to 'true' to silence this warning. See https://github.com/dailydevops/frameshift for the documented setup."
     />
 
     <ItemGroup>
