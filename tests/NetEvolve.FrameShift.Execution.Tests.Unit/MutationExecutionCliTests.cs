@@ -1,5 +1,6 @@
 namespace NetEvolve.FrameShift.Execution.Tests.Unit;
 
+using System.Globalization;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -127,6 +128,228 @@ public class MutationExecutionCliTests
         {
             Directory.Delete(directory.FullName, recursive: true);
         }
+    }
+
+    [Test]
+    public async Task RunAsync_HtmlReportFormat_WritesHtmlFileToReportPath()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-html-");
+
+        try
+        {
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            var reportPath = Path.Combine(directory.FullName, "report.html");
+            _ = await RunWithReportOptionsAsync(
+                    directory.FullName,
+                    sourcePath,
+                    "--report-format",
+                    "html",
+                    "--report-path",
+                    reportPath
+                )
+                .ConfigureAwait(false);
+
+            var html = await File.ReadAllTextAsync(reportPath).ConfigureAwait(false);
+
+            _ = await Assert.That(html).StartsWith("<!doctype html>");
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_MarkdownReportFormatWithPath_WritesMarkdownFileToReportPath()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-markdown-path-");
+
+        try
+        {
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            var reportPath = Path.Combine(directory.FullName, "report.md");
+            _ = await RunWithReportOptionsAsync(
+                    directory.FullName,
+                    sourcePath,
+                    "--report-format",
+                    "markdown",
+                    "--report-path",
+                    reportPath
+                )
+                .ConfigureAwait(false);
+
+            var markdown = await File.ReadAllTextAsync(reportPath).ConfigureAwait(false);
+
+            _ = await Assert.That(markdown).Contains("Mutation execution report");
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_MarkdownReportFormatWithoutPath_WritesMarkdownToOutput()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-markdown-console-");
+
+        try
+        {
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            var (_, output) = await RunWithReportOptionsAsync(
+                    directory.FullName,
+                    sourcePath,
+                    "--report-format",
+                    "markdown"
+                )
+                .ConfigureAwait(false);
+
+            _ = await Assert.That(output).Contains("Mutation execution report");
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_ConsoleReportFormatWithPath_WritesConsoleReportToFile()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-console-path-");
+
+        try
+        {
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            var reportPath = Path.Combine(directory.FullName, "report.txt");
+            var (_, output) = await RunWithReportOptionsAsync(
+                    directory.FullName,
+                    sourcePath,
+                    "--report-path",
+                    reportPath
+                )
+                .ConfigureAwait(false);
+
+            var console = await File.ReadAllTextAsync(reportPath).ConfigureAwait(false);
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(console).Contains("Next steps:");
+                _ = await Assert.That(output).DoesNotContain("Next steps:");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_GitHubSummaryFormatWithoutEnvironmentVariable_ThrowsInvalidOperationException()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-github-summary-missing-");
+        var previousSummaryPath = Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY");
+
+        try
+        {
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", null);
+
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            _ = await Assert
+                .That(async () =>
+                    await RunWithReportOptionsAsync(directory.FullName, sourcePath, "--report-format", "github-summary")
+                        .ConfigureAwait(false)
+                )
+                .Throws<InvalidOperationException>();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", previousSummaryPath);
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task RunAsync_GitHubSummaryFormatWithEnvironmentVariable_AppendsMarkdownToSummaryFile()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-github-summary-");
+        var previousSummaryPath = Environment.GetEnvironmentVariable("GITHUB_STEP_SUMMARY");
+        var summaryPath = Path.Combine(directory.FullName, "step-summary.md");
+
+        try
+        {
+            await File.WriteAllTextAsync(summaryPath, "# Existing summary\n").ConfigureAwait(false);
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", summaryPath);
+
+            var sourcePath = Path.Combine(directory.FullName, "Calculator.cs");
+            await File.WriteAllTextAsync(sourcePath, ProductionSource).ConfigureAwait(false);
+            await PrepareTestOutputAsync(directory.FullName).ConfigureAwait(false);
+
+            _ = await RunWithReportOptionsAsync(directory.FullName, sourcePath, "--report-format", "github-summary")
+                .ConfigureAwait(false);
+
+            var summary = await File.ReadAllTextAsync(summaryPath).ConfigureAwait(false);
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(summary).StartsWith("# Existing summary");
+                _ = await Assert.That(summary).Contains("Mutation execution report");
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("GITHUB_STEP_SUMMARY", previousSummaryPath);
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    private static async Task<(MutationScore Score, string Output)> RunWithReportOptionsAsync(
+        string testOutputDirectory,
+        string sourcePath,
+        params string[] extraArgs
+    )
+    {
+        var parsed = ExecutionCliOptions.TryParse(
+            [
+                "--test-output",
+                testOutputDirectory,
+                "--production-dll",
+                ProductionAssemblyFileName,
+                "--test-dll",
+                TestHostAssemblyFileName,
+                "--source",
+                sourcePath,
+                "--timeout-seconds",
+                ((int)MutantTimeout.TotalSeconds).ToString(CultureInfo.InvariantCulture),
+                .. extraArgs,
+            ],
+            out var options,
+            out var error
+        );
+
+        if (!parsed)
+        {
+            throw new InvalidOperationException($"Fixture options failed to parse: {error}");
+        }
+
+        using var output = new StringWriter();
+        var score = await MutationExecutionCli.RunAsync(options!, output).ConfigureAwait(false);
+
+        return (score, output.ToString());
     }
 
     private static async Task PrepareTestOutputAsync(string testOutputDirectory)

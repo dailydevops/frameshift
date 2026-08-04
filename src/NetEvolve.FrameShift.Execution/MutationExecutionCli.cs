@@ -1,10 +1,11 @@
-namespace NetEvolve.FrameShift.Execution;
+﻿namespace NetEvolve.FrameShift.Execution;
 
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Reflection;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using NetEvolve.FrameShift.Execution.Reports;
 using NetEvolve.FrameShift.Mutations;
 
 /// <summary>
@@ -80,8 +81,81 @@ internal static class MutationExecutionCli
 
         var score = MutationScore.FromResults(results.ToImmutable());
         await ReportScoreAsync(output, score).ConfigureAwait(false);
+        await WriteReportAsync(options, output, ExecutionReport.FromScore(score)).ConfigureAwait(false);
 
         return score;
+    }
+
+    /// <summary>
+    /// The environment variable a GitHub Actions job exposes the path of its step summary file under; see
+    /// https://docs.github.com/actions/using-workflows/workflow-commands-for-github-actions#adding-a-job-summary.
+    /// </summary>
+    private const string GitHubStepSummaryEnvironmentVariable = "GITHUB_STEP_SUMMARY";
+
+    /// <summary>
+    /// Writes the end-of-run report in the format <paramref name="options" /> selected.
+    /// </summary>
+    private static async Task WriteReportAsync(ExecutionCliOptions options, TextWriter output, ExecutionReport report)
+    {
+        if (options.ReportFormat == ReportFormat.Html)
+        {
+            var html = HtmlExecutionReportWriter.Write(report);
+            await File.WriteAllTextAsync(options.ReportPath!, html).ConfigureAwait(false);
+
+            return;
+        }
+
+        if (options.ReportFormat == ReportFormat.GitHubSummary)
+        {
+            var summaryPath = Environment.GetEnvironmentVariable(GitHubStepSummaryEnvironmentVariable);
+
+            if (string.IsNullOrEmpty(summaryPath))
+            {
+                throw new InvalidOperationException(
+                    $"The '{GitHubStepSummaryEnvironmentVariable}' environment variable is not set; "
+                        + "'github-summary' is only usable inside a GitHub Actions job."
+                );
+            }
+
+            var summaryMarkdown = MarkdownExecutionReportWriter.Write(report);
+            await File.AppendAllTextAsync(summaryPath, summaryMarkdown + Environment.NewLine).ConfigureAwait(false);
+
+            return;
+        }
+
+        if (options.ReportFormat == ReportFormat.Markdown)
+        {
+            var markdown = MarkdownExecutionReportWriter.Write(report);
+
+            if (options.ReportPath is { Length: > 0 })
+            {
+                await File.WriteAllTextAsync(options.ReportPath, markdown).ConfigureAwait(false);
+            }
+            else
+            {
+                await output.WriteLineAsync(markdown).ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        if (options.ReportPath is { Length: > 0 })
+        {
+            var reportWriter = new StreamWriter(options.ReportPath);
+
+            try
+            {
+                await ConsoleExecutionReportWriter.WriteAsync(reportWriter, report).ConfigureAwait(false);
+            }
+            finally
+            {
+                await reportWriter.DisposeAsync().ConfigureAwait(false);
+            }
+
+            return;
+        }
+
+        await ConsoleExecutionReportWriter.WriteAsync(output, report).ConfigureAwait(false);
     }
 
     private static async Task ReportResultAsync(

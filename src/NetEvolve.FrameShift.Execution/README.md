@@ -31,6 +31,9 @@ for real, against every generated mutant.
   run indefinitely.
 - Aggregates every mutant's verdict into a single mutation score, alongside the per-mutant
   breakdown that produced it.
+- An end-of-run report lists exactly what needs attention next - survived mutants (missing test
+  coverage), build failures, and timeouts - as plain console text, a self-contained HTML document,
+  GitHub-flavored Markdown, or a GitHub Actions job summary.
 
 ## Installation
 
@@ -68,7 +71,7 @@ The test project must already be built - `frameshift` recompiles only the produc
 it is given, against the test assembly and its dependencies already present in that build output.
 
 ```text
-Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>]
+Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <file.dll> --source <file.cs> [--source <file.cs> ...] [--timeout-seconds <seconds>] [--report-format <console|html|markdown|github-summary>] [--report-path <file>]
 
   --test-output         The build output directory of the test project (contains the test
                            assembly, the production assembly and every dependency of both).
@@ -80,6 +83,35 @@ Usage: frameshift --test-output <dir> --production-dll <file.dll> --test-dll <fi
                            Repeatable.
   --timeout-seconds    How long to wait for the test host of a single mutant before it is
                            killed and the mutant is reported as timed out. Defaults to 60.
+  --report-format      The format of the end-of-run report: 'console', 'html', 'markdown' or
+                           'github-summary'. Defaults to 'console'.
+  --report-path        The file the end-of-run report is written to. Required for 'html';
+                           optional for 'console' and 'markdown', which write to the console when
+                           omitted; ignored for 'github-summary', which always appends to the file
+                           named by the GITHUB_STEP_SUMMARY environment variable.
+```
+
+### Report Formats
+
+By default, the end-of-run report is plain text appended to the console output. Three other
+formats are available via `--report-format`:
+
+- `html` - a single self-contained HTML document (no external stylesheets or scripts), written to
+  the file named by `--report-path`. Suitable for double-clicking open from a file explorer.
+- `markdown` - GitHub-flavored Markdown, written to `--report-path` if given, or to the console
+  otherwise. Suitable for pasting into a pull request comment.
+- `github-summary` - the same Markdown as `markdown`, but appended straight to the file named by
+  the `GITHUB_STEP_SUMMARY` environment variable, so the report shows up as the GitHub Actions
+  job's own summary. Only usable inside an Actions job; `--report-path` is ignored for this format.
+
+```bash
+frameshift \
+  --test-output tests/Calculator.Tests/bin/Debug/net10.0 \
+  --production-dll Calculator.dll \
+  --test-dll Calculator.Tests.dll \
+  --source src/Calculator/Rates.cs \
+  --report-format html \
+  --report-path mutation-report.html
 ```
 
 ### Basic Example

@@ -329,5 +329,146 @@ public class ExecutionCliOptionsTests
     }
 
     [Test]
+    public async Task TryParse_NoReportFormatFlag_DefaultsToConsoleWithNoPath()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-options-");
+        var sourcePath = Path.Combine(directory.FullName, "Source.cs");
+
+        try
+        {
+            await File.WriteAllTextAsync(sourcePath, "class C;").ConfigureAwait(false);
+
+            var parsed = ExecutionCliOptions.TryParse(
+                ValidArgs(sourcePath, directory.FullName),
+                out var options,
+                out var error
+            );
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(parsed).IsTrue();
+                _ = await Assert.That(error).IsNull();
+                _ = await Assert.That(options!.ReportFormat).IsEqualTo(ReportFormat.Console);
+                _ = await Assert.That(options.ReportPath).IsNull();
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    [Arguments("console", "Console")]
+    [Arguments("CONSOLE", "Console")]
+    [Arguments("markdown", "Markdown")]
+    [Arguments("github-summary", "GitHubSummary")]
+    public async Task TryParse_ReportFormatFlag_ParsesEveryFormatThatNeedsNoPath(string value, string expectedName)
+    {
+        var expected = Enum.Parse<ReportFormat>(expectedName);
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-options-");
+        var sourcePath = Path.Combine(directory.FullName, "Source.cs");
+
+        try
+        {
+            await File.WriteAllTextAsync(sourcePath, "class C;").ConfigureAwait(false);
+
+            var parsed = ExecutionCliOptions.TryParse(
+                [.. ValidArgs(sourcePath, directory.FullName), "--report-format", value],
+                out var options,
+                out var error
+            );
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(parsed).IsTrue();
+                _ = await Assert.That(error).IsNull();
+                _ = await Assert.That(options!.ReportFormat).IsEqualTo(expected);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task TryParse_HtmlReportFormatWithPath_SucceedsAndExposesThePath()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-options-");
+        var sourcePath = Path.Combine(directory.FullName, "Source.cs");
+        var reportPath = Path.Combine(directory.FullName, "report.html");
+
+        try
+        {
+            await File.WriteAllTextAsync(sourcePath, "class C;").ConfigureAwait(false);
+
+            var parsed = ExecutionCliOptions.TryParse(
+                [.. ValidArgs(sourcePath, directory.FullName), "--report-format", "html", "--report-path", reportPath],
+                out var options,
+                out var error
+            );
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(parsed).IsTrue();
+                _ = await Assert.That(error).IsNull();
+                _ = await Assert.That(options!.ReportFormat).IsEqualTo(ReportFormat.Html);
+                _ = await Assert.That(options.ReportPath).IsEqualTo(reportPath);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task TryParse_HtmlReportFormatWithoutPath_Fails()
+    {
+        var directory = Directory.CreateTempSubdirectory("frameshift-cli-options-");
+        var sourcePath = Path.Combine(directory.FullName, "Source.cs");
+
+        try
+        {
+            await File.WriteAllTextAsync(sourcePath, "class C;").ConfigureAwait(false);
+
+            var parsed = ExecutionCliOptions.TryParse(
+                [.. ValidArgs(sourcePath, directory.FullName), "--report-format", "html"],
+                out var options,
+                out var error
+            );
+
+            using (Assert.Multiple())
+            {
+                _ = await Assert.That(parsed).IsFalse();
+                _ = await Assert.That(options).IsNull();
+                _ = await Assert.That(error).IsEqualTo("'--report-path' is required when '--report-format' is 'html'.");
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory.FullName, recursive: true);
+        }
+    }
+
+    [Test]
+    public async Task TryParse_InvalidReportFormatValue_Fails()
+    {
+        var parsed = ExecutionCliOptions.TryParse(["--report-format", "xml"], out var options, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsFalse();
+            _ = await Assert.That(options).IsNull();
+            _ = await Assert
+                .That(error)
+                .IsEqualTo(
+                    "'xml' is not a valid report format. Expected 'console', 'html', 'markdown' or 'github-summary'."
+                );
+        }
+    }
+
+    [Test]
     public async Task Usage_MatchesTheSnapshot() => await Verify(ExecutionCliOptions.Usage).ConfigureAwait(false);
 }
