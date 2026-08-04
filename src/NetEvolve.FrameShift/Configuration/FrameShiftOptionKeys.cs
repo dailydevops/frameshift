@@ -55,4 +55,14 @@ internal static class FrameShiftOptionKeys
     /// property existed.
     /// </summary>
     public const string TestAnalyzers = BuildPropertyPrefix + "FrameShiftTestAnalyzers";
+
+    /// <summary>
+    /// MSBuild property <c>TargetFramework</c>: the SDK's own property naming the target framework
+    /// moniker of the current inner build, for example <c>net8.0</c>. Not a <c>FrameShift</c>-prefixed
+    /// switch and not read through <see cref="FrameShiftOptions" /> - <see cref="Generation.TestSurfaceManifestGenerator" />
+    /// reads it directly, purely to annotate the manifest with the framework it was collected under.
+    /// The SDK does not expose it to analyzers on its own, so <c>NetEvolve.FrameShift.props</c> declares
+    /// it as a <c>CompilerVisibleProperty</c> itself.
+    /// </summary>
+    public const string TargetFramework = BuildPropertyPrefix + "TargetFramework";
 }

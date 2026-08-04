@@ -199,6 +199,49 @@ public class TestSurfaceManifestWriterTests
     }
 
     [Test]
+    public async Task Write_TargetFrameworkGiven_WritesTheCommentRightAfterTheHeader()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), ["M:Production.A.Alpha"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest, "net8.0");
+
+        _ = await Assert
+            .That(written)
+            .IsEqualTo(
+                Header + "\n" + "# targetframework: net8.0\n" + "T M:Tests.A.First 1\n" + "R M:Production.A.Alpha\n"
+            );
+    }
+
+    [Test]
+    [Arguments(null)]
+    [Arguments("")]
+    [Arguments("   ")]
+    public async Task Write_TargetFrameworkNullOrBlank_WritesNoComment(string? targetFramework)
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), []));
+
+        var written = TestSurfaceManifestWriter.Write(manifest, targetFramework);
+
+        _ = await Assert.That(written).IsEqualTo(Header + "\n" + "T M:Tests.A.First 1\n");
+    }
+
+    [Test]
+    public async Task RoundTrip_ManifestWithTargetFrameworkComment_IgnoresTheCommentAndParsesTheSurface()
+    {
+        var manifest = Blocks(("M:Tests.A.First", TestCaseCount.Exact(1), ["M:Production.A.Alpha"]));
+
+        var written = TestSurfaceManifestWriter.Write(manifest, "net10.0");
+        var parsed = TestSurfaceManifestReader.TryRead(SourceText.From(written), out var roundTripped, out var error);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(parsed).IsTrue();
+            _ = await Assert.That(error).IsNull();
+        }
+        _ = await AssertSameSurface(manifest, roundTripped).ConfigureAwait(false);
+    }
+
+    [Test]
     public async Task Write_ManifestIsNull_ThrowsArgumentNullException()
     {
         var threw = ThrowsArgumentNull(() => _ = TestSurfaceManifestWriter.Write(null!));

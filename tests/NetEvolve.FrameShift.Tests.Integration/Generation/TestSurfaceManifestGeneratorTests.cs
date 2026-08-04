@@ -411,6 +411,46 @@ public class TestSurfaceManifestGeneratorTests
     }
 
     /// <summary>
+    /// The MSBuild props declare <c>TargetFramework</c> compiler-visible for exactly this: the generator
+    /// annotates the manifest with the framework moniker of the compilation it was collected from, right
+    /// after the header. The comment is informational only — the reader ignores every comment line
+    /// regardless of content — but a reviewer reading the checked-in manifest benefits from knowing which
+    /// inner build actually produced it.
+    /// </summary>
+    [Test]
+    public async Task Generate_TargetFrameworkPropertySet_EmitsTheTargetFrameworkComment()
+    {
+        var test = CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction());
+        var options = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["build_property.TargetFramework"] = "net8.0",
+        };
+
+        var text = Run(test, options).TextOf(TestSurfaceManifestGenerator.HintName);
+
+        using (Assert.Multiple())
+        {
+            _ = await Assert.That(Lines(text)[0]).IsEqualTo(CommentStart);
+            _ = await Assert.That(Lines(text)[1]).IsEqualTo(Header);
+            _ = await Assert.That(Lines(text)[2]).IsEqualTo("# targetframework: net8.0");
+        }
+    }
+
+    /// <summary>
+    /// No <c>TargetFramework</c> property reaching the compiler is the ordinary case for a build that did
+    /// not expose it, and the manifest looks exactly as before this annotation existed.
+    /// </summary>
+    [Test]
+    public async Task Generate_TargetFrameworkPropertyAbsent_EmitsNoComment()
+    {
+        var test = CreateTest(TestFramework.TUnit, TUnitSource, CreateProduction());
+
+        var text = Generate(test);
+
+        _ = await Assert.That(Lines(text)[1]).IsEqualTo(Header);
+    }
+
+    /// <summary>
     /// A test project without a single test still belongs to its framework, so it gets a manifest — an
     /// empty one. Emitting nothing would leave a stale manifest on disk behind and make the production
     /// side judge the code against tests that no longer exist.

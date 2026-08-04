@@ -120,7 +120,9 @@ public sealed class TestSurfaceManifestGenerator : IIncrementalGenerator
             return;
         }
 
-        context.AddSource(HintName, SourceText.From(Render(manifest), Encoding.UTF8));
+        _ = optionsProvider.GlobalOptions.TryGetValue(FrameShiftOptionKeys.TargetFramework, out var targetFramework);
+
+        context.AddSource(HintName, SourceText.From(Render(manifest, targetFramework), Encoding.UTF8));
     }
 
     /// <summary>
@@ -164,14 +166,19 @@ public sealed class TestSurfaceManifestGenerator : IIncrementalGenerator
     /// wrapping the canonical manifest text.
     /// </summary>
     /// <param name="manifest">The manifest to render.</param>
+    /// <param name="targetFramework">
+    /// The target framework moniker of the compilation the manifest was collected from, or
+    /// <see langword="null" /> when the build did not expose one. Forwarded verbatim to
+    /// <see cref="TestSurfaceManifestWriter.Write(TestSurfaceManifest, string?)" />.
+    /// </param>
     /// <returns>The content of the emitted source file.</returns>
-    private static string Render(TestSurfaceManifest manifest)
+    private static string Render(TestSurfaceManifest manifest, string? targetFramework)
     {
         var builder = new StringBuilder();
 
         _ = builder.Append(CommentStart).Append(LineFeed);
 
-        foreach (var line in TestSurfaceManifestWriter.Write(manifest).Split(LineFeed))
+        foreach (var line in TestSurfaceManifestWriter.Write(manifest, targetFramework).Split(LineFeed))
         {
             var manifestLine = line.TrimEnd(CarriageReturn);
 

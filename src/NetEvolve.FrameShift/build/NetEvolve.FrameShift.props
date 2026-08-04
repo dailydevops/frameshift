@@ -33,7 +33,7 @@
                                                          (TUnit, xunit, NUnit, MSTest), false otherwise.
                                                          Enabling it turns on $(EmitCompilerGeneratedFiles).
       FrameShiftTestSurfaceManifestFile     path         The manifest file that is written. Default:
-                                                         $(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift.
+                                                         $(MSBuildProjectDirectory)\$(MSBuildProjectName).$(TargetFramework).frameshift.
       FrameShiftTestAnalyzers               list         A ';'-separated list of the test-surface analyzers
                                                          allowed to run, by token: TUnit, XunitV2, XunitV3,
                                                          NUnit, MSTest. Default: Discovery, which runs every
@@ -74,6 +74,13 @@
     <CompilerVisibleProperty Include="FrameShiftReportTrivialMutants" />
     <CompilerVisibleProperty Include="FrameShiftEnableRegexPatternMutations" />
     <CompilerVisibleProperty Include="FrameShiftTestAnalyzers" />
+
+    <!--
+      Not a FrameShift-prefixed switch: the SDK's own target framework moniker, which the manifest
+      generator reads to annotate the written manifest with the framework it was collected under. The
+      SDK does not make it compiler-visible on its own.
+    -->
+    <CompilerVisibleProperty Include="TargetFramework" />
   </ItemGroup>
 
   <PropertyGroup Label="FrameShift manifest exclusions">
