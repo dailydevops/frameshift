@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.TestSurface;
+﻿namespace NetEvolve.FrameShift.TestSurface;
 
 /// <summary>
 /// The constants defining the on-disk format of a test-surface manifest.
@@ -13,7 +13,7 @@ internal static class TestSurfaceManifestFormat
     /// <summary>
     /// The file name suffix identifying a manifest among the additional files.
     /// </summary>
-    public const string FileSuffix = ".frameshift";
+    public const string FileSuffix = ".frameshift-tests";
 
     /// <summary>
     /// The line prefix opening the block of a test method. The line carries the documentation comment

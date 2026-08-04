@@ -153,7 +153,7 @@ The test project - the project whose tests are discovered and whose manifest is 
 
 1. Reference `NetEvolve.FrameShift` in the production project and in the test project.
 2. Build the test project once. This writes
-   `$(MSBuildProjectName).frameshift` next to the test project file.
+   `$(MSBuildProjectName).frameshift-tests` next to the test project file.
 3. Point the production project at that manifest and build it. The `FSH0001` warnings are the gaps.
 4. Commit the manifest - it is the input of the next build of the production project.
 
@@ -161,7 +161,7 @@ Step 3, in the production project:
 
 ```xml
 <ItemGroup>
-  <AdditionalFiles Include="..\..\tests\Calculator.Tests\Calculator.Tests.frameshift" />
+  <AdditionalFiles Include="..\..\tests\Calculator.Tests\Calculator.Tests.frameshift-tests" />
 </ItemGroup>
 ```
 
@@ -170,7 +170,7 @@ directory, where the package picks it up automatically:
 
 ```xml
 <PropertyGroup>
-  <FrameShiftTestSurfaceManifestFile>$(MSBuildThisFileDirectory)..\..\src\Calculator\Calculator.frameshift</FrameShiftTestSurfaceManifestFile>
+  <FrameShiftTestSurfaceManifestFile>$(MSBuildThisFileDirectory)..\..\src\Calculator\Calculator.frameshift-tests</FrameShiftTestSurfaceManifestFile>
 </PropertyGroup>
 ```
 
@@ -202,7 +202,7 @@ public sealed class RatesTests
 }
 ```
 
-Building the test project writes `tests/Calculator.Tests/Calculator.Tests.frameshift`. The
+Building the test project writes `tests/Calculator.Tests/Calculator.Tests.frameshift-tests`. The
 format is plain text and grouped per test: a mandatory header line, then one block per discovered test
 method - a `T` line naming the method and its test-case count, followed by one `R` line per member
 *that* test references. The ids are documentation comment ids, the blocks and the lines within a block
@@ -272,7 +272,7 @@ flowchart TD
         A["Test methods discovered<br/>TUnit / xUnit v2 / xUnit v3 / NUnit / MSTest"] --> B["Walk code reachable<br/>inside the test assembly"]
         B --> C["Record referenced production<br/>members per test, with its case count"]
         C --> D["Source generator emits<br/>the manifest"]
-        D --> E["MSBuild target writes<br/>ProjectName.frameshift"]
+        D --> E["MSBuild target writes<br/>ProjectName.frameshift-tests"]
     end
 
     E -->|"committed, then read via AdditionalFiles"| F
@@ -305,9 +305,9 @@ via `-p:Name=Value`.
 | `FrameShiftEnableRegexPatternMutations` | `true` | Runs the eight operators of the regular-expression pattern family - anchors, quantifiers, groups, alternation, character classes, escapes, lookaround, backreferences. `false` switches the family off and leaves every other operator untouched, including the `RegexOptions` one of the culture-sensitivity family. Use it when the pattern mutants of a pattern-heavy project crowd out the mutation points of the surrounding code: the family is skipped before `FrameShiftMaxMutantsPerMember` is consulted, so the budget of a member is then spent on its other mutation points. |
 | `FrameShiftSuppressSetupWarning` | `false` | Silences the `FSH0005` setup warning, for example for a project that is deliberately not covered, or while the manifest of the first pass does not exist yet. |
 | `FrameShiftIsTestProject` | *(unset)* | Set to `true` to mark a project as a test project, which suppresses `FSH0005` for it. Read only by the targets, never by the analyzers. `$(IsTestProject)` and `$(IsTestingPlatformApplication)` have the same effect. |
-| `FrameShiftEnableDefaultManifestItems` | `true`, or `false` when `$(EnableDefaultItems)` is `false` | Adds every `**/*.frameshift` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories. |
+| `FrameShiftEnableDefaultManifestItems` | `true`, or `false` when `$(EnableDefaultItems)` is `false` | Adds every `**/*.frameshift-tests` file of the project directory to `@(AdditionalFiles)`, excluding the output and intermediate directories. |
 | `FrameShiftWriteTestSurfaceManifest` | `true` for a project referencing a known test framework package (a `PackageReference` whose id starts, case-insensitively, with `tunit`, `xunit`, `nunit` or `mstest`), `false` otherwise | Writes the generated test-surface manifest next to the project file. Enabling it turns on `$(EmitCompilerGeneratedFiles)`. |
-| `FrameShiftTestSurfaceManifestFile` | `$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift` | The manifest file that is written. |
+| `FrameShiftTestSurfaceManifestFile` | `$(MSBuildProjectDirectory)\$(MSBuildProjectName).frameshift-tests` | The manifest file that is written. |
 
 The first four properties are exposed to the analyzers as `build_property.<Name>`; a value that
 cannot be parsed falls back to the documented default. In a multi-targeting test project exactly one

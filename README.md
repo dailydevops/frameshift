@@ -1,4 +1,4 @@
-# NetEvolve.FrameShift
+﻿# NetEvolve.FrameShift
 
 [![License](https://img.shields.io/github/license/dailydevops/frameshift.svg)](LICENSE)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/dailydevops/frameshift/cicd.yml?branch=main)](https://github.com/dailydevops/frameshift/actions)
@@ -10,7 +10,7 @@ This repository contains `NetEvolve.FrameShift`, a Roslyn analyzer package that 
 
 The analysis has to run in two passes, and that constraint shapes the whole solution. A test compilation references the production assembly as metadata only: it can name the production members its test methods touch, but it owns no production syntax tree it could mutate. A production compilation owns every syntax tree and the complete call graph, but it cannot see a single test. Neither side alone knows enough.
 
-The **test side** therefore runs first. A test-framework specific analyzer discovers the test methods of the project, walks the code reachable from them inside the test assembly and records every production member they reference. A source generator serialises that list into a _test-surface manifest_ and emits it as a generated source file; the packaged MSBuild target `FrameShiftWriteTestSurfaceManifest` turns that file into `<ProjectName>.frameshift` next to the test project. The manifest is a plain, line-based text file beginning with `frameshift-test-surface/1`, with one documentation comment id per line, prefixed `T` for a test method and `R` for a referenced production member. It is meant to be checked in and diffed.
+The **test side** therefore runs first. A test-framework specific analyzer discovers the test methods of the project, walks the code reachable from them inside the test assembly and records every production member they reference. A source generator serialises that list into a _test-surface manifest_ and emits it as a generated source file; the packaged MSBuild target `FrameShiftWriteTestSurfaceManifest` turns that file into `<ProjectName>.frameshift-tests` next to the test project. The manifest is a plain, line-based text file beginning with `frameshift-test-surface/1`, with one documentation comment id per line, prefixed `T` for a test method and `R` for a referenced production member. It is meant to be checked in and diffed.
 
 The **production side** consumes the manifest through `AdditionalFiles`. `MutationCoverageAnalyzer` seeds the reachable set from the recorded member ids, closes it transitively over the production call graph — which only this side can see — walks every syntax tree, generates the candidate mutants, verifies by in-memory recompilation that each one still compiles, and classifies those that cannot change observable behaviour. What remains is reported: `FSH0001` for a meaningful mutant in an unreachable member, `FSH0002` for a mutant without observable effect, `FSH0003` for a manifest that is missing, malformed or stale, `FSH0004` for a test method that references no production member at all, and `FSH0006` for a mutation point that is reached, but only by tests contributing a single input combination in total — reachable code whose mutation would still go unnoticed. A project without a manifest stays silent, because it has not opted in; the MSBuild warning `FSH0005` reports the missing setup instead.
 
@@ -23,7 +23,7 @@ flowchart LR
         T1 --> T2 --> T3
     end
 
-    M["Test-surface manifest<br/>ProjectName.frameshift<br/>T = test · R = referenced member"]
+    M["Test-surface manifest<br/>ProjectName.frameshift-tests<br/>T = test · R = referenced member"]
 
     subgraph pass2["Pass 2 — production project"]
         P1["Reachability<br/>seed + transitive closure"]

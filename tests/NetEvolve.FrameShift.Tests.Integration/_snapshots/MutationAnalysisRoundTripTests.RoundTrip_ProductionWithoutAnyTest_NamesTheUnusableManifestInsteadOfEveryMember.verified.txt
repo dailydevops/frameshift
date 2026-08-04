@@ -1,5 +1,5 @@
---- manifest ---
+﻿--- manifest ---
 frameshift-test-surface/1
 
 --- diagnostics ---
-FSH0003 TestSurface.frameshift(1,1): Test-surface manifest 'TestSurface.frameshift' could not be read: the manifest does not record a single referenced production member, so it is empty or stale; rebuild the test project to regenerate it
+FSH0003 TestSurface.frameshift-tests(1,1): Test-surface manifest 'TestSurface.frameshift-tests' could not be read: the manifest does not record a single referenced production member, so it is empty or stale; rebuild the test project to regenerate it
