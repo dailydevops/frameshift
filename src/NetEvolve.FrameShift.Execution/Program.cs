@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Execution;
+﻿namespace NetEvolve.FrameShift.Execution;
 
 /// <summary>
 /// The entry point of the execution CLI: parses the command line, delegates the actual run to
@@ -41,7 +41,7 @@ internal static class Program
 
         try
         {
-            _ = await MutationExecutionCli.RunAsync(options!, Console.Out).ConfigureAwait(false);
+            _ = await MutationExecutionCli.RunAsync(options, Console.Out).ConfigureAwait(false);
 
             return SuccessExitCode;
         }

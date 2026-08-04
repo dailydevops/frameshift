@@ -1,6 +1,7 @@
-namespace NetEvolve.FrameShift.Execution;
+﻿namespace NetEvolve.FrameShift.Execution;
 
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 
@@ -87,7 +88,11 @@ internal sealed class ExecutionCliOptions
     /// <param name="options">The parsed options, or <see langword="null" /> on failure.</param>
     /// <param name="error">The description of the problem, or <see langword="null" /> on success.</param>
     /// <returns><see langword="true" /> if <paramref name="args" /> parsed successfully.</returns>
-    public static bool TryParse(string[] args, out ExecutionCliOptions? options, out string? error)
+    public static bool TryParse(
+        string[] args,
+        [NotNullWhen(true)] out ExecutionCliOptions? options,
+        [NotNullWhen(false)] out string? error
+    )
     {
         ArgumentNullException.ThrowIfNull(args);
 
@@ -114,7 +119,7 @@ internal sealed class ExecutionCliOptions
         return true;
     }
 
-    private static bool TryParseFlags(string[] args, out RawOptions raw, out string? error)
+    private static bool TryParseFlags(string[] args, out RawOptions raw, [NotNullWhen(false)] out string? error)
     {
         raw = new RawOptions
         {
@@ -174,7 +179,7 @@ internal sealed class ExecutionCliOptions
         return true;
     }
 
-    private static bool TryValidate(RawOptions raw, out string? error)
+    private static bool TryValidate(RawOptions raw, [NotNullWhen(false)] out string? error)
     {
         if (string.IsNullOrEmpty(raw.TestOutputDirectory))
         {
