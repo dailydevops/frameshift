@@ -286,6 +286,28 @@ public class EquivalenceClassifierTests
         await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// A call through a <c>dynamic</c> receiver is late-bound: the semantic model reports no method
+    /// symbol for it at all, since resolution only happens at run time. The check must treat that
+    /// exactly like any other invocation it cannot resolve, not assume it is <c>ConfigureAwait</c>.
+    /// </summary>
+    [Test]
+    public async Task Classify_MutationOfConfigureAwaitArgumentOnDynamicReceiver_IsNotTrivial()
+    {
+        const string source = """
+            namespace Fixture;
+
+            public sealed class Widget
+            {
+                public dynamic Compute(dynamic awaitable) => awaitable.ConfigureAwait(/*!*/false);
+            }
+            """;
+
+        var verdict = ClassifyBooleanLiteral(source);
+
+        await AssertNotTrivialAsync(verdict).ConfigureAwait(false);
+    }
+
     [Test]
     public async Task Classify_BehaviourChangingMutationInNormalMethod_IsNotTrivial()
     {
