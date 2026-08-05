@@ -31,7 +31,7 @@
       forced up to 10.0.1 through this ProjectReference collides with it at compile time (MSB3277).
       Pinned back down to what this tier actually needs instead of inheriting the 5.6.0 tier's ceiling.
     -->
-    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="9.0.0" />
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="10.0.10" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />

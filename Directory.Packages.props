@@ -51,7 +51,7 @@
       CentralPackageTransitivePinningEnabled promotes this central version everywhere, including
       projects that never reference the package directly.
     -->
-    <PackageVersion Include="System.Collections.Immutable" Version="10.0.1" />
+    <PackageVersion Include="System.Collections.Immutable" Version="10.0.10" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />
