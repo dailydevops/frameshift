@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Integration;
+﻿namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;

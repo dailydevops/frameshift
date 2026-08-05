@@ -1,5 +1,5 @@
-#if FRAMESHIFT_XUNIT_V3
-namespace NetEvolve.FrameShift.Tests.Integration;
+﻿#if FRAMESHIFT_XUNIT_V3
+namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
 using System.Globalization;
