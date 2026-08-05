@@ -16,7 +16,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// <remarks>
 /// <para>
 /// Every overload of these methods is preserved as it was found: the mutant keeps whatever
-/// <c>StringComparison</c>, <c>CultureInfo</c> or <c>char</c>-versus-<c>string</c> argument list the
+/// <c>StringComparison</c>, <c>CultureInfo</c> or <see cref="char"/>-versus-<see cref="string"/> argument list the
 /// original call used, because only the method name changes. A mutant is only produced when the
 /// target method actually declares an overload with the same parameter types, so that every produced
 /// mutant compiles.
