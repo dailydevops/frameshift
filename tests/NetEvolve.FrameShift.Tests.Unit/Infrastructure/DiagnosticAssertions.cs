@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 using System.Collections.Immutable;
 using System.Globalization;
