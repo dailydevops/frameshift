@@ -473,7 +473,7 @@ public class ReachabilityAndEquivalenceMutationTests
 
     /// <summary>
     /// <c>Subscriber.Subscribe</c> only ever adds a handler to <c>Bell.Rung</c>, never removes one, yet the
-    /// <c>remove</c> accessor is a separate declaration that shares the reachability of the event it
+    /// <see langword="remove"/> accessor is a separate declaration that shares the reachability of the event it
     /// belongs to, exactly like a property's setter shares the reachability of a getter-only caller.
     /// </summary>
     private const string EventAccessorSource = """
@@ -603,7 +603,7 @@ public class ReachabilityAndEquivalenceMutationTests
         """;
 
     /// <summary>
-    /// <c>1 + 2</c> sits inside a classic <c>case</c> label, the third and last constant-only position
+    /// <c>1 + 2</c> sits inside a classic <see langword="case"/> label, the third and last constant-only position
     /// exercised in this file.
     /// </summary>
     private const string CaseLabelSource = """
@@ -863,7 +863,7 @@ public class ReachabilityAndEquivalenceMutationTests
     }
 
     /// <summary>
-    /// A test that only ever adds a handler to an event never removes one, yet the <c>remove</c> accessor
+    /// A test that only ever adds a handler to an event never removes one, yet the <see langword="remove"/> accessor
     /// becomes reachable as well: like a property's getter and setter, both accessors are separate
     /// declarations that share the reachability of the event they belong to.
     /// </summary>
@@ -965,7 +965,7 @@ public class ReachabilityAndEquivalenceMutationTests
     }
 
     /// <summary>
-    /// The third and last constant-only position exercised in this file: a classic <c>case</c> label can
+    /// The third and last constant-only position exercised in this file: a classic <see langword="case"/> label can
     /// only ever be a compile-time constant as well.
     /// </summary>
     [Test]

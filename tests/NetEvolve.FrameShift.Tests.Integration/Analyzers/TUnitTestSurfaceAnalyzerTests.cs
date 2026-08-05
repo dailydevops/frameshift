@@ -105,7 +105,7 @@ public class TUnitTestSurfaceAnalyzerTests
 
     /// <summary>
     /// The test assembly under analysis. The local-only test deliberately touches neither the
-    /// production assembly nor the framework: a predefined type keyword, a <c>var</c> or an operator
+    /// production assembly nor the framework: a predefined type keyword, a <see langword="var"/> or an operator
     /// would all bind to a member outside this assembly and would therefore count as a production
     /// reference, which is exactly what the <c>FSH0004</c> expectation is about.
     /// </summary>

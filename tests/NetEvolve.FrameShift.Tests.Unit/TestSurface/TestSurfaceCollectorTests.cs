@@ -16,7 +16,7 @@ using TUnit.Core;
 /// that every recorded member is attributed to every test that reaches it.
 /// </summary>
 /// <remarks>
-/// The fixture deliberately avoids <c>var</c>, predefined type keywords and operators inside the code
+/// The fixture deliberately avoids <see langword="var"/>, predefined type keywords and operators inside the code
 /// that is walked. Those all bind to members of the framework assemblies, which are outside the test
 /// assembly and would therefore be recorded as production references, drowning the interesting ids in
 /// noise.

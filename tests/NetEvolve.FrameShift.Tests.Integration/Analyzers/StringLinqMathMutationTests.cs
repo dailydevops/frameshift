@@ -314,10 +314,10 @@ public class StringLinqMathMutationTests
     /// Every construct <see cref="StatementRemovalMutator" /> recognises and every guard that keeps it
     /// from firing, in one file: a nested <c>return;</c> (line 19, removed - it is not the trailing
     /// statement of the method body), a trailing <c>return;</c> in <c>LastReturn</c> (kept - removing it
-    /// would change nothing), a <c>break</c> and a <c>continue</c> inside a loop (removed), a nested
-    /// <c>throw</c> in a <see langword="void" /> method (removed), a trailing <c>throw</c> in a
+    /// would change nothing), a <see langword="break"/> and a <see langword="continue"/> inside a loop (removed), a nested
+    /// <see langword="throw"/> in a <see langword="void" /> method (removed), a trailing <see langword="throw"/> in a
     /// non-<see langword="void" /> method (kept - removing it would leave a code path without a required
-    /// return) and a standalone invocation with a <c>ref</c> argument (kept - removing it would change
+    /// return) and a standalone invocation with a <see langword="ref"/> argument (kept - removing it would change
     /// what the caller observes through the reference). Every condition is a bare identifier, so no other
     /// operator has a mutation point on any of these lines.
     /// </summary>
@@ -651,8 +651,8 @@ public class StringLinqMathMutationTests
 
     /// <summary>
     /// The flagship case of the family: every removable construct reports its removal, and every guard -
-    /// the trailing <c>return;</c>, the trailing <c>throw</c> of a non-<see langword="void" /> member and
-    /// the invocation with a <c>ref</c> argument - keeps the analysis silent instead. Every <c>if</c>
+    /// the trailing <c>return;</c>, the trailing <see langword="throw"/> of a non-<see langword="void" /> member and
+    /// the invocation with a <see langword="ref"/> argument - keeps the analysis silent instead. Every <see langword="if"/>
     /// condition guarding a removable statement is itself a <c>bool</c> parameter, which
     /// <see cref="LogicalNegationMutator" /> also reports a gap for at its own line - a second,
     /// independent operator firing on the same fixture, not a mistake.

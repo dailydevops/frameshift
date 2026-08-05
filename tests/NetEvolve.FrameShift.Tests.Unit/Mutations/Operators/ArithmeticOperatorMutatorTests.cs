@@ -697,7 +697,7 @@ public class ArithmeticOperatorMutatorTests
     }
 
     /// <summary>
-    /// A dynamic expression binds to the built-in operator of <c>dynamic</c> rather than to a user defined
+    /// A dynamic expression binds to the built-in operator of <see langword="dynamic"/> rather than to a user defined
     /// one, so the user defined operator filter cannot narrow the result and every counterpart is offered.
     /// </summary>
     [Test]
@@ -937,7 +937,7 @@ public class ArithmeticOperatorMutatorTests
 
     /// <summary>
     /// Builds a fixture over two operands of the same type. The expression carries the marker itself, so
-    /// that a case can wrap the marked expression into a <c>checked</c> or <c>unchecked</c> context.
+    /// that a case can wrap the marked expression into a <see langword="checked"/> or <see langword="unchecked"/> context.
     /// </summary>
     /// <param name="operandType">The declared type of both operands.</param>
     /// <param name="resultType">The declared result type of the fixture method.</param>
@@ -957,7 +957,7 @@ public class ArithmeticOperatorMutatorTests
     /// <summary>
     /// The operator identifiers of all four counterparts of <paramref name="originalName" />.
     /// </summary>
-    /// <param name="originalName">The name of the original operator, e.g. <c>add</c>.</param>
+    /// <param name="originalName">The name of the original operator, e.g. <see langword="add"/>.</param>
     /// <returns>The expected operator identifiers, sorted.</returns>
     private static ImmutableArray<string> AllCounterparts(string originalName) =>
         Sorted(

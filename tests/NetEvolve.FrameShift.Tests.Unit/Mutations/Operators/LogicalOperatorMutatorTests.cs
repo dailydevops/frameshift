@@ -263,7 +263,7 @@ public class LogicalOperatorMutatorTests
     }
 
     /// <summary>
-    /// A type with <c>true</c> and <c>false</c> operators may be used with <c>&amp;&amp;</c> and
+    /// A type with <see langword="true"/> and <see langword="false"/> operators may be used with <c>&amp;&amp;</c> and
     /// <c>||</c>, which resolve through its <c>&amp;</c> and <c>|</c> operators. The conditional form is
     /// mutated, because both underlying operators exist.
     /// </summary>

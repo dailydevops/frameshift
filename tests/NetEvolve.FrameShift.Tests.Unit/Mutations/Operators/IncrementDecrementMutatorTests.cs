@@ -506,7 +506,7 @@ public class IncrementDecrementMutatorTests
     }
 
     /// <summary>
-    /// A <c>checked</c> or <c>unchecked</c> context changes what the mutant does at run time, but not
+    /// A <see langword="checked"/> or <see langword="unchecked"/> context changes what the mutant does at run time, but not
     /// whether it is created: the swap is offered in both contexts.
     /// </summary>
     [Test]

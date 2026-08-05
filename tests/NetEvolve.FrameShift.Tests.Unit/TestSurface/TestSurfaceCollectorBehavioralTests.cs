@@ -14,7 +14,7 @@ using TUnit.Core;
 /// recognised, non-trivial assertion somewhere in its reachable code.
 /// </summary>
 /// <remarks>
-/// The fixture, like <see cref="TestSurfaceCollectorTests" />, avoids <c>var</c> and predefined type
+/// The fixture, like <see cref="TestSurfaceCollectorTests" />, avoids <see langword="var"/> and predefined type
 /// keywords inside the walked test code, so that framework members do not pollute the ids under test.
 /// </remarks>
 public class TestSurfaceCollectorBehavioralTests
