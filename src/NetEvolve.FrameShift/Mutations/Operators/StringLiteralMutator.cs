@@ -56,10 +56,10 @@ internal sealed class StringLiteralMutator : MutationOperatorBase
         SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, SyntaxFactory.Literal(value));
 
     /// <summary>
-    /// Determines whether <paramref name="node" /> is the argument of a <c>nameof</c> expression.
+    /// Determines whether <paramref name="node" /> is the argument of a <see langword="nameof"/> expression.
     /// </summary>
     /// <param name="node">The node to inspect.</param>
-    /// <returns><see langword="true" /> if the node is a <c>nameof</c> argument.</returns>
+    /// <returns><see langword="true" /> if the node is a <see langword="nameof"/> argument.</returns>
     private static bool IsNameOfArgument(SyntaxNode node) =>
         node.Parent is ArgumentSyntax argument
         && argument.Parent is ArgumentListSyntax argumentList

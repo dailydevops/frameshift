@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Removes an existing logical negation (<c>!x</c> becomes <c>x</c>) and introduces a negation around
-/// the boolean condition of an <c>if</c>, <c>while</c> or <c>do</c> statement and of a conditional
+/// the boolean condition of an <see langword="if"/>, <see langword="while"/> or <see langword="do"/> statement and of a conditional
 /// expression (<c>x</c> becomes <c>!(x)</c>).
 /// </summary>
 /// <remarks>
@@ -16,7 +16,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// because <c>!x</c> on a <c>bool?</c> is itself a <c>bool?</c>, so the operand can take the place of the
 /// whole expression without changing the type of the position. Introducing one rejects it, because the
 /// wrapped <c>!(x)</c> would again be a <c>bool?</c>, and a <c>bool?</c> is not a valid condition of an
-/// <c>if</c>, <c>while</c> or <c>do</c> statement nor of a conditional expression, so the mutant would
+/// <see langword="if"/>, <see langword="while"/> or <see langword="do"/> statement nor of a conditional expression, so the mutant would
 /// never compile.
 /// </para>
 /// <para>

@@ -350,7 +350,7 @@ public class ConditionalAndLogicalMutationTests
 
     /// <summary>
     /// <c>Toggle.Invert</c> removes an existing negation on line 15, while <c>Guard.ClampNonNegative</c>
-    /// wraps the condition of an <c>if</c> statement on line 25. <c>Guard.Fallback</c> is a
+    /// wraps the condition of an <see langword="if"/> statement on line 25. <c>Guard.Fallback</c> is a
     /// <see langword="const" /> field, so its literal never becomes a mutation point of its own and the
     /// method returning it carries none either.
     /// </summary>
@@ -613,7 +613,7 @@ public class ConditionalAndLogicalMutationTests
 
     /// <summary>
     /// Both directions of <c>LogicalNegationMutator</c> in one fixture: removing an existing negation on
-    /// line 15, and wrapping the condition of an <c>if</c> statement that has none on line 25.
+    /// line 15, and wrapping the condition of an <see langword="if"/> statement that has none on line 25.
     /// </summary>
     [Test]
     public async Task Analyze_UntestedNegationRemovalAndWrap_ReportsBothDirections()

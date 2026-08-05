@@ -287,7 +287,7 @@ public class EquivalenceClassifierTests
     }
 
     /// <summary>
-    /// A call through a <c>dynamic</c> receiver is late-bound: the semantic model reports no method
+    /// A call through a <see langword="dynamic"/> receiver is late-bound: the semantic model reports no method
     /// symbol for it at all, since resolution only happens at run time. The check must treat that
     /// exactly like any other invocation it cannot resolve, not assume it is <c>ConfigureAwait</c>.
     /// </summary>

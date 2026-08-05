@@ -383,7 +383,7 @@ public class NullableLiteralMutatorTests
     }
 
     /// <summary>
-    /// <c>Guid</c> has no literal syntax, so <c>null</c> is the only state this operator ever meets for
+    /// <c>Guid</c> has no literal syntax, so <see langword="null"/> is the only state this operator ever meets for
     /// it; the default it moves to is written fully qualified, so the mutant compiles whether or not the
     /// mutated file has a <c>using System;</c>.
     /// </summary>

@@ -1063,7 +1063,7 @@ internal sealed class RegexPatternTokenizerAdversarialTests
     /// <summary>
     /// Checks that the tokens tile the pattern and that every token's text is the substring its own span
     /// names. A description rather than a boolean, so that a failure names the offending token instead of
-    /// only saying <c>false</c>.
+    /// only saying <see langword="false"/>.
     /// </summary>
     /// <param name="pattern">The tokenized pattern.</param>
     /// <param name="tokens">The tokens of the pattern.</param>

@@ -93,7 +93,7 @@ internal enum MutationKind
     ShiftOperator,
 
     /// <summary>
-    /// The <c>checked</c> and <c>unchecked</c> keyword of a checked expression or statement, swapped for
+    /// The <see langword="checked"/> and <see langword="unchecked"/> keyword of a checked expression or statement, swapped for
     /// its counterpart. The keyword only decides how arithmetic overflow is handled at run time, so a
     /// test suite that never distinguishes the two cannot tell whether the choice is actually enforced.
     /// </summary>
@@ -228,7 +228,7 @@ internal enum MutationKind
 
     /// <summary>
     /// The element list of an array or collection initializer and of a collection expression, emptied
-    /// when it carries elements and, where provably safe, filled with a single <c>default</c> element
+    /// when it carries elements and, where provably safe, filled with a single <see langword="default"/> element
     /// when it is empty. An emptied lookup table, default argument list or seed collection is otherwise
     /// indistinguishable from the original to a test suite that never inspects its contents.
     /// </summary>
@@ -236,9 +236,9 @@ internal enum MutationKind
 
     /// <summary>
     /// Whole statements removed outright: a bare <c>return;</c> inside a <see langword="void" />
-    /// returning member, a loop <c>break</c> or <c>continue</c>, a <c>throw</c> statement, and a
-    /// standalone invocation of a <see langword="void" /> returning method with no <c>ref</c> or
-    /// <c>out</c> arguments. A test suite that never distinguishes the statement being there from it
+    /// returning member, a loop <see langword="break"/> or <see langword="continue"/>, a <see langword="throw"/> statement, and a
+    /// standalone invocation of a <see langword="void" /> returning method with no <see langword="ref"/> or
+    /// <see langword="out"/> arguments. A test suite that never distinguishes the statement being there from it
     /// being gone cannot tell an early return, a changed loop exit, a silently skipped guard or a
     /// discarded side-effecting call apart from the code that no longer has it.
     /// </summary>

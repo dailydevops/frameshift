@@ -25,7 +25,7 @@ using TUnit.Core;
 /// </para>
 /// <para>
 /// The negative cases matter just as much. A member that merely shares a name with the abstraction,
-/// a member that hides it with <c>new</c> instead of overriding it, and an override of a base that
+/// a member that hides it with <see langword="new"/> instead of overriding it, and an override of a base that
 /// nobody touched must all stay out of the reachable set, because a set that grows too eagerly hides
 /// exactly the gaps the analysis exists to find.
 /// </para>

@@ -11,7 +11,7 @@ using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers the <c>checked</c>/<c>unchecked</c> keyword swap, for both the expression form and the
+/// Covers the <see langword="checked"/>/<see langword="unchecked"/> keyword swap, for both the expression form and the
 /// statement block form.
 /// </summary>
 public class CheckedContextMutatorTests
