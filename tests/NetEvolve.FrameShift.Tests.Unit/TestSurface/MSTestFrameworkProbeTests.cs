@@ -1,9 +1,9 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+namespace NetEvolve.FrameShift.Tests.Unit.TestSurface;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using NetEvolve.FrameShift.Tests.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;

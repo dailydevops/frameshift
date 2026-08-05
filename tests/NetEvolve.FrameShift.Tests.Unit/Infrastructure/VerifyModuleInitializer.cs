@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 using System.Globalization;
 using System.Runtime.CompilerServices;
