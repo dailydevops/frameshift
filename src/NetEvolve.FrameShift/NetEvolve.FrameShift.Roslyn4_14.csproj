@@ -1,0 +1,38 @@
+<Project>
+  <!--
+    Middle-tier Roslyn API surface, matching the Roslyn version the .NET 9 SDK / VS 2022 17.14 ship.
+    See NetEvolve.FrameShift.Build.props for why this variant uses the explicit Sdk.props/Sdk.targets
+    import style.
+  -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <RoslynApiVersion>4.14.0</RoslynApiVersion>
+    <!-- Roslyn API availability is monotonic: this variant meets or exceeds every lower threshold too. -->
+    <DefineConstants>$(DefineConstants);FRAMESHIFT_ROSLYN_4_8_OR_GREATER;FRAMESHIFT_ROSLYN_4_14_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
+  <Import Project="NetEvolve.FrameShift.Build.props" />
+
+  <ItemGroup Label="Roslyn (version-specific)">
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" VersionOverride="$(RoslynApiVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" VersionOverride="$(RoslynApiVersion)" />
+    <!--
+      Microsoft.CodeAnalysis.Common 4.14.0's own nuspec depends on exactly System.Collections.Immutable
+      9.0.0. Directory.Packages.props centrally pins this package at 10.0.1 (the Roslyn5_6 variant's own
+      ceiling) and CentralPackageTransitivePinningEnabled would otherwise promote that ceiling onto this
+      variant too - which a net9.0 test project referencing this variant cannot tolerate: net9.0 ships
+      System.Collections.Immutable as its own independently-versioned 9.0.x reference assembly, and being
+      forced up to 10.0.1 through this ProjectReference collides with it at compile time (MSB3277).
+      Pinned back down to what this tier actually needs instead of inheriting the 5.6.0 tier's ceiling.
+    -->
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="9.0.0" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

@@ -480,7 +480,16 @@ internal static class TestSurfaceAnalysis
             location,
             string.IsNullOrEmpty(declarationId)
                 ? method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
+                // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated
+                // starting with the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries
+                // no nullable annotation at all), so the null-forgiving operator needed to satisfy the
+                // 4.14.0/5.6.0 variants' nullable analysis is flagged as genuinely redundant - not just
+                // stylistically unnecessary - on the 4.8.0 variant.
+#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
                 : declarationId!
+#else
+                : declarationId
+#endif
         );
     }
 

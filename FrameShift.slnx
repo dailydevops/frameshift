@@ -23,6 +23,9 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />
+    <Project Path="src/NetEvolve.FrameShift/NetEvolve.FrameShift.Roslyn4_8.csproj" />
+    <Project Path="src/NetEvolve.FrameShift/NetEvolve.FrameShift.Roslyn4_14.csproj" />
+    <Project Path="src/NetEvolve.FrameShift/NetEvolve.FrameShift.Roslyn5_6.csproj" />
     <Project Path="src/NetEvolve.FrameShift.Execution/NetEvolve.FrameShift.Execution.csproj" />
   </Folder>
   <Folder Name="/tests/">

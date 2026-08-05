@@ -104,12 +104,23 @@ internal static class TestSurfaceCollector
                 continue;
             }
 
-            testCaseCounts[testMethodId!] = entry.CaseCount;
-            referencesByTest[testMethodId!] = referencesByTest.TryGetValue(testMethodId!, out var known)
+            // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting
+            // with the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable
+            // annotation at all), so the null-forgiving operator needed to satisfy the 4.14.0/5.6.0
+            // variants' nullable analysis is flagged as genuinely redundant - not just stylistically
+            // unnecessary - on the 4.8.0 variant.
+#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
+            var testMethodKey = testMethodId!;
+#else
+            var testMethodKey = testMethodId;
+#endif
+
+            testCaseCounts[testMethodKey] = entry.CaseCount;
+            referencesByTest[testMethodKey] = referencesByTest.TryGetValue(testMethodKey, out var known)
                 ? known.Union(entry.ReferencedMemberIds)
                 : entry.ReferencedMemberIds;
-            behavioralReferencesByTest[testMethodId!] = behavioralReferencesByTest.TryGetValue(
-                testMethodId!,
+            behavioralReferencesByTest[testMethodKey] = behavioralReferencesByTest.TryGetValue(
+                testMethodKey,
                 out var knownBehavioral
             )
                 ? knownBehavioral.Union(entry.BehavioralReferencedMemberIds)
@@ -358,7 +369,18 @@ internal static class TestSurfaceCollector
             return;
         }
 
-        _ = accumulator.ReferencedMemberIds.Add(declarationId!);
+        // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting with
+        // the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable annotation
+        // at all), so the null-forgiving operator needed to satisfy the 4.14.0/5.6.0 variants' nullable
+        // analysis is flagged as genuinely redundant - not just stylistically unnecessary - on the
+        // 4.8.0 variant.
+#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
+        var declarationKey = declarationId!;
+#else
+        var declarationKey = declarationId;
+#endif
+
+        _ = accumulator.ReferencedMemberIds.Add(declarationKey);
 
         // A method referenced only as a bare method-group conversion - a captured delegate that is
         // never called from the test's own reachable code - gives no basis for believing a mutation of
@@ -368,7 +390,7 @@ internal static class TestSurfaceCollector
         // distinguish from an actual read or write.
         if (isInvocation || definition.Kind != SymbolKind.Method)
         {
-            _ = accumulator.InvokedMemberIds.Add(declarationId!);
+            _ = accumulator.InvokedMemberIds.Add(declarationKey);
         }
     }
 

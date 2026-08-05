@@ -14,7 +14,8 @@
     <PackageReference Include="Verify.TUnit" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />
+    <!-- net10.0-only, tracks the newest Roslyn variant (see NetEvolve.FrameShift.Execution.csproj). -->
+    <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.Roslyn5_6.csproj" />
     <ProjectReference Include="../../src/NetEvolve.FrameShift.Execution/NetEvolve.FrameShift.Execution.csproj" />
   </ItemGroup>
   <ItemGroup Label="Shared test infrastructure">

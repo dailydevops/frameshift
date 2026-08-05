@@ -1,0 +1,79 @@
+<Project>
+  <!--
+    Shared settings for every Roslyn-version variant of the NetEvolve.FrameShift analyzer assembly.
+
+    Each variant (NetEvolve.FrameShift.RoslynX_Y.csproj) uses the explicit Sdk.props/Sdk.targets import
+    style instead of the `<Project Sdk="...">` shorthand, so it can set $(BaseIntermediateOutputPath) and
+    $(BaseOutputPath) - keyed by $(MSBuildProjectName) - before Sdk.props runs; that is what keeps every
+    variant's obj/bin output from colliding, since all of them live in this same directory and compile
+    the very same source files. Each variant sets $(RoslynApiVersion), its own Roslyn PackageReference
+    VersionOverride, and its FRAMESHIFT_ROSLYN_*_OR_GREATER symbol(s) before importing this file, and the
+    packing project (NetEvolve.FrameShift.csproj) drives all three variant builds without compiling any
+    source of its own - see that project and Directory.Packages.props for the rest of the scheme.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <AssemblyName>NetEvolve.FrameShift</AssemblyName>
+    <RootNamespace>NetEvolve.FrameShift</RootNamespace>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Analyzer packaging">
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <!-- The assembly ships as an analyzer asset, so there is no lib/ folder to describe. -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- Symbols travel next to the analyzer assembly; a separate symbol package would be empty. -->
+    <IncludeSymbols>false</IncludeSymbols>
+  </PropertyGroup>
+
+  <ItemGroup Label="Isolate variant intermediate output">
+    <!--
+      The SDK's default item excludes only cover *this* project's own $(BaseIntermediateOutputPath)/
+      $(BaseOutputPath); every other variant's obj/bin folder, sitting right next to it in the same
+      directory, is not excluded automatically and would otherwise be swept into this variant's own
+      compile through the default globs.
+    -->
+    <Compile Remove="obj/**;bin/**" />
+  </ItemGroup>
+
+  <ItemGroup Label="Test visibility">
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Tests.Integration</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Unit</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Integration</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
+
+  <ItemGroup Label="Analyzer release tracking">
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+  <!--
+    Hands the packing project (NetEvolve.FrameShift.csproj) this variant's built assembly and doc file
+    without a ProjectReference - a ProjectReference would make this variant a compile-time dependency of
+    a project that has no compilation of its own (EnableDefaultCompileItems is false there). Depending on
+    the Build target means @(IntermediateAssembly)/@(DocFileItem) are already populated in memory, in the
+    very same MSBuild invocation the packing project's <MSBuild> task makes, by the time this target's
+    own body runs.
+  -->
+  <Target Name="GetFrameShiftAnalyzerAssets" DependsOnTargets="Build" Returns="@(_FrameShiftAnalyzerAsset)">
+    <ItemGroup>
+      <_FrameShiftAnalyzerAsset Include="@(IntermediateAssembly)" />
+      <_FrameShiftAnalyzerAsset Include="@(DocFileItem)" />
+    </ItemGroup>
+  </Target>
+</Project>

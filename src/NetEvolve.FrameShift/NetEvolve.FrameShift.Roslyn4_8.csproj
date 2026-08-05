@@ -1,0 +1,54 @@
+<Project>
+  <!--
+    Oldest supported Roslyn API surface. See NetEvolve.FrameShift.Build.props for why this variant uses
+    the explicit Sdk.props/Sdk.targets import style, and Directory.Packages.props for why 4.8.0 is the
+    floor: `CollectionExpressionSyntax` and its siblings, consumed by
+    `Mutations/Operators/CollectionInitializerMutator.cs`, `TestSurface/SequenceLengthReader.cs` and
+    `TestSurface/TUnitTestMethodRecognizer.cs`, first appear in the roslyn-dotnet-4.7.0 API moniker, but
+    4.7.0 still gates C# 12 collection expressions behind the 'preview' language version (parsing a
+    `[...]` collection expression at any explicit LangVersion, including 'latest', fails with CS8652
+    "currently in Preview and unsupported"). Collection expressions only became a non-preview, LangVersion
+    12-recognized feature starting with 4.8.0 (VS 2022 17.8 / .NET SDK 8.0.100 GA) - confirmed by this
+    project's own fixture-compiling tests (`Fixtures_EveryCompilation_CompilesWithoutErrors`), which fail
+    with CS8652 against every target framework mapped to a 4.7.0 build. 4.4.0 is excluded outright: the
+    types above do not exist in its API surface at all.
+  -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <RoslynApiVersion>4.8.0</RoslynApiVersion>
+    <DefineConstants>$(DefineConstants);FRAMESHIFT_ROSLYN_4_8_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
+  <Import Project="NetEvolve.FrameShift.Build.props" />
+
+  <ItemGroup Label="Roslyn (version-specific)">
+    <!--
+      Microsoft.CodeAnalysis.Analyzers is versioned on its own, much slower cadence than
+      Microsoft.CodeAnalysis.CSharp: nuget.org has no 4.x release between 3.12.0 and 4.14.0, so a 4.8.0
+      version of this specific package does not exist (restore falls back to 4.14.0 with an NU1603
+      warning promoted to an error by this repo's warnings-as-errors setup). Microsoft.CodeAnalysis.Common
+      4.8.0's own nuspec only requires Microsoft.CodeAnalysis.Analyzers >= 3.3.4, so the central
+      PackageVersion (5.6.0, see Directory.Packages.props) already satisfies it - left unoverridden here
+      rather than pointing it at a version that doesn't exist.
+    -->
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" VersionOverride="$(RoslynApiVersion)" />
+    <!--
+      Microsoft.CodeAnalysis.Common 4.8.0's own nuspec depends on System.Collections.Immutable 7.0.0,
+      which predates [CollectionBuilder] support on ImmutableArray<T> (added in 8.0.0) and breaks every
+      `[...]` collection expression in this project that targets ImmutableArray<T> with CS9210. Pinned up
+      to 8.0.0 explicitly - not to Directory.Packages.props' central 10.0.1 ceiling (the Roslyn5_6
+      variant's own need) - because a net6.0/net7.0 test project referencing this variant would otherwise
+      inherit a version its own reference assemblies don't agree with.
+    -->
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="8.0.0" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>
