@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Reachability;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
