@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 /// <summary>
 /// The test framework whose assemblies a test compilation references.
