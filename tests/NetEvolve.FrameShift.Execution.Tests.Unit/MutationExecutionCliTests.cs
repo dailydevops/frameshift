@@ -13,6 +13,8 @@ using Microsoft.CodeAnalysis.CSharp;
 /// </summary>
 public class MutationExecutionCliTests
 {
+    private const string GitHubStepSummaryConstraintKey = nameof(MutationExecutionCliTests) + ".GITHUB_STEP_SUMMARY";
+
     private const string ProductionSource = """
         namespace Fixture;
 
@@ -255,7 +257,15 @@ public class MutationExecutionCliTests
         }
     }
 
+    /// <summary>
+    /// This test and <see cref="RunAsync_GitHubSummaryFormatWithEnvironmentVariable_AppendsMarkdownToSummaryFile" />
+    /// both mutate the process-wide <c>GITHUB_STEP_SUMMARY</c> environment variable; without
+    /// <see cref="NotInParallelAttribute" /> pinning them to the same constraint key, TUnit's default
+    /// parallel execution can run them concurrently and have one test's save-and-restore race the
+    /// other's, so either can observe a value neither test itself set.
+    /// </summary>
     [Test]
+    [NotInParallel(GitHubStepSummaryConstraintKey)]
     public async Task RunAsync_GitHubSummaryFormatWithoutEnvironmentVariable_ThrowsInvalidOperationException()
     {
         var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-github-summary-missing-");
@@ -283,7 +293,13 @@ public class MutationExecutionCliTests
         }
     }
 
+    /// <summary>
+    /// See the summary on
+    /// <see cref="RunAsync_GitHubSummaryFormatWithoutEnvironmentVariable_ThrowsInvalidOperationException" />:
+    /// this test shares the same <c>GITHUB_STEP_SUMMARY</c> constraint key for the same reason.
+    /// </summary>
     [Test]
+    [NotInParallel(GitHubStepSummaryConstraintKey)]
     public async Task RunAsync_GitHubSummaryFormatWithEnvironmentVariable_AppendsMarkdownToSummaryFile()
     {
         var directory = Directory.CreateTempSubdirectory("frameshift-cli-report-github-summary-");
