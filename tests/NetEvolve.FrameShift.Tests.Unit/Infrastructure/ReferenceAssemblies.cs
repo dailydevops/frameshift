@@ -73,10 +73,10 @@ internal static class ReferenceAssemblies
     /// <summary>
     /// The .NET Framework runtime assemblies without which no fixture binds at all:
     /// <list type="bullet">
-    /// <item><c>mscorlib</c> - <c>object</c> and the primitives, <c>Attribute</c> with
+    /// <item><c>mscorlib</c> - <see cref="object"/> and the primitives, <c>Attribute</c> with
     /// <c>AttributeUsage</c> and <c>AttributeTargets</c>, <c>Action</c>, <c>Func</c>, <c>EventHandler</c>,
-    /// <c>EventArgs</c>, <c>Obsolete</c>, <c>Console</c>, <c>Math</c>, <c>Convert</c>, <c>DateTime</c>,
-    /// <c>TimeSpan</c>, <c>IntPtr</c>, the exceptions the fixtures throw, <c>IEnumerable&lt;T&gt;</c> and
+    /// <c>EventArgs</c>, <c>Obsolete</c>, <c>Console</c>, <c>Math</c>, <c>Convert</c>, <see cref="DateTime"/>,
+    /// <see cref="TimeSpan"/>, <c>IntPtr</c>, the exceptions the fixtures throw, <c>IEnumerable&lt;T&gt;</c> and
     /// the other generic collections, <c>System.Threading.Tasks.Task</c> and
     /// <c>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</c>.</item>
     /// <item><c>System</c> - <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c>, which the generated-code

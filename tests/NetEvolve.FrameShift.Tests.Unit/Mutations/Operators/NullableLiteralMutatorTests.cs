@@ -13,7 +13,7 @@ using TUnit.Core;
 
 /// <summary>
 /// Covers the nullable literal operator: the mutations produced per source state for each supported
-/// underlying type (<c>bool</c>, an integral and floating type, <c>char</c> and <c>Guid</c>), the
+/// underlying type (<see cref="bool"/>, an integral and floating type, <see cref="char"/> and <see cref="Guid"/>), the
 /// rewritten source, and every position it must leave alone, which is a plain non-nullable type, a
 /// reference type <see langword="null" />, a constant context, and a <see langword="default" /> written
 /// in place of a literal.
@@ -99,7 +99,7 @@ public class NullableLiteralMutatorTests
     }
 
     /// <summary>
-    /// <see langword="false" /> already is the default value of <c>bool</c>, so mutating it to that same
+    /// <see langword="false" /> already is the default value of <see cref="bool"/>, so mutating it to that same
     /// default would not be a mutation at all; only the transition to <see langword="null" /> fires.
     /// </summary>
     [Test]
@@ -160,7 +160,7 @@ public class NullableLiteralMutatorTests
     }
 
     /// <summary>
-    /// <c>0</c> already is the default value of <c>int</c>, so only the transition to
+    /// <c>0</c> already is the default value of <see cref="int"/>, so only the transition to
     /// <see langword="null" /> fires.
     /// </summary>
     [Test]
@@ -305,7 +305,7 @@ public class NullableLiteralMutatorTests
 
     /// <summary>
     /// A negative literal in a plain, non-nullable context is left alone: the whole unary expression's
-    /// converted type is <c>int</c>, not <c>int?</c>, so <see cref="MutationOperatorBase" /> never offers
+    /// converted type is <see cref="int"/>, not <c>int?</c>, so <see cref="MutationOperatorBase" /> never offers
     /// the <see langword="null" />/default mutants a non-nullable position could not compile.
     /// </summary>
     [Test]
@@ -383,7 +383,7 @@ public class NullableLiteralMutatorTests
     }
 
     /// <summary>
-    /// <c>Guid</c> has no literal syntax, so <see langword="null"/> is the only state this operator ever meets for
+    /// <see cref="Guid"/> has no literal syntax, so <see langword="null"/> is the only state this operator ever meets for
     /// it; the default it moves to is written fully qualified, so the mutant compiles whether or not the
     /// mutated file has a <c>using System;</c>.
     /// </summary>
@@ -403,7 +403,7 @@ public class NullableLiteralMutatorTests
 
     /// <summary>
     /// The receiver is resolved semantically against <c>System.Guid</c> specifically, so a same-named
-    /// <c>Guid</c> type declared in another namespace is never mistaken for it.
+    /// <see cref="Guid"/> type declared in another namespace is never mistaken for it.
     /// </summary>
     [Test]
     public async Task CreateMutations_NullOtherNamespaceGuidLiteral_ReturnsEmpty()
@@ -414,7 +414,7 @@ public class NullableLiteralMutatorTests
     }
 
     /// <summary>
-    /// <c>Guid</c> has no literal syntax, so <c>IsDefaultValue</c>'s <c>Guid</c> case can never actually
+    /// <see cref="Guid"/> has no literal syntax, so <c>IsDefaultValue</c>'s <see cref="Guid"/> case can never actually
     /// be reached through <c>CreateMutations</c> - it exists only to keep the switch exhaustive. This
     /// invokes the private method directly to prove that defensive case still behaves as documented.
     /// </summary>

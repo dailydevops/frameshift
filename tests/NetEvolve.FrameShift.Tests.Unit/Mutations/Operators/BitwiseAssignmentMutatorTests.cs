@@ -308,7 +308,7 @@ public class BitwiseAssignmentMutatorTests
     }
 
     /// <summary>
-    /// A <c>char</c> operand is one of the allowed integral special types, so it takes part in the
+    /// A <see cref="char"/> operand is one of the allowed integral special types, so it takes part in the
     /// bitwise assignment mutations just like the other narrow integral types.
     /// </summary>
     [Test]

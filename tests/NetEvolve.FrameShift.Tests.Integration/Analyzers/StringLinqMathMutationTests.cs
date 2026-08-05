@@ -410,9 +410,9 @@ public class StringLinqMathMutationTests
     /// <c>Arrays.Pair</c> (line 17) empties a non-empty array initializer, <c>Arrays.EmptyArray</c> (line
     /// 22) fills an empty collection expression converted to an array, <c>Collections.Values</c> (line 30)
     /// empties a non-empty collection expression, and the remaining members of <c>Collections</c> probe
-    /// every answer <c>AllowsDefault</c> can give for an empty one: <c>int</c> is a value type (line 35,
-    /// filled), <c>object</c> is <see cref="Microsoft.CodeAnalysis.SpecialType.System_Object" /> (line 40, filled), an
-    /// annotated <c>string?</c> is a nullable reference type (line 45, filled), a plain <c>string</c> is
+    /// every answer <c>AllowsDefault</c> can give for an empty one: <see cref="int"/> is a value type (line 35,
+    /// filled), <see cref="object"/> is <see cref="Microsoft.CodeAnalysis.SpecialType.System_Object" /> (line 40, filled), an
+    /// annotated <c>string?</c> is a nullable reference type (line 45, filled), a plain <see cref="string"/> is
     /// not annotated under this compilation's enabled nullable context (not filled), and an unconstrained
     /// type parameter resolves to neither (not filled).
     /// </summary>
@@ -653,7 +653,7 @@ public class StringLinqMathMutationTests
     /// The flagship case of the family: every removable construct reports its removal, and every guard -
     /// the trailing <c>return;</c>, the trailing <see langword="throw"/> of a non-<see langword="void" /> member and
     /// the invocation with a <see langword="ref"/> argument - keeps the analysis silent instead. Every <see langword="if"/>
-    /// condition guarding a removable statement is itself a <c>bool</c> parameter, which
+    /// condition guarding a removable statement is itself a <see cref="bool"/> parameter, which
     /// <see cref="LogicalNegationMutator" /> also reports a gap for at its own line - a second,
     /// independent operator firing on the same fixture, not a mistake.
     /// </summary>
@@ -694,7 +694,7 @@ public class StringLinqMathMutationTests
     /// <summary>
     /// A non-empty collection expression reports its collapse to an empty one, an empty collection
     /// expression reports the fill with <see langword="default" /> for every element type
-    /// <c>AllowsDefault</c> accepts - a value type, <c>object</c>, and an annotated nullable reference
+    /// <c>AllowsDefault</c> accepts - a value type, <see cref="object"/>, and an annotated nullable reference
     /// type - and reports nothing for the two it rejects: a non-annotated reference type and an
     /// unconstrained type parameter. The old-style array initializer of <c>Arrays.Pair</c>
     /// (<c>new[] { first, second }</c>) is deliberately included and reports nothing at all:

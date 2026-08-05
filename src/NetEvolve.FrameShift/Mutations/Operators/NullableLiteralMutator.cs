@@ -36,13 +36,13 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// <see langword="null" /> - so both directions out of <see langword="null" /> are worth provoking.
 /// </para>
 /// <para>
-/// <c>System.Guid?</c> is included even though <c>Guid</c> has no literal syntax of its own: there is no
-/// way to write a <c>Guid</c> value as a literal token, so this operator only ever encounters one for it
+/// <c>System.Guid?</c> is included even though <see cref="Guid"/> has no literal syntax of its own: there is no
+/// way to write a <see cref="Guid"/> value as a literal token, so this operator only ever encounters one for it
 /// on the <see langword="null" /> side, moving it to <c>Guid.Empty</c>, the type's default value.
 /// </para>
 /// <para>
 /// The converted type is resolved through the semantic model and has to be a nullable value type built
-/// over <see langword="bool" />, <c>char</c>, one of the built-in numeric types or <c>System.Guid</c>,
+/// over <see langword="bool" />, <see cref="char"/>, one of the built-in numeric types or <c>System.Guid</c>,
 /// never the corresponding non-nullable type and never a reference type. The check is load bearing
 /// rather than cosmetic: on a plain, non-nullable type the mutant that introduces <see langword="null" />
 /// does not compile, and although <c>MutantCompiler</c> would discard it afterwards, it would already
@@ -61,8 +61,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// A <see langword="null" /> literal on a reference type is deliberately out of scope. It belongs to a
 /// separate and considerably riskier family, because the surviving mutant then depends on whether the
 /// dereference is guarded rather than on the presence-of-a-value distinction this operator targets.
-/// Other types without a literal syntax of their own - an <see langword="enum" />, <c>DateTime</c> or a
-/// user-defined struct - are equally out of scope, since <c>Guid</c> is special-cased explicitly and
+/// Other types without a literal syntax of their own - an <see langword="enum" />, <see cref="DateTime"/> or a
+/// user-defined struct - are equally out of scope, since <see cref="Guid"/> is special-cased explicitly and
 /// there is no literal node for this operator to mutate for any of the others in the first place.
 /// </para>
 /// </remarks>
@@ -352,7 +352,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     /// mutation at all.
     /// </summary>
     /// <remarks>
-    /// <c>Guid</c> has no literal syntax, so <paramref name="valueNode" /> can never actually resolve to
+    /// <see cref="Guid"/> has no literal syntax, so <paramref name="valueNode" /> can never actually resolve to
     /// it here; the case exists only to keep the switch exhaustive.
     /// </remarks>
     private static bool IsDefaultValue(
@@ -397,7 +397,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
 
     /// <summary>
     /// Builds the expression for the default value of <paramref name="underlyingKind" />: a literal for
-    /// every built-in type, and <c>global::System.Guid.Empty</c> for <c>Guid</c>, which has no literal of
+    /// every built-in type, and <c>global::System.Guid.Empty</c> for <see cref="Guid"/>, which has no literal of
     /// its own.
     /// </summary>
     private static ExpressionSyntax? CreateDefaultExpression(UnderlyingKind underlyingKind) =>
@@ -443,7 +443,7 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
     /// <summary>
     /// The human-readable text for a default-value expression, which is the expression's own text for a
     /// plain literal, and the short, unqualified <c>Guid.Empty</c> for the globally-qualified expression
-    /// this operator builds for <c>Guid</c>.
+    /// this operator builds for <see cref="Guid"/>.
     /// </summary>
     private static string DisplayText(UnderlyingKind underlyingKind, ExpressionSyntax defaultExpression) =>
         underlyingKind == UnderlyingKind.Guid ? "Guid.Empty" : defaultExpression.ToString();

@@ -871,7 +871,7 @@ public class MixedFrameworkTestSurfaceTests
     /// Merges the reference sets of <paramref name="frameworks" /> and adds the xUnit.net v3 assemblies
     /// under <see cref="XunitV3Alias" />, leaving out everything the merged set already carries so that
     /// only the assemblies version 3 contributes of its own are aliased. Aliasing a runtime assembly would
-    /// take <c>object</c> out of the global namespace and nothing would compile at all.
+    /// take <see cref="object"/> out of the global namespace and nothing would compile at all.
     /// </summary>
     /// <param name="frameworks">The frameworks whose assemblies are referenced without an alias.</param>
     /// <returns>The merged references.</returns>

@@ -223,7 +223,7 @@ public class MutationCoverageAnalyzerTests
         """;
 
     /// <summary>
-    /// <c>DateTime</c> declares <c>op_Subtraction</c> and <c>op_Addition</c>, so the arithmetic
+    /// <see cref="DateTime"/> declares <c>op_Subtraction</c> and <c>op_Addition</c>, so the arithmetic
     /// operator is offered the <c>-</c> to <c>+</c> mutation on line 17, but <c>end + start</c> does
     /// not bind.
     /// </summary>

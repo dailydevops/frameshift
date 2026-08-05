@@ -110,11 +110,11 @@ internal sealed class LogicalNegationMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Determines whether <paramref name="type" /> is <c>bool</c> or <c>bool?</c>, which are the two
+    /// Determines whether <paramref name="type" /> is <see cref="bool"/> or <c>bool?</c>, which are the two
     /// operand types the removal of a negation leaves in a well typed position.
     /// </summary>
     /// <param name="type">The type to inspect, which may be <see langword="null" /> for an unresolved node.</param>
-    /// <returns><see langword="true" /> if the type is <c>bool</c> or <c>bool?</c>.</returns>
+    /// <returns><see langword="true" /> if the type is <see cref="bool"/> or <c>bool?</c>.</returns>
     private static bool IsBoolean(ITypeSymbol? type)
     {
         if (type is null)

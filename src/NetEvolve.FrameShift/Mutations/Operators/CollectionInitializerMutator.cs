@@ -33,7 +33,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// The reverse direction, turning <c>[]</c> into <c>[default]</c>, is only offered for a collection
 /// expression, never for the brace initializer syntax, and only when it is safe: the target type of the
 /// collection expression has to resolve, through the semantic model, to a concrete element type, and that
-/// element type has to be a value type, a nullable reference type, or <see langword="dynamic"/>/<c>object</c>.
+/// element type has to be a value type, a nullable reference type, or <see langword="dynamic"/>/<see cref="object"/>.
 /// Everything else - an unresolved element type, an unconstrained type parameter, or a non-nullable
 /// reference type the nullable context has not annotated - is skipped, because <see langword="default" />
 /// is not guaranteed to compile there without deeper analysis this operator deliberately does not
@@ -200,7 +200,7 @@ internal sealed class CollectionInitializerMutator : MutationOperatorBase
 
     /// <summary>
     /// Determines whether <see langword="default" /> is safe to write for <paramref name="elementType" />:
-    /// a value type, a nullable reference type, or <see langword="dynamic"/>/<c>object</c>. Every other reference
+    /// a value type, a nullable reference type, or <see langword="dynamic"/>/<see cref="object"/>. Every other reference
     /// type, including one the nullable context leaves oblivious, is rejected, because whether
     /// <see langword="default" /> compiles there without a warning depends on analysis this operator does
     /// not perform.
