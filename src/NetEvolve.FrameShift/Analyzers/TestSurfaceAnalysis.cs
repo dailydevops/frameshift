@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Analyzers;
+﻿namespace NetEvolve.FrameShift.Analyzers;
 
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -476,12 +476,23 @@ internal static class TestSurfaceAnalysis
     {
         var declarationId = DocumentationCommentId.CreateDeclarationId(method.OriginalDefinition);
 
+        // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting with
+        // the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable annotation
+        // at all), so `string.IsNullOrEmpty`'s `NotNullWhen` narrowing alone is not enough for the tuple
+        // literal below to type-check on 4.14.0/5.6.0 - the explicit null check is what narrows there.
+        // On 4.8.0, where `declarationId` is already statically non-null, the very same check is correctly
+        // flagged as dead code (CA1508); suppressed rather than branched on a Roslyn-version symbol,
+        // because CA1508 - unlike some third-party analyzer rules - is a standard, pragma-suppressible
+        // diagnostic and a branch would need a second code path no single test run can exercise both
+        // sides of, since only one is ever compiled into a given variant's assembly.
+#pragma warning disable CA1508 // dead code only on the 4.8.0 variant
         return (
             location,
-            string.IsNullOrEmpty(declarationId)
+            declarationId is null || string.IsNullOrEmpty(declarationId)
                 ? method.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)
-                : declarationId!
+                : declarationId
         );
+#pragma warning restore CA1508
     }
 
     /// <summary>

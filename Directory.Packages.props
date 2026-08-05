@@ -20,12 +20,38 @@
   </ItemGroup>
   <ItemGroup Label="Roslyn">
     <!--
-      Roslyn 5.6 is the floor on purpose: the analyzer is loaded by whichever Roslyn the consumer's
-      SDK ships, so building against it requires the .NET 10 SDK or newer on the consuming side.
+      src/NetEvolve.FrameShift builds three variants of the analyzer assembly, one per supported Roslyn
+      API surface (4.8.0 / 4.14.0 / 5.6.0 - see NetEvolve.FrameShift.Roslyn4_8/4_14/5_6.csproj and their
+      shared NetEvolve.FrameShift.Build.props), so a consumer's SDK/VS can load whichever one its own
+      Roslyn version actually supports instead of requiring the newest one. 4.8.0 is the floor:
+      `CollectionExpressionSyntax` and its siblings, used by the collection-expression mutation and
+      recognition code, first appear at 4.7.0, but that version still gates C# 12 collection expressions
+      behind the 'preview' language version regardless of the requested LangVersion (CS8652). 4.8.0 (VS
+      2022 17.8 / .NET SDK 8.0.100 GA) is the first tier where the feature is non-preview. 4.4.0 is
+      excluded outright: the types above do not exist in its API surface at all.
+
+      The PackageVersion entries below are the *ceiling* (newest variant), used as the central version by
+      every project that does not need to build against more than one Roslyn API surface -
+      NetEvolve.FrameShift.Execution and the test projects included. Each variant project of
+      src/NetEvolve.FrameShift overrides this central version down to its own tier via
+      VersionOverride="$(RoslynApiVersion)" on its Microsoft.CodeAnalysis.Analyzers/.CSharp
+      PackageReference - legal without extra setup because CentralPackageVersionOverrideEnabled is not
+      disabled anywhere in this repository.
     -->
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.6.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+    <!--
+      Each Roslyn tier's own Microsoft.CodeAnalysis.Common brings a different minimum
+      System.Collections.Immutable (4.8.0 -> 7.0.0, 4.14.0 -> 9.0.0, 5.6.0 -> 10.0.1). The Roslyn4_8
+      variant's 7.0.0 predates the [CollectionBuilder] attribute on ImmutableArray<T> (added in 8.0.0),
+      so `[...]` collection expressions targeting ImmutableArray<T> fail with CS9210 there. Central
+      pinning must sit at or above the *highest* tier's own minimum (10.0.1) - pinning any lower trips
+      NU1109 ("package downgrade detected") for the 4.14.0/5.6.0 variants, since
+      CentralPackageTransitivePinningEnabled promotes this central version everywhere, including
+      projects that never reference the package directly.
+    -->
+    <PackageVersion Include="System.Collections.Immutable" Version="10.0.1" />
   </ItemGroup>
   <ItemGroup Label="Testing">
     <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.9.0" />

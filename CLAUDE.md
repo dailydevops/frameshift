@@ -60,8 +60,12 @@ from the compilation is a documented limitation, not a workaround.
 
 ## Project layout
 
-- `src/NetEvolve.FrameShift` (`netstandard2.0`, single-target on purpose — only one assembly may sit
-  in `analyzers/dotnet/cs`) — analyzers, generator, packaged MSBuild assets under `build/`.
+- `src/NetEvolve.FrameShift` (`netstandard2.0` throughout, single-target on purpose — no project inside
+  it has a TFM fan-out) — analyzers, generator, packaged MSBuild assets under `build/`. Builds three
+  Roslyn-API-surface variants (`NetEvolve.FrameShift.Roslyn4_8/4_14/5_6.csproj`, sharing source through
+  `NetEvolve.FrameShift.Build.props`) from a packing-only `NetEvolve.FrameShift.csproj`, each packed into
+  its own `analyzers/dotnet/roslynX.Y/cs/` folder — see `Directory.Packages.props` for the version
+  matrix and floor rationale.
 - `src/NetEvolve.FrameShift.Execution` (`net10.0`, ships as a .NET tool) — the `frameshift` CLI:
   `MutationExecutionEngine`, `MutantAssemblyBuilder`, `IsolatedAssemblyRunner`/`ProcessTestHostRunner`
   (collectible `AssemblyLoadContext`), and report writers under `Reports/` (console/HTML/Markdown/
@@ -106,8 +110,12 @@ breaks are invisible on Linux/macOS; build on Windows or expect CI to catch them
 
 - Package versions live only in `Directory.Packages.props`; never add a `Version` attribute to a
   `PackageReference` in a project file.
-- Never add target frameworks to `src/NetEvolve.FrameShift` — Roslyn only loads one assembly from
-  `analyzers/dotnet/cs`, so a second target produces something nothing can load. Multi-targeting
+- Never add a target-framework fan-out (`TargetFrameworks`) to any project under `src/NetEvolve.FrameShift`
+  — each variant must stay a single `netstandard2.0` target, because that is the one target every Roslyn
+  host (the .NET SDK's compiler server, Visual Studio's, and `csc` on either) can load; a second target
+  on one of these projects produces an assembly nothing can load. Adding a new *Roslyn API surface*
+  variant (a new `NetEvolve.FrameShift.RoslynX_Y.csproj`) is a different, supported kind of change — see
+  `Directory.Packages.props` and `NetEvolve.FrameShift.Build.props`. Multi-targeting across .NET runtimes
   belongs to the test projects.
 - Snapshot tests (`Verify.TUnit`) live in `_snapshots/` mirroring the test that owns them. A failing
   snapshot writes a `.received.` file next to the accepted one — review the diff, and if correct,

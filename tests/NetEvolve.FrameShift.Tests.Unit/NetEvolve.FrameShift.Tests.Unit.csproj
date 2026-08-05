@@ -4,6 +4,15 @@
     <OutputType>Exe</OutputType>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <!--
+      Directory.Packages.props' central PackageVersion for System.Collections.Immutable exists purely to
+      pin the Roslyn5_6/net10.0 pairing's floor; CentralPackageTransitivePinningEnabled promotes it onto
+      every project as an implicit top-level reference regardless of target framework, which the SDK's
+      package-pruning check (new since it can trim references already covered by the shared framework)
+      then flags as removable (NU1510). It cannot actually be removed - doing so reopens the CS9210/
+      MSB3277 conflicts this pin exists to prevent - so the suggestion is suppressed instead.
+    -->
+    <NoWarn>$(NoWarn);NU1510</NoWarn>
+    <!--
       TUnit injects its own `Polyfill` reference on `netstandard2.0` and .NET Framework. This project
       references the package explicitly, with the content files TUnit's injection excludes, so the
       automatic one would only duplicate the item and fail the restore with NU1504.
@@ -34,8 +43,47 @@
   <PropertyGroup Condition=" '$(_HasXunitV3)' == 'true' ">
     <DefineConstants>$(DefineConstants);FRAMESHIFT_XUNIT_V3</DefineConstants>
   </PropertyGroup>
+  <PropertyGroup Label="Roslyn variant selection">
+    <!--
+      src/NetEvolve.FrameShift builds three variants of the analyzer assembly, one per supported Roslyn
+      API surface (see its NetEvolve.FrameShift.Roslyn4_8/4_14/5_6.csproj and Directory.Packages.props).
+      Each target framework here is matched to the oldest variant that is still a coherent, real-world
+      SDK/VS pairing for that era, oldest TFM -> oldest variant, newest TFM -> newest variant, so this
+      project's own `CSharpCompilation`-based test harness binds against the same Roslyn API surface as
+      the analyzer variant it exercises for that target framework.
+    -->
+    <_FrameShiftRoslynVariant>Roslyn4_8</_FrameShiftRoslynVariant>
+    <_FrameShiftRoslynVersion>4.8.0</_FrameShiftRoslynVersion>
+    <_FrameShiftRoslynVariant Condition=" '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0' ">Roslyn4_14</_FrameShiftRoslynVariant>
+    <_FrameShiftRoslynVersion Condition=" '$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net9.0' ">4.14.0</_FrameShiftRoslynVersion>
+    <_FrameShiftRoslynVariant Condition=" '$(TargetFramework)' == 'net10.0' ">Roslyn5_6</_FrameShiftRoslynVariant>
+    <_FrameShiftRoslynVersion Condition=" '$(TargetFramework)' == 'net10.0' ">5.6.0</_FrameShiftRoslynVersion>
+    <!--
+      Directory.Packages.props centrally pins System.Collections.Immutable at 10.0.1 (the Roslyn5_6/
+      net10.0 ceiling) and CentralPackageTransitivePinningEnabled promotes that pin onto every project
+      regardless of target framework - which every other target framework here tolerates just fine (TUnit
+      itself needs at least 9.0.0, and every Roslyn tier's own floor is lower still). net9.0 alone is the
+      exception: its own reference assemblies ship System.Collections.Immutable as an unbundled,
+      independently versioned 9.0.x assembly, and forcing it up to 10.0.1 collides with that reference
+      assembly at compile time (MSB3277, "conflicts... that could not be resolved"). Pinned back down to
+      exactly what net9.0's own reference assemblies and TUnit agree on, instead of inheriting the ceiling
+      meant for net10.0.
+    -->
+    <_FrameShiftImmutableVersion Condition=" '$(TargetFramework)' == 'net9.0' ">9.0.0</_FrameShiftImmutableVersion>
+  </PropertyGroup>
+  <PropertyGroup Label="Roslyn API availability">
+    <!--
+      "At least" scheme mirroring src/NetEvolve.FrameShift's own FRAMESHIFT_ROSLYN_X_OR_GREATER symbols
+      (see its Build.props/variant csproj comments): every tier this project's own TFM resolved to or
+      above stays defined, so a guard here reads the same way it does in the analyzer project itself.
+    -->
+    <DefineConstants>$(DefineConstants);FRAMESHIFT_ROSLYN_4_8_OR_GREATER</DefineConstants>
+    <DefineConstants Condition=" '$(_FrameShiftRoslynVariant)' == 'Roslyn4_14' or '$(_FrameShiftRoslynVariant)' == 'Roslyn5_6' ">$(DefineConstants);FRAMESHIFT_ROSLYN_4_14_OR_GREATER</DefineConstants>
+    <DefineConstants Condition=" '$(_FrameShiftRoslynVariant)' == 'Roslyn5_6' ">$(DefineConstants);FRAMESHIFT_ROSLYN_5_6_OR_GREATER</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="$(_FrameShiftRoslynVersion)" />
+    <PackageReference Include="System.Collections.Immutable" Condition=" '$(_FrameShiftImmutableVersion)' != '' " VersionOverride="$(_FrameShiftImmutableVersion)" />
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
     <PackageReference Include="NetEvolve.Extensions.TUnit" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
@@ -55,7 +103,7 @@
     <PackageReference Include="xunit.v3.core" Condition=" '$(_HasXunitV3)' == 'true' " PrivateAssets="all" ExcludeAssets="build;buildTransitive;analyzers" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.csproj" />
+    <ProjectReference Include="../../src/NetEvolve.FrameShift/NetEvolve.FrameShift.$(_FrameShiftRoslynVariant).csproj" />
   </ItemGroup>
   <ItemGroup Label="Test categorisation">
     <AssemblyAttribute Include="NetEvolve.Extensions.TUnit.UnitTestAttribute" />

@@ -564,13 +564,24 @@ public class ReachabilityClosureMemberTests
         params ISymbol[] seeds
     )
     {
-        string[] referencedMemberIds = [.. seeds.Select(seed => DocumentationCommentId.CreateDeclarationId(seed)!)];
+        string[] referencedMemberIds = [.. seeds.Select(DeclarationId)];
         var builder = ImmutableDictionary.CreateBuilder<string, ImmutableHashSet<string>>(StringComparer.Ordinal);
 
         builder[testId] = ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds);
 
         return builder.ToImmutable();
     }
+
+    // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting with the
+    // Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable annotation at
+    // all), so the null-forgiving operator needed to satisfy the 4.14.0/5.6.0 variants' nullable analysis
+    // is flagged as genuinely redundant - not just stylistically unnecessary - on the 4.8.0 variant.
+    private static string DeclarationId(ISymbol symbol) =>
+#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
+        DocumentationCommentId.CreateDeclarationId(symbol)!;
+#else
+        DocumentationCommentId.CreateDeclarationId(symbol);
+#endif
 
     private static string Describe(ReachableSymbolSet reachable, ISymbol symbol) =>
         Describe(reachable.GetTestIds(symbol));
@@ -580,7 +591,7 @@ public class ReachabilityClosureMemberTests
 
     private static TestSurfaceManifest Manifest(params ISymbol[] seeds)
     {
-        string[] referencedMemberIds = [.. seeds.Select(seed => DocumentationCommentId.CreateDeclarationId(seed)!)];
+        string[] referencedMemberIds = [.. seeds.Select(DeclarationId)];
 
         return new TestSurfaceManifest([], ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds));
     }

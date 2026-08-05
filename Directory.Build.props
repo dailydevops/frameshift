@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup Label="Package settings">
     <Title>$(MSBuildProjectName)</Title>
-    <Description>Roslyn analyzers that surface mutation-testing gaps in .NET code at build time. Requires a toolchain shipping Roslyn 5.6 or newer (.NET SDK 10.0.100 or Visual Studio 2026 and above); see the Requirements section of the README for details.</Description>
+    <Description>Roslyn analyzers that surface mutation-testing gaps in .NET code at build time. Supports Roslyn 4.8 and newer (.NET SDK 8.0.400+ or Visual Studio 2022 17.8+), and picks the newest API surface your toolchain provides; see the Requirements section of the README for details.</Description>
     <RepositoryUrl>https://github.com/dailydevops/frameshift</RepositoryUrl>
     <PackageProjectUrl>https://github.com/dailydevops/frameshift</PackageProjectUrl>
     <PackageReleaseNotes>$(PackageProjectUrl)/releases</PackageReleaseNotes>

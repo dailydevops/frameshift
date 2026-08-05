@@ -1,0 +1,28 @@
+<Project>
+  <!--
+    Newest Roslyn API surface, matching the central/ceiling PackageVersion in Directory.Packages.props
+    and the .NET 10 SDK this repo otherwise targets. See NetEvolve.FrameShift.Build.props for why this
+    variant uses the explicit Sdk.props/Sdk.targets import style.
+  -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin\$(MSBuildProjectName)\</BaseOutputPath>
+  </PropertyGroup>
+
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <RoslynApiVersion>5.6.0</RoslynApiVersion>
+    <!-- Roslyn API availability is monotonic: this variant meets or exceeds every lower threshold too. -->
+    <DefineConstants>$(DefineConstants);FRAMESHIFT_ROSLYN_4_8_OR_GREATER;FRAMESHIFT_ROSLYN_4_14_OR_GREATER;FRAMESHIFT_ROSLYN_5_6_OR_GREATER</DefineConstants>
+  </PropertyGroup>
+
+  <Import Project="NetEvolve.FrameShift.Build.props" />
+
+  <ItemGroup Label="Roslyn (version-specific)">
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" VersionOverride="$(RoslynApiVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" VersionOverride="$(RoslynApiVersion)" />
+  </ItemGroup>
+
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+</Project>

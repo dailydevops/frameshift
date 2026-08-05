@@ -1,6 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Packing-only project: it no longer compiles any of this directory's source itself
+    (EnableDefaultCompileItems is false, so it does not pick up the very files the variant projects
+    compile). Packaging analyzers/dotnet/roslynX.Y/cs/ for each supported Roslyn API surface (see
+    Directory.Packages.props for the version matrix and rationale) instead drives a build of each
+    variant project (NetEvolve.FrameShift.RoslynX_Y.csproj) through an <MSBuild> task and packs the
+    resulting assembly + doc file into its own PackagePath - there is no shared analyzers/dotnet/cs/
+    fallback, so an SDK/VS older than what auto-selects among the roslynX.Y folders picks up no analyzer
+    at all; see README.md for that tradeoff.
+  -->
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
   <PropertyGroup Label="Analyzer packaging">
@@ -14,36 +25,28 @@
     <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);PackAnalyzerAssets</TargetsForTfmSpecificContentInPackage>
   </PropertyGroup>
   <Target Name="PackAnalyzerAssets">
+    <MSBuild Projects="NetEvolve.FrameShift.Roslyn4_8.csproj" Targets="GetFrameShiftAnalyzerAssets" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_FrameShiftRoslyn4_8Asset" />
+    </MSBuild>
+    <MSBuild Projects="NetEvolve.FrameShift.Roslyn4_14.csproj" Targets="GetFrameShiftAnalyzerAssets" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_FrameShiftRoslyn4_14Asset" />
+    </MSBuild>
+    <MSBuild Projects="NetEvolve.FrameShift.Roslyn5_6.csproj" Targets="GetFrameShiftAnalyzerAssets" Properties="Configuration=$(Configuration)">
+      <Output TaskParameter="TargetOutputs" ItemName="_FrameShiftRoslyn5_6Asset" />
+    </MSBuild>
+
     <ItemGroup>
-      <TfmSpecificPackageFile Include="@(IntermediateAssembly)" PackagePath="analyzers/dotnet/cs/" />
-      <TfmSpecificPackageFile Include="@(DocFileItem)" PackagePath="analyzers/dotnet/cs/" />
+      <TfmSpecificPackageFile Include="@(_FrameShiftRoslyn4_8Asset)" PackagePath="analyzers/dotnet/roslyn4.8/cs/" />
+      <TfmSpecificPackageFile Include="@(_FrameShiftRoslyn4_14Asset)" PackagePath="analyzers/dotnet/roslyn4.14/cs/" />
+      <TfmSpecificPackageFile Include="@(_FrameShiftRoslyn5_6Asset)" PackagePath="analyzers/dotnet/roslyn5.6/cs/" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_FrameShiftRoslyn4_8Asset Remove="@(_FrameShiftRoslyn4_8Asset)" />
+      <_FrameShiftRoslyn4_14Asset Remove="@(_FrameShiftRoslyn4_14Asset)" />
+      <_FrameShiftRoslyn5_6Asset Remove="@(_FrameShiftRoslyn5_6Asset)" />
     </ItemGroup>
   </Target>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" ExcludeAssets="runtime" />
-  </ItemGroup>
-  <ItemGroup Label="Test visibility">
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Tests.Unit</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Tests.Integration</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Execution</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Unit</_Parameter1>
-    </AssemblyAttribute>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>NetEvolve.FrameShift.Execution.Tests.Integration</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
-  <ItemGroup>
-    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
-    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
-  </ItemGroup>
   <ItemGroup Label="Package build assets">
     <!-- Shipped under build/ for direct references and buildTransitive/ so project references inherit them. -->
     <None Update="build\NetEvolve.FrameShift.props" Pack="true" PackagePath="build\NetEvolve.FrameShift.props;buildTransitive\NetEvolve.FrameShift.props" />

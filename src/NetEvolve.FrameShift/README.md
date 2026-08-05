@@ -401,16 +401,23 @@ dotnet_diagnostic.FSH0006.severity = warning
 
 ## Requirements
 
-- A C# project built with a toolchain that ships Roslyn 5.6 or newer - .NET SDK 10.0.100 or Visual
-  Studio 2026 and above. This is a hard requirement, not a recommendation: the analyzer is loaded by
-  whichever Roslyn the consuming toolchain provides, and an older host cannot load an assembly built
-  against a newer Roslyn. **The analyzed projects themselves can target any framework**,
-  including .NET Framework: the analyzer runs inside the compiler, not inside your application, so
-  the framework your code targets is irrelevant to it.
-- A single `netstandard2.0` assembly is what the package ships, because that is the one target every
-  compiler host can load - the .NET Core-based build server of the .NET SDK, the .NET Framework-based
-  one inside Visual Studio, and `csc` on either. It is exercised on both runtimes: the test suite runs
-  on `net6.0` through `net10.0` and, on Windows, additionally on `net472`, `net48` and `net481`.
+- A C# project built with a toolchain that ships Roslyn 4.8.0 or newer - .NET SDK 8.0.100 or Visual
+  Studio 2022 17.8 and above. This is a hard requirement, not a recommendation: the analyzer is loaded
+  by whichever Roslyn the consuming toolchain provides, and a host older than 4.8.0 cannot load any
+  variant of it (4.8.0 is the floor because `CollectionExpressionSyntax` and its siblings, used by the
+  collection-expression mutation and recognition code, only become a non-preview language feature at
+  that tier). **The analyzed projects themselves can target any framework**, including .NET Framework:
+  the analyzer runs inside the compiler, not inside your application, so the framework your code
+  targets is irrelevant to it.
+- The package ships three `netstandard2.0` assemblies, one per supported Roslyn API surface (4.8.0,
+  4.14.0, 5.6.0), each in its own `analyzers/dotnet/roslynX.Y/cs/` folder inside the package. An SDK or
+  Visual Studio auto-selects the newest folder its own Roslyn version supports; there is no shared
+  `analyzers/dotnet/cs/` fallback, so a toolchain below 4.8.0 loads nothing. `netstandard2.0` is used for
+  all three because that is the one target every compiler host can load - the .NET Core-based build
+  server of the .NET SDK, the .NET Framework-based one inside Visual Studio, and `csc` on either. Each
+  variant is exercised by the same test suite: the test projects multi-target `net6.0` through `net10.0`
+  and, on Windows, additionally `net472`, `net48` and `net481`, with each target framework referencing
+  the Roslyn variant that is the oldest coherent, real-world SDK/VS pairing for its era.
 - A test project using TUnit, xUnit v2, xUnit v3, NUnit or MSTest (3 or 4). Every framework version has
   its own adapter, and referencing more than one of them in the same project is supported - including
   xUnit v2 and v3 side by side. Each version's tests are discovered by its own adapter and all of them

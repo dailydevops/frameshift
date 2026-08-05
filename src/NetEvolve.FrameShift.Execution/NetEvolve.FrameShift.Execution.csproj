@@ -25,7 +25,12 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\NetEvolve.FrameShift\NetEvolve.FrameShift.csproj" />
+    <!--
+      References the Roslyn5_6 variant directly, not the packing-only NetEvolve.FrameShift.csproj (it has
+      EnableDefaultCompileItems=false and produces no compilation of its own - see that project). net10.0
+      already tracks the newest Roslyn, so this variant is the correct compile-time surface.
+    -->
+    <ProjectReference Include="..\NetEvolve.FrameShift\NetEvolve.FrameShift.Roslyn5_6.csproj" />
   </ItemGroup>
   <ItemGroup Label="Test visibility">
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">

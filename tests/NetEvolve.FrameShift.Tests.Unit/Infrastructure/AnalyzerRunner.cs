@@ -53,6 +53,10 @@ internal static class AnalyzerRunner
         ArgumentNullException.ThrowIfNull(analyzer);
         ArgumentNullException.ThrowIfNull(compilation);
 
+        // The CancellationToken-accepting overload of Compilation.WithAnalyzers is already obsolete on
+        // every supported Roslyn variant (4.8.0 and up), not only from 4.14.0 onward as once assumed here
+        // - the token-less overload is what every tier expects. This method still observes the token, via
+        // GetAnalyzerDiagnosticsAsync below.
         var options = CreateOptions(additionalFiles, globalOptions);
         var withAnalyzers = compilation.WithAnalyzers(ImmutableArray.Create(analyzer), options);
         var diagnostics = await withAnalyzers.GetAnalyzerDiagnosticsAsync(cancellationToken).ConfigureAwait(false);
