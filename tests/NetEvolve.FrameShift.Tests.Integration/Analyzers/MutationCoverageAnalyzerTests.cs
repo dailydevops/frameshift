@@ -304,7 +304,7 @@ public class MutationCoverageAnalyzerTests
         """;
 
     /// <summary>
-    /// Two members with identical shape, each a standalone <c>void</c> invocation statement - the
+    /// Two members with identical shape, each a standalone <see langword="void"/> invocation statement - the
     /// statement removal operator's invocation construct. <c>Covered.Log</c> sits on line 9,
     /// <c>Uncovered.Log</c> on line 17.
     /// </summary>
@@ -364,7 +364,7 @@ public class MutationCoverageAnalyzerTests
 
     /// <summary>
     /// Top-level statements, generics, local functions, lambdas, expression-bodied members, pattern
-    /// matching, a <c>switch</c> expression and a record, all in one compilation. The body of
+    /// matching, a <see langword="switch"/> expression and a record, all in one compilation. The body of
     /// <c>Toolbox.Describe</c> spans the lines 10 to 25.
     /// </summary>
     private const string RobustSource = """
@@ -827,7 +827,7 @@ public class MutationCoverageAnalyzerTests
 
     /// <summary>
     /// Top-level statements, generics, a local function, lambdas, an expression-bodied member, pattern
-    /// matching, a <c>switch</c> expression and a record, all analysed at once. The snapshot is the whole
+    /// matching, a <see langword="switch"/> expression and a record, all analysed at once. The snapshot is the whole
     /// diagnostic set, so it states the two things an enumeration of line numbers could only hint at: the
     /// body of <c>Toolbox.Describe</c> on the lines 10 to 25 produces nothing, because the manifest covers
     /// it, and every other construct is walked and reported instead of silently skipped or crashed on.

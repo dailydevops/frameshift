@@ -614,7 +614,7 @@ public class TestSurfaceManifestGeneratorTests
     /// <para>
     /// The diagnostics are rendered into one string rather than snapshotted as a collection. Verify ships
     /// a different assembly per target framework and they do not agree on how an empty collection is
-    /// written — some omit the member, others write <c>null</c> — which would make the eight runs of the
+    /// written — some omit the member, others write <see langword="null"/> — which would make the eight runs of the
     /// matrix disagree about a snapshot none of them changed. A rendered string is the same everywhere and
     /// still fails the day the generator starts reporting something.
     /// </para>

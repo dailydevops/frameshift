@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -7,9 +7,9 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
 /// Removes a whole statement outright, by replacing it with an empty statement (<c>;</c>): a bare
-/// <c>return;</c> inside a <see langword="void" /> returning member, a loop <c>break</c> or
-/// <c>continue</c>, a <c>throw</c> statement, and a standalone invocation of a <see langword="void" />
-/// returning method with no <c>ref</c> or <c>out</c> arguments.
+/// <c>return;</c> inside a <see langword="void" /> returning member, a loop <see langword="break"/> or
+/// <see langword="continue"/>, a <see langword="throw"/> statement, and a standalone invocation of a <see langword="void" />
+/// returning method with no <see langword="ref"/> or <see langword="out"/> arguments.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -119,9 +119,9 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Removes a <c>break</c>, unless the nearest enclosing breakable construct - stopping the search at
-    /// a member or lambda boundary - is a <c>switch</c> section rather than a loop; removing a
-    /// switch-section <c>break</c> changes fall-through semantics this operator does not touch.
+    /// Removes a <see langword="break"/>, unless the nearest enclosing breakable construct - stopping the search at
+    /// a member or lambda boundary - is a <see langword="switch"/> section rather than a loop; removing a
+    /// switch-section <see langword="break"/> changes fall-through semantics this operator does not touch.
     /// </summary>
     private IEnumerable<Mutation> CreateForBreak(BreakStatementSyntax breakStatement)
     {
@@ -136,7 +136,7 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Removes a <c>continue</c>, unless no enclosing loop can be found before crossing a member or
+    /// Removes a <see langword="continue"/>, unless no enclosing loop can be found before crossing a member or
     /// lambda boundary.
     /// </summary>
     private IEnumerable<Mutation> CreateForContinue(ContinueStatementSyntax continueStatement)
@@ -152,7 +152,7 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
     }
 
     /// <summary>
-    /// Removes a <c>throw</c> statement, unless it is the trailing statement of the body of a member that
+    /// Removes a <see langword="throw"/> statement, unless it is the trailing statement of the body of a member that
     /// does not return <see langword="void" /> - removing it would leave that code path without a
     /// required return, which the compiler would reject.
     /// </summary>
@@ -178,7 +178,7 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
 
     /// <summary>
     /// Removes a standalone invocation statement, provided the invoked method is known to return
-    /// <see langword="void" /> and none of its arguments are passed by <c>ref</c> or <c>out</c>.
+    /// <see langword="void" /> and none of its arguments are passed by <see langword="ref"/> or <see langword="out"/>.
     /// </summary>
     private IEnumerable<Mutation> CreateForInvocation(
         ExpressionStatementSyntax expressionStatement,
@@ -273,7 +273,7 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
 
     /// <summary>
     /// Walks upwards from <paramref name="node" />, without crossing a member or lambda boundary, and
-    /// returns the nearest loop, or the nearest <c>switch</c> statement when <paramref name="includeSwitch" />
+    /// returns the nearest loop, or the nearest <see langword="switch"/> statement when <paramref name="includeSwitch" />
     /// is <see langword="true" />, whichever comes first.
     /// </summary>
     private static SyntaxNode? FindNearestBreakableConstruct(SyntaxNode node, bool includeSwitch)

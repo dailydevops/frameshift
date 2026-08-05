@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 /// <summary>
-/// Swaps <c>checked</c> and <c>unchecked</c>, in both the expression form (<c>checked(expr)</c> /
+/// Swaps <see langword="checked"/> and <see langword="unchecked"/>, in both the expression form (<c>checked(expr)</c> /
 /// <c>unchecked(expr)</c>) and the statement form (<c>checked { }</c> / <c>unchecked { }</c>).
 /// </summary>
 /// <remarks>

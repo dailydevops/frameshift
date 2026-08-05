@@ -12,7 +12,7 @@ using TUnit.Core;
 
 /// <summary>
 /// Covers the string literal operator: the two directions of the mutation, verbatim literals, the
-/// <c>nameof</c> exception, interpolated strings and the constant contexts.
+/// <see langword="nameof"/> exception, interpolated strings and the constant contexts.
 /// </summary>
 public class StringLiteralMutatorTests
 {

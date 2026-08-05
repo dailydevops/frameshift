@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.TestSurface;
+﻿namespace NetEvolve.FrameShift.TestSurface;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -351,7 +351,7 @@ internal sealed class NUnitTestMethodRecognizer : ITestMethodRecognizer
     /// <returns>The number of values.</returns>
     /// <remarks>
     /// Up to three values bind to the individual overloads and appear as one constructor argument each;
-    /// more of them bind to the <c>params</c> overload and appear as a single array argument. An empty
+    /// more of them bind to the <see langword="params"/> overload and appear as a single array argument. An empty
     /// <c>[Values]</c> is a lower bound of one, because NUnit then derives the values from the type of the
     /// parameter — every member of an enum, both values of a <see cref="bool" /> — which is a framework
     /// behaviour this count does not reproduce.

@@ -670,7 +670,7 @@ public class CultureInfoMutatorTests
     }
 
     /// <summary>
-    /// The remaining positions that only accept a compile time constant: a <c>case</c> label, a
+    /// The remaining positions that only accept a compile time constant: a <see langword="case"/> label, a
     /// <c>goto case</c> statement, a relational pattern and an enumeration member. A
     /// culture is an object reference and never a constant, so every one of these fixtures deliberately does
     /// not compile - they are still the only way to put a culture read in such a position, which is exactly
