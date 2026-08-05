@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.TestSurface;
+﻿namespace NetEvolve.FrameShift.TestSurface;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -99,28 +99,27 @@ internal static class TestSurfaceCollector
 
             var testMethodId = DocumentationCommentId.CreateDeclarationId(entry.TestMethod);
 
-            if (string.IsNullOrEmpty(testMethodId))
+            // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting
+            // with the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable
+            // annotation at all), so the explicit null check below is what narrows `testMethodId` for the
+            // dictionary writes further down on 4.14.0/5.6.0. On 4.8.0, where it is already statically
+            // non-null, the very same check is correctly flagged as dead code (CA1508); suppressed rather
+            // than branched on a Roslyn-version symbol, because CA1508 is a standard, pragma-suppressible
+            // diagnostic and a branch would need a second code path no single test run can exercise both
+            // sides of, since only one is ever compiled into a given variant's assembly.
+#pragma warning disable CA1508 // dead code only on the 4.8.0 variant
+            if (testMethodId is null || string.IsNullOrEmpty(testMethodId))
             {
                 continue;
             }
+#pragma warning restore CA1508
 
-            // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting
-            // with the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable
-            // annotation at all), so the null-forgiving operator needed to satisfy the 4.14.0/5.6.0
-            // variants' nullable analysis is flagged as genuinely redundant - not just stylistically
-            // unnecessary - on the 4.8.0 variant.
-#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
-            var testMethodKey = testMethodId!;
-#else
-            var testMethodKey = testMethodId;
-#endif
-
-            testCaseCounts[testMethodKey] = entry.CaseCount;
-            referencesByTest[testMethodKey] = referencesByTest.TryGetValue(testMethodKey, out var known)
+            testCaseCounts[testMethodId] = entry.CaseCount;
+            referencesByTest[testMethodId] = referencesByTest.TryGetValue(testMethodId, out var known)
                 ? known.Union(entry.ReferencedMemberIds)
                 : entry.ReferencedMemberIds;
-            behavioralReferencesByTest[testMethodKey] = behavioralReferencesByTest.TryGetValue(
-                testMethodKey,
+            behavioralReferencesByTest[testMethodId] = behavioralReferencesByTest.TryGetValue(
+                testMethodId,
                 out var knownBehavioral
             )
                 ? knownBehavioral.Union(entry.BehavioralReferencedMemberIds)
@@ -364,33 +363,26 @@ internal static class TestSurfaceCollector
 
         var declarationId = DocumentationCommentId.CreateDeclarationId(definition);
 
-        if (string.IsNullOrEmpty(declarationId))
+        // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting with
+        // the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable annotation
+        // at all), so the explicit null check below is what narrows `declarationId` for the uses further
+        // down on 4.14.0/5.6.0. On 4.8.0, where it is already statically non-null, the very same check is
+        // correctly flagged as dead code (CA1508); suppressed rather than branched on a Roslyn-version
+        // symbol, because CA1508 is a standard, pragma-suppressible diagnostic and a branch would need a
+        // second code path no single test run can exercise both sides of, since only one is ever compiled
+        // into a given variant's assembly.
+#pragma warning disable CA1508 // dead code only on the 4.8.0 variant
+        if (declarationId is null || string.IsNullOrEmpty(declarationId))
         {
             return;
         }
+#pragma warning restore CA1508
 
-        // `DocumentationCommentId.CreateDeclarationId`'s return type is nullable-annotated starting with
-        // the Roslyn 4.14.0 API surface but not before (its 4.8.0 metadata carries no nullable annotation
-        // at all), so the null-forgiving operator needed to satisfy the 4.14.0/5.6.0 variants' nullable
-        // analysis is flagged as genuinely redundant - not just stylistically unnecessary - on the
-        // 4.8.0 variant.
-#if FRAMESHIFT_ROSLYN_4_14_OR_GREATER
-        var declarationKey = declarationId!;
-#else
-        var declarationKey = declarationId;
-#endif
+        _ = accumulator.ReferencedMemberIds.Add(declarationId);
 
-        _ = accumulator.ReferencedMemberIds.Add(declarationKey);
-
-        // A method referenced only as a bare method-group conversion - a captured delegate that is
-        // never called from the test's own reachable code - gives no basis for believing a mutation of
-        // it would be observed, so it only counts as invoked when this very reference is a call or an
-        // object creation. Every other kind of member (a field, a property, an event) is recorded as
-        // invoked unconditionally: there is no bare-reference shape for them that this analysis can
-        // distinguish from an actual read or write.
         if (isInvocation || definition.Kind != SymbolKind.Method)
         {
-            _ = accumulator.InvokedMemberIds.Add(declarationKey);
+            _ = accumulator.InvokedMemberIds.Add(declarationId);
         }
     }
 
