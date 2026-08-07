@@ -1,4 +1,4 @@
-﻿namespace NetEvolve.FrameShift.Tests.Integration;
+﻿namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Analyzers;
 using NetEvolve.FrameShift.Diagnostics;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;

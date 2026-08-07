@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Generation;
+﻿namespace NetEvolve.FrameShift.Generation;
 
 using System.Collections.Immutable;
 using System.Text;
@@ -52,8 +52,8 @@ using NetEvolve.FrameShift.TestSurface;
 /// grows with the size of the test project. This is unavoidable — the test surface is a property of the
 /// entire compilation, not of any single syntax node — and it is stated here plainly rather than hidden.
 /// If that cost is not wanted, disable FrameShift for the project by setting the MSBuild property
-/// <c>FrameShiftEnabled</c> to <c>false</c>, or keep the analysis and only stop the manifest from being
-/// written by setting <c>FrameShiftWriteTestSurfaceManifest</c> to <c>false</c>.
+/// <c>FrameShiftEnabled</c> to <see langword="false"/>, or keep the analysis and only stop the manifest from being
+/// written by setting <c>FrameShiftWriteTestSurfaceManifest</c> to <see langword="false"/>.
 /// </para>
 /// </remarks>
 [Generator(LanguageNames.CSharp)]

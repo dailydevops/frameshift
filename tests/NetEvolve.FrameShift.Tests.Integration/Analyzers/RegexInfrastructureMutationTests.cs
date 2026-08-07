@@ -8,7 +8,7 @@ using NetEvolve.FrameShift.Analyzers;
 using NetEvolve.FrameShift.Diagnostics;
 using NetEvolve.FrameShift.Mutations.Operators;
 using NetEvolve.FrameShift.Mutations.RegularExpressions;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
