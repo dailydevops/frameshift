@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -308,7 +308,7 @@ public class BitwiseAssignmentMutatorTests
     }
 
     /// <summary>
-    /// A <c>char</c> operand is one of the allowed integral special types, so it takes part in the
+    /// A <see cref="char"/> operand is one of the allowed integral special types, so it takes part in the
     /// bitwise assignment mutations just like the other narrow integral types.
     /// </summary>
     [Test]

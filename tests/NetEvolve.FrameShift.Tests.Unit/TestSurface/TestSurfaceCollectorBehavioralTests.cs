@@ -1,8 +1,8 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+namespace NetEvolve.FrameShift.Tests.Unit.TestSurface;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -14,7 +14,7 @@ using TUnit.Core;
 /// recognised, non-trivial assertion somewhere in its reachable code.
 /// </summary>
 /// <remarks>
-/// The fixture, like <see cref="TestSurfaceCollectorTests" />, avoids <c>var</c> and predefined type
+/// The fixture, like <see cref="TestSurfaceCollectorTests" />, avoids <see langword="var"/> and predefined type
 /// keywords inside the walked test code, so that framework members do not pollute the ids under test.
 /// </remarks>
 public class TestSurfaceCollectorBehavioralTests

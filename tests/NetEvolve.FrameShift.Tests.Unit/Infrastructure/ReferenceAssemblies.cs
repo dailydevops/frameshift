@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 using System.Collections.Immutable;
 using System.Reflection;
@@ -55,7 +55,7 @@ internal static class ReferenceAssemblies
 
     /// <summary>
     /// The compiler-support type .NET Framework never shipped, declared with the same name, namespace and
-    /// accessibility the runtime uses on .NET. <c>IsExternalInit</c> is what an <c>init</c> accessor - and
+    /// accessibility the runtime uses on .NET. <c>IsExternalInit</c> is what an <see langword="init"/> accessor - and
     /// therefore every positional record - is compiled against; without it a fixture declaring a record
     /// fails with CS0518, and the tests asserting that their own fixture compiles would fail for a reason
     /// that has nothing to do with the analyzers. The declaration carries no behaviour at all: the compiler
@@ -73,10 +73,10 @@ internal static class ReferenceAssemblies
     /// <summary>
     /// The .NET Framework runtime assemblies without which no fixture binds at all:
     /// <list type="bullet">
-    /// <item><c>mscorlib</c> - <c>object</c> and the primitives, <c>Attribute</c> with
+    /// <item><c>mscorlib</c> - <see cref="object"/> and the primitives, <c>Attribute</c> with
     /// <c>AttributeUsage</c> and <c>AttributeTargets</c>, <c>Action</c>, <c>Func</c>, <c>EventHandler</c>,
-    /// <c>EventArgs</c>, <c>Obsolete</c>, <c>Console</c>, <c>Math</c>, <c>Convert</c>, <c>DateTime</c>,
-    /// <c>TimeSpan</c>, <c>IntPtr</c>, the exceptions the fixtures throw, <c>IEnumerable&lt;T&gt;</c> and
+    /// <c>EventArgs</c>, <c>Obsolete</c>, <c>Console</c>, <c>Math</c>, <c>Convert</c>, <see cref="DateTime"/>,
+    /// <see cref="TimeSpan"/>, <c>IntPtr</c>, the exceptions the fixtures throw, <c>IEnumerable&lt;T&gt;</c> and
     /// the other generic collections, <c>System.Threading.Tasks.Task</c> and
     /// <c>System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute</c>.</item>
     /// <item><c>System</c> - <c>System.CodeDom.Compiler.GeneratedCodeAttribute</c>, which the generated-code
@@ -93,7 +93,7 @@ internal static class ReferenceAssemblies
     /// <item><c>System.Runtime</c> and <c>netstandard</c> - the type-forwarding facades a netstandard2.0
     /// assembly is compiled against. TUnit reaches .NET Framework through netstandard2.0, and without the
     /// facades none of its types can be bound by a fixture.</item>
-    /// <item><c>Microsoft.CSharp</c> - the runtime binder. A fixture using <c>dynamic</c> is reported as
+    /// <item><c>Microsoft.CSharp</c> - the runtime binder. A fixture using <see langword="dynamic"/> is reported as
     /// CS0656 <em>missing compiler required member</em> without it.</item>
     /// <item><c>System.Numerics</c> - so that the namespace of the generic-math fixtures resolves; note
     /// that <c>INumber&lt;T&gt;</c> itself does not exist on .NET Framework at all.</item>

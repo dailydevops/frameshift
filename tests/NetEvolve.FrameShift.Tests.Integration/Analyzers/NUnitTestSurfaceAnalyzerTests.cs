@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Integration;
+﻿namespace NetEvolve.FrameShift.Tests.Integration.Analyzers;
 
 using System.Collections.Immutable;
 using System.Globalization;
@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Analyzers;
 using NetEvolve.FrameShift.Diagnostics;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -77,7 +77,7 @@ public class NUnitTestSurfaceAnalyzerTests
 
     /// <summary>
     /// The test assembly under analysis. The local-only test deliberately touches neither the production
-    /// assembly nor the framework: a predefined type keyword, a <c>var</c> or an operator would all bind
+    /// assembly nor the framework: a predefined type keyword, a <see langword="var"/> or an operator would all bind
     /// to a member outside this assembly and would therefore count as a production reference, which is
     /// exactly what the <c>FSH0004</c> expectation is about.
     /// </summary>

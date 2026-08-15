@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -238,7 +238,7 @@ public class StringMethodMutatorTests
     /// <summary>
     /// <c>StartsWith</c> and <c>EndsWith</c> are offered as each other's counterpart, whatever overload
     /// was called: the plain string overload, the one carrying a <c>StringComparison</c> and the one
-    /// carrying a <c>bool</c> and a <c>CultureInfo</c>.
+    /// carrying a <see cref="bool"/> and a <c>CultureInfo</c>.
     /// </summary>
     [Test]
     [Arguments("StartsWith", "EndsWith", PlainOverloadTemplate)]

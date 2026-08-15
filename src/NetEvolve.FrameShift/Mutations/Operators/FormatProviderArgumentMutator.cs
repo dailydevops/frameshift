@@ -46,7 +46,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// The argument is located by name for a named argument and by position for a positional one, which
 /// covers arguments written out of order and optional parameters left out entirely. Positional matching
 /// stays exact even next to a named argument, because C# only allows a positional argument to follow a
-/// named one when that named one already sits in its own declared position. A <c>params</c> parameter is
+/// named one when that named one already sits in its own declared position. A <see langword="params"/> parameter is
 /// never treated as the provider parameter: its argument is one element of an expanded collection, and
 /// removing an element does not remove the provider the call formats with.
 /// </para>
@@ -151,7 +151,7 @@ internal sealed class FormatProviderArgumentMutator : MutationOperatorBase
 
     /// <summary>
     /// Finds the first parameter of <paramref name="method" /> whose type is or implements
-    /// <paramref name="provider" />, skipping a <c>params</c> parameter.
+    /// <paramref name="provider" />, skipping a <see langword="params"/> parameter.
     /// </summary>
     /// <param name="method">The bound symbol of the invocation.</param>
     /// <param name="provider">The <c>System.IFormatProvider</c> of the analysed compilation.</param>

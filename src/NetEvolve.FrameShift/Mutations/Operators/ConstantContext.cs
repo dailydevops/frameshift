@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+﻿namespace NetEvolve.FrameShift.Mutations.Operators;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -27,7 +27,7 @@ internal static class ConstantContext
     /// <summary>
     /// Determines whether <paramref name="node" /> sits in a position that only accepts a compile time
     /// constant, such as an attribute argument, a <see langword="const" /> initializer, a default parameter
-    /// value, a <c>case</c> label, a <c>goto case</c> statement, a constant pattern, a relational pattern
+    /// value, a <see langword="case"/> label, a <c>goto case</c> statement, a constant pattern, a relational pattern
     /// or an enumeration member declaration.
     /// </summary>
     /// <param name="node">The node to inspect.</param>

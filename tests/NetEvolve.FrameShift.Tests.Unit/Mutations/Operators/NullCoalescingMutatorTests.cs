@@ -5,14 +5,14 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
 /// Covers the null-coalescing operator: both operands replace the whole expression, unless the
-/// replacement would not convert to the expected type or would be a <c>throw</c> expression.
+/// replacement would not convert to the expected type or would be a <see langword="throw"/> expression.
 /// </summary>
 public class NullCoalescingMutatorTests
 {
@@ -40,7 +40,7 @@ public class NullCoalescingMutatorTests
 
     /// <summary>
     /// The two operands have nothing in common, so the whole expression has no type. The fixture
-    /// deliberately does not compile, and the <c>var</c> initializer keeps the expression from being
+    /// deliberately does not compile, and the <see langword="var"/> initializer keeps the expression from being
     /// converted to anything, which is the only way to reach the unknown target type.
     /// </summary>
     private const string NoCommonTypeSource = """
@@ -197,7 +197,7 @@ public class NullCoalescingMutatorTests
     }
 
     /// <summary>
-    /// A <c>throw</c> right operand is legal for <c>??=</c>, but not for a plain assignment: the
+    /// A <see langword="throw"/> right operand is legal for <c>??=</c>, but not for a plain assignment: the
     /// language only permits a throw expression as the second/third operand of <c>?:</c>, an arm of a
     /// switch expression, the right operand of <c>??</c>/<c>??=</c>, or an expression-bodied member
     /// body (see CS8115). The mutation is therefore skipped, the same way the <c>??</c> mutations skip
