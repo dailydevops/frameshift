@@ -40,7 +40,7 @@
     -->
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.9.0" />
     <!--
       Each Roslyn tier's own Microsoft.CodeAnalysis.Common brings a different minimum
       System.Collections.Immutable (4.8.0 -> 7.0.0, 4.14.0 -> 9.0.0, 5.6.0 -> 10.0.1). The Roslyn4_8
