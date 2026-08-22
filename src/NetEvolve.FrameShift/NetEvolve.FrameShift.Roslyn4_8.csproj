@@ -47,7 +47,7 @@
       variant's own need) - because a net6.0/net7.0 test project referencing this variant would otherwise
       inherit a version its own reference assemblies don't agree with.
     -->
-    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="8.0.0" />
+    <PackageReference Include="System.Collections.Immutable" PrivateAssets="all" VersionOverride="10.0.11" />
   </ItemGroup>
 
   <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
