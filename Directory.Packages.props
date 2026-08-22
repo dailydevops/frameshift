@@ -87,6 +87,6 @@
     <PackageVersion Include="MSTest.TestFramework" Version="4.3.3" />
     <PackageVersion Include="NUnit" Version="4.6.1" />
     <PackageVersion Include="xunit.core" Version="2.9.3" />
-    <PackageVersion Include="xunit.v3.core" Version="3.2.2" />
+    <PackageVersion Include="xunit.v3.core" Version="4.0.0" />
   </ItemGroup>
 </Project>
