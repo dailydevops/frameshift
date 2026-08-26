@@ -74,7 +74,7 @@
       a public `NotNullWhenAttribute`, which .NET Framework keeps internal.
     -->
     <PackageVersion Include="Polyfill" Version="11.2.0" />
-    <PackageVersion Include="TUnit" Version="1.65.51" />
+    <PackageVersion Include="TUnit" Version="1.65.63" />
     <PackageVersion Include="Verify.TUnit" Version="31.28.0" />
   </ItemGroup>
   <ItemGroup Label="Test framework metadata">
