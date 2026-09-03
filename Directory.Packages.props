@@ -84,7 +84,7 @@
       must never be imported, because the test projects run on TUnit through Microsoft.Testing.Platform
       and a competing test-platform extension would break the run.
     -->
-    <PackageVersion Include="MSTest.TestFramework" Version="4.3.3" />
+    <PackageVersion Include="MSTest.TestFramework" Version="4.4.0" />
     <PackageVersion Include="NUnit" Version="4.6.1" />
     <PackageVersion Include="xunit.core" Version="2.9.3" />
     <PackageVersion Include="xunit.v3.core" Version="3.2.2" />
