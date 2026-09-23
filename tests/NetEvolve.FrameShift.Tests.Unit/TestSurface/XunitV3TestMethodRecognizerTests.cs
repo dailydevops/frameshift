@@ -86,6 +86,8 @@ internal sealed class XunitV3TestMethodRecognizerTests
         [AttributeUsage(AttributeTargets.Method)]
         public sealed class MarkerInterfaceFactAttribute : Attribute, IFactAttribute
         {
+            public bool DisableParallelization => false;
+
             public string? DisplayName => null;
 
             public bool Explicit => false;
@@ -240,6 +242,8 @@ internal sealed class XunitV3TestMethodRecognizerTests
         [AttributeUsage(AttributeTargets.Method, AllowMultiple = true)]
         public sealed class MarkerInterfaceDataAttribute : Attribute, IDataAttribute
         {
+            public bool DisableParallelization => false;
+
             public bool? Explicit => null;
 
             public string? Label => null;
