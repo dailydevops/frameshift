@@ -524,6 +524,8 @@ public class TestMarkerRecognitionTests
         [AttributeUsage(AttributeTargets.Method)]
         public sealed class MarkerInterfaceFactAttribute : Attribute, IFactAttribute
         {
+            public bool DisableParallelization => false;
+
             public string? DisplayName => null;
 
             public bool Explicit => false;
