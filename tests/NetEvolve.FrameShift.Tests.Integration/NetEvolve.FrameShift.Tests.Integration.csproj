@@ -31,6 +31,12 @@
       `PolyUseEmbeddedAttribute`, which gives every project its own embedded copy.
     -->
     <PolyPublic>false</PolyPublic>
+
+    <!-- Verify v33+ build-time license gate (SC021). FrameShift is a non-revenue open source project, so the OpenSource exemption applies.
+         See https://github.com/VerifyTests/Verify/blob/main/docs/maintenance-fee.md
+         Renew yearly: the end month may be at most 12 months ahead of the build date; builds fail after 2027-09. -->
+    <Verify_SponsorshipExemption>OpenSource</Verify_SponsorshipExemption>
+    <Verify_SponsorshipExemptionUntil>2027-09</Verify_SponsorshipExemptionUntil>
   </PropertyGroup>
   <PropertyGroup Label="xUnit v3 availability">
     <!--
