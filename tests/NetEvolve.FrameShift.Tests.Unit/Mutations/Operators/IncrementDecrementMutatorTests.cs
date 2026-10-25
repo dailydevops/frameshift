@@ -6,7 +6,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -506,7 +506,7 @@ public class IncrementDecrementMutatorTests
     }
 
     /// <summary>
-    /// A <c>checked</c> or <c>unchecked</c> context changes what the mutant does at run time, but not
+    /// A <see langword="checked"/> or <see langword="unchecked"/> context changes what the mutant does at run time, but not
     /// whether it is created: the swap is offered in both contexts.
     /// </summary>
     [Test]

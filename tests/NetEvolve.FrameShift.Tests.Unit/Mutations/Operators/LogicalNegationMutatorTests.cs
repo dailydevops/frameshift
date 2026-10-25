@@ -7,14 +7,14 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
 /// Covers <see cref="LogicalNegationMutator" />, which unwraps an existing <c>!x</c> and wraps the
-/// condition of an <c>if</c>, <c>while</c> or <c>do</c> statement and of a conditional expression into
+/// condition of an <see langword="if"/>, <see langword="while"/> or <see langword="do"/> statement and of a conditional expression into
 /// <c>!(x)</c>.
 /// </summary>
 public class LogicalNegationMutatorTests
@@ -416,7 +416,7 @@ public class LogicalNegationMutatorTests
     }
 
     /// <summary>
-    /// A type with <c>true</c> and <c>false</c> operators is a legal <c>if</c> condition, but its type is
+    /// A type with <see langword="true"/> and <see langword="false"/> operators is a legal <see langword="if"/> condition, but its type is
     /// not <see langword="bool" />. Wrapping it into <c>!(...)</c> would require a <c>!</c> operator the
     /// type does not declare, so no mutation is offered.
     /// </summary>
@@ -436,7 +436,7 @@ public class LogicalNegationMutatorTests
 
     /// <summary>
     /// The wrapping guard rejects an already negated condition of every supported node, not only of an
-    /// <c>if</c> statement, because <c>!(!x)</c> is no useful mutant.
+    /// <see langword="if"/> statement, because <c>!(!x)</c> is no useful mutant.
     /// </summary>
     [Test]
     [Arguments(NegatedWhileSource)]

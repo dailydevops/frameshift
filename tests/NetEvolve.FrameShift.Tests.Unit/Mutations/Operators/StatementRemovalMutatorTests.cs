@@ -1,18 +1,18 @@
-namespace NetEvolve.FrameShift.Mutations.Operators;
+namespace NetEvolve.FrameShift.Tests.Unit.Mutations.Operators;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
-/// Covers the statement removal operator: the bare <c>return;</c>, loop <c>break</c>/<c>continue</c>,
-/// <c>throw</c> statement and standalone invocation constructs, each with its removal happening when
+/// Covers the statement removal operator: the bare <c>return;</c>, loop <see langword="break"/>/<see langword="continue"/>,
+/// <see langword="throw"/> statement and standalone invocation constructs, each with its removal happening when
 /// safe and skipped when it would not compile or would be a no-op.
 /// </summary>
 public class StatementRemovalMutatorTests

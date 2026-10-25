@@ -1,5 +1,5 @@
 #if NETFRAMEWORK
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 using System.Text;
 

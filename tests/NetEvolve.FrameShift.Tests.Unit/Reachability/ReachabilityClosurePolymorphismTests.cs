@@ -1,10 +1,10 @@
-﻿namespace NetEvolve.FrameShift.Tests.Unit;
+﻿namespace NetEvolve.FrameShift.Tests.Unit.Reachability;
 
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using NetEvolve.FrameShift.Reachability;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.TestSurface;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
@@ -25,7 +25,7 @@ using TUnit.Core;
 /// </para>
 /// <para>
 /// The negative cases matter just as much. A member that merely shares a name with the abstraction,
-/// a member that hides it with <c>new</c> instead of overriding it, and an override of a base that
+/// a member that hides it with <see langword="new"/> instead of overriding it, and an override of a base that
 /// nobody touched must all stay out of the reachable set, because a set that grows too eagerly hides
 /// exactly the gaps the analysis exists to find.
 /// </para>

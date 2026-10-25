@@ -20,7 +20,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// </para>
 /// <para>
 /// <see cref="System.Math" /> does not declare every member for every numeric type: the trigonometric
-/// functions and <c>Floor</c> / <c>Ceiling</c> only have <c>double</c>, <c>float</c> and <c>decimal</c>
+/// functions and <c>Floor</c> / <c>Ceiling</c> only have <see cref="double"/>, <see cref="float"/> and <see cref="decimal"/>
 /// overloads, while <c>Min</c>, <c>Max</c> and <c>Abs</c> have one for every numeric type including the
 /// integral ones. Rather than hard-coding that shape, the counterpart is only offered when
 /// <see cref="System.Math" /> itself declares a static overload of that name whose parameters match the

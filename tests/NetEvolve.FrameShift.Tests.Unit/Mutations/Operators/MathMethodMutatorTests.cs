@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -139,7 +139,7 @@ public class MathMethodMutatorTests
 
     /// <summary>
     /// Every trigonometric co-function is mutated into its counterpart. <see cref="System.Math" /> only
-    /// declares these six as <c>double</c> overloads, so <c>double</c> is the only type exercised here.
+    /// declares these six as <see cref="double"/> overloads, so <see cref="double"/> is the only type exercised here.
     /// </summary>
     [Test]
     [Arguments("Sin", "Cos", "math.method.sin-to-cos")]
@@ -198,7 +198,7 @@ public class MathMethodMutatorTests
     }
 
     /// <summary>
-    /// <c>Min</c> and <c>Max</c> are mutated into each other for both <c>double</c> and <c>decimal</c>,
+    /// <c>Min</c> and <c>Max</c> are mutated into each other for both <see cref="double"/> and <see cref="decimal"/>,
     /// the two types <see cref="System.Math" /> declares overloads for that the issue asks to cover.
     /// </summary>
     [Test]
@@ -245,8 +245,8 @@ public class MathMethodMutatorTests
     }
 
     /// <summary>
-    /// <c>Floor</c> and <c>Ceiling</c> are mutated into each other for both <c>double</c> and
-    /// <c>decimal</c>.
+    /// <c>Floor</c> and <c>Ceiling</c> are mutated into each other for both <see cref="double"/> and
+    /// <see cref="decimal"/>.
     /// </summary>
     [Test]
     [Arguments("double", "Floor", "Ceiling")]
@@ -293,7 +293,7 @@ public class MathMethodMutatorTests
 
     /// <summary>
     /// <c>Math.Abs</c> has no counterpart of its own: the whole call is dropped in favour of its single
-    /// argument expression, for both <c>double</c> and <c>decimal</c>.
+    /// argument expression, for both <see cref="double"/> and <see cref="decimal"/>.
     /// </summary>
     [Test]
     [Arguments("double")]

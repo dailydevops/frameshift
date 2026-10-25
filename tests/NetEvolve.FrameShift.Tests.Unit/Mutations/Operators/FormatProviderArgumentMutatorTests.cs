@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -156,7 +156,7 @@ public class FormatProviderArgumentMutatorTests
         """;
 
     /// <summary>
-    /// A provider passed as one element of an expanded <c>params</c> array. The parameter the argument
+    /// A provider passed as one element of an expanded <see langword="params"/> array. The parameter the argument
     /// belongs to is the array, not the provider, so there is no provider argument to remove.
     /// </summary>
     private const string ParamsSource = """
@@ -528,7 +528,7 @@ public class FormatProviderArgumentMutatorTests
     }
 
     /// <summary>
-    /// The provider is one element of an expanded <c>params</c> array. The parameter it belongs to is the
+    /// The provider is one element of an expanded <see langword="params"/> array. The parameter it belongs to is the
     /// array, which is no format provider, so no argument qualifies for removal.
     /// </summary>
     [Test]

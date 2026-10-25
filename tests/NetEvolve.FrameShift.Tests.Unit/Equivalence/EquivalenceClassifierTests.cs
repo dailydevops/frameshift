@@ -5,7 +5,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Equivalence;
 using NetEvolve.FrameShift.Mutations;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -287,7 +287,7 @@ public class EquivalenceClassifierTests
     }
 
     /// <summary>
-    /// A call through a <c>dynamic</c> receiver is late-bound: the semantic model reports no method
+    /// A call through a <see langword="dynamic"/> receiver is late-bound: the semantic model reports no method
     /// symbol for it at all, since resolution only happens at run time. The check must treat that
     /// exactly like any other invocation it cannot resolve, not assume it is <c>ConfigureAwait</c>.
     /// </summary>

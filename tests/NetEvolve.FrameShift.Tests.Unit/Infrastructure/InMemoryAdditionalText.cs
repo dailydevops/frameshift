@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Infrastructure;
+namespace NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;

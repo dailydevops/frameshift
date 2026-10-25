@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
@@ -839,7 +839,7 @@ public class ArithmeticAssignmentMutatorTests
     }
 
     /// <summary>
-    /// A dynamic assignment binds to the built-in operator of <c>dynamic</c> rather than to a user defined
+    /// A dynamic assignment binds to the built-in operator of <see langword="dynamic"/> rather than to a user defined
     /// one, so the user defined operator filter cannot narrow the result and every counterpart is offered.
     /// </summary>
     [Test]
@@ -1080,7 +1080,7 @@ public class ArithmeticAssignmentMutatorTests
 
     /// <summary>
     /// Builds a fixture over a target and a value of the given types. The statement carries the marker
-    /// itself, so that a case can wrap it into a <c>checked</c> or <c>unchecked</c> block.
+    /// itself, so that a case can wrap it into a <see langword="checked"/> or <see langword="unchecked"/> block.
     /// </summary>
     /// <param name="targetType">The declared type of the assignment target.</param>
     /// <param name="valueType">The declared type of the assigned value.</param>

@@ -1,4 +1,4 @@
-namespace NetEvolve.FrameShift.Tests.Unit;
+namespace NetEvolve.FrameShift.Tests.Unit.TestSurface;
 
 using System.Collections.Immutable;
 using NetEvolve.FrameShift.TestSurface;

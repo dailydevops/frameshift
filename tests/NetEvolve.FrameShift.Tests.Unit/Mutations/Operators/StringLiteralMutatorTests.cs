@@ -5,14 +5,14 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Mutations;
 using NetEvolve.FrameShift.Mutations.Operators;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;
 
 /// <summary>
 /// Covers the string literal operator: the two directions of the mutation, verbatim literals, the
-/// <c>nameof</c> exception, interpolated strings and the constant contexts.
+/// <see langword="nameof"/> exception, interpolated strings and the constant contexts.
 /// </summary>
 public class StringLiteralMutatorTests
 {

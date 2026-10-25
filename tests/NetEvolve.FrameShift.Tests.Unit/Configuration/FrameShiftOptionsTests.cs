@@ -3,7 +3,7 @@ namespace NetEvolve.FrameShift.Tests.Unit.Configuration;
 using System.Globalization;
 using NetEvolve.FrameShift.Configuration;
 using NetEvolve.FrameShift.Mutations;
-using NetEvolve.FrameShift.Tests.Infrastructure;
+using NetEvolve.FrameShift.Tests.Unit.Infrastructure;
 using TUnit.Assertions;
 using TUnit.Assertions.Extensions;
 using TUnit.Core;

@@ -30,7 +30,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 /// <para>
 /// The bound method symbol decides whether a call is mutated at all, and its containing type has to be
 /// <see cref="string" /> itself. A <c>ToUpper</c> declared on another type, an extension method of that
-/// name, and the <c>char</c> and <c>System.Globalization.TextInfo</c> conversions are all left
+/// name, and the <see cref="char"/> and <c>System.Globalization.TextInfo</c> conversions are all left
 /// untouched. So is a null-conditional call, whose receiver is not a plain member access, and a call in
 /// a position that requires a compile time constant.
 /// </para>
