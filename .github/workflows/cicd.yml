@@ -28,7 +28,7 @@ jobs:
   all:
     if: github.run_id != 1
     name: Build & Tests
-    uses: dailydevops/pipelines/.github/workflows/build-dotnet-matrix.yml@a6a924045652b971394343083b26966208716ca3 # 2.5.338
+    uses: dailydevops/pipelines/.github/workflows/build-dotnet-matrix.yml@d2437a28457fe70bb760b6318e399afcaa442569 # 2.5.341
     with:
       dotnetLogging: ${{ inputs.dotnet-logging }}
       # The repository variable overrides the organisation default, because this repository
