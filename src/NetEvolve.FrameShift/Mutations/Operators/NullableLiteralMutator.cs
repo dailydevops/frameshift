@@ -159,10 +159,11 @@ internal sealed class NullableLiteralMutator : MutationOperatorBase
         CancellationToken cancellationToken
     )
     {
-        if (
-            unaryMinus.Operand is not LiteralExpressionSyntax operand
-            || !operand.IsKind(SyntaxKind.NumericLiteralExpression)
-        )
+        // Plain assigned local instead of a negated pattern variable, see ParenthesizationMutator.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var operand = unaryMinus.Operand as LiteralExpressionSyntax;
+#pragma warning restore IDE0019
+        if (operand is null || !operand.IsKind(SyntaxKind.NumericLiteralExpression))
         {
             yield break;
         }
