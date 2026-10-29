@@ -1,0 +1,9 @@
+﻿## Mutation execution report
+
+Mutation score: 100.0 %
+
+| Killed | Survived | Build failed | Timed out |
+| ------ | -------- | ------------ | --------- |
+| 1      | 0        | 0            | 0         |
+
+Nothing left to do - every mutant was killed or excluded.

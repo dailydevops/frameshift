@@ -3,6 +3,7 @@ namespace NetEvolve.FrameShift.Execution.Tests.Unit;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Execution.Reports;
+using NetEvolve.FrameShift.Execution.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.Mutations;
 
 /// <summary>
@@ -124,5 +125,23 @@ public class ConsoleExecutionReportWriterTests
         _ = await Assert
             .That(async () => await ConsoleExecutionReportWriter.WriteAsync(output, null!).ConfigureAwait(false))
             .Throws<ArgumentNullException>();
+    }
+
+    [Test]
+    public async Task WriteAsync_MixedReport_MatchesTheSnapshot()
+    {
+        using var output = new StringWriter();
+        await ConsoleExecutionReportWriter.WriteAsync(output, ReportSnapshotFixtures.Mixed()).ConfigureAwait(false);
+
+        _ = await Verify(output.ToString()).ConfigureAwait(false);
+    }
+
+    [Test]
+    public async Task WriteAsync_CleanReport_MatchesTheSnapshot()
+    {
+        using var output = new StringWriter();
+        await ConsoleExecutionReportWriter.WriteAsync(output, ReportSnapshotFixtures.Clean()).ConfigureAwait(false);
+
+        _ = await Verify(output.ToString()).ConfigureAwait(false);
     }
 }

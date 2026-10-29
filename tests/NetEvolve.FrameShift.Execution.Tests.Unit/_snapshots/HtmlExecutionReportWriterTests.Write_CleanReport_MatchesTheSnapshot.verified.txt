@@ -1,0 +1,55 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mutation execution report</title>
+<style>:root {
+    color-scheme: light dark;
+}
+body {
+    font-family: system-ui, sans-serif;
+    margin: 2rem;
+    background: #ffffff;
+    color: #1a1a1a;
+}
+h1 {
+    margin-bottom: 0.5rem;
+}
+section {
+    margin-bottom: 1.5rem;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #cccccc;
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+}
+th {
+    background: #f0f0f0;
+}
+.score {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+.clean {
+    font-size: 1.1rem;
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        background: #121212;
+        color: #e6e6e6;
+    }
+    th, td {
+        border-color: #444444;
+    }
+    th {
+        background: #1f1f1f;
+    }
+}</style>
+</head>
+<body>
+<h1>Mutation execution report</h1><section class="summary"><p class="score">Mutation score: 100.0 %</p><ul><li>Killed: 1</li><li>Survived: 0</li><li>Build failed: 0</li><li>Timed out: 0</li></ul></section><p class="clean">Nothing left to do: every mutant was killed.</p></body>
+</html>

@@ -1,0 +1,26 @@
+﻿## Mutation execution report
+
+Mutation score: 33.3 %
+
+| Killed | Survived | Build failed | Timed out |
+| ------ | -------- | ------------ | --------- |
+| 1      | 2        | 1            | 1         |
+
+### Survived mutants (missing test coverage) (2)
+
+| Location                  | Mutation               |
+| ------------------------- | ---------------------- |
+| `Calc<T>&'x'&#124;y.cs:3` | `a < b & 'c' &#124; d` |
+| `A.cs:12`                 | `x`                    |
+
+### Build-failed mutants (fix the mutant or the test harness) (1)
+
+| Location      | Mutation |
+| ------------- | -------- |
+| `Broken.cs:7` | `+ => *` |
+
+### Timed-out mutants (raise --timeout-seconds or investigate slow tests) (1)
+
+| Location     | Mutation |
+| ------------ | -------- |
+| `Slow.cs:20` | `+ => /` |

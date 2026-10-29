@@ -1,0 +1,55 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mutation execution report</title>
+<style>:root {
+    color-scheme: light dark;
+}
+body {
+    font-family: system-ui, sans-serif;
+    margin: 2rem;
+    background: #ffffff;
+    color: #1a1a1a;
+}
+h1 {
+    margin-bottom: 0.5rem;
+}
+section {
+    margin-bottom: 1.5rem;
+}
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+th, td {
+    border: 1px solid #cccccc;
+    padding: 0.4rem 0.6rem;
+    text-align: left;
+}
+th {
+    background: #f0f0f0;
+}
+.score {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+.clean {
+    font-size: 1.1rem;
+}
+@media (prefers-color-scheme: dark) {
+    body {
+        background: #121212;
+        color: #e6e6e6;
+    }
+    th, td {
+        border-color: #444444;
+    }
+    th {
+        background: #1f1f1f;
+    }
+}</style>
+</head>
+<body>
+<h1>Mutation execution report</h1><section class="summary"><p class="score">Mutation score: 33.3 %</p><ul><li>Killed: 1</li><li>Survived: 2</li><li>Build failed: 1</li><li>Timed out: 1</li></ul></section><section><h2>Survived mutants (2)</h2><p>No test failed against these mutants - each one is a gap in test coverage to close.</p><table><thead><tr><th>File</th><th>Line</th><th>Mutation</th></tr></thead><tbody><tr><td>Calc&lt;T&gt;&amp;`x`|y.cs</td><td>3</td><td>a &lt; b &amp; `c` | d</td></tr><tr><td>A.cs</td><td>12</td><td>x</td></tr></tbody></table></section><section><h2>Build-failed mutants (1)</h2><p>These mutants never became a real program at all - fix the mutant generator or the test harness.</p><table><thead><tr><th>File</th><th>Line</th><th>Mutation</th></tr></thead><tbody><tr><td>Broken.cs</td><td>7</td><td>+ =&gt; *</td></tr></tbody></table></section><section><h2>Timed-out mutants (1)</h2><p>These mutants&#39; test host had to be killed for exceeding its timeout - raise the timeout or investigate slow tests.</p><table><thead><tr><th>File</th><th>Line</th><th>Mutation</th></tr></thead><tbody><tr><td>Slow.cs</td><td>20</td><td>+ =&gt; /</td></tr></tbody></table></section></body>
+</html>

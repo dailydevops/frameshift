@@ -3,6 +3,7 @@ namespace NetEvolve.FrameShift.Execution.Tests.Unit;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Execution.Reports;
+using NetEvolve.FrameShift.Execution.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.Mutations;
 
 /// <summary>
@@ -129,4 +130,12 @@ public class HtmlExecutionReportWriterTests
 
         return new MutantExecutionResult(mutation, verdict, failure: null);
     }
+
+    [Test]
+    public async Task Write_MixedReport_MatchesTheSnapshot() =>
+        await Verify(HtmlExecutionReportWriter.Write(ReportSnapshotFixtures.Mixed())).ConfigureAwait(false);
+
+    [Test]
+    public async Task Write_CleanReport_MatchesTheSnapshot() =>
+        await Verify(HtmlExecutionReportWriter.Write(ReportSnapshotFixtures.Clean())).ConfigureAwait(false);
 }

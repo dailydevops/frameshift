@@ -1,0 +1,9 @@
+﻿
+Next steps:
+  Survived mutants (missing test coverage) (2):
+    - Calc<T>&`x`|y.cs:3 'a < b & `c` | d'
+    - A.cs:12 'x'
+  Build-failed mutants (fix the mutant or the test harness) (1):
+    - Broken.cs:7 '+ => *'
+  Timed-out mutants (raise --timeout-seconds or investigate slow tests) (1):
+    - Slow.cs:20 '+ => /'

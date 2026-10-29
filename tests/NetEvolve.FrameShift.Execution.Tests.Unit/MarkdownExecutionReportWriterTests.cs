@@ -3,6 +3,7 @@ namespace NetEvolve.FrameShift.Execution.Tests.Unit;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using NetEvolve.FrameShift.Execution.Reports;
+using NetEvolve.FrameShift.Execution.Tests.Unit.Infrastructure;
 using NetEvolve.FrameShift.Mutations;
 
 /// <summary>
@@ -110,4 +111,12 @@ public class MarkdownExecutionReportWriterTests
             _ = await Assert.That(markdown).DoesNotContain("| b |");
         }
     }
+
+    [Test]
+    public async Task Write_MixedReport_MatchesTheSnapshot() =>
+        await Verify(MarkdownExecutionReportWriter.Write(ReportSnapshotFixtures.Mixed())).ConfigureAwait(false);
+
+    [Test]
+    public async Task Write_CleanReport_MatchesTheSnapshot() =>
+        await Verify(MarkdownExecutionReportWriter.Write(ReportSnapshotFixtures.Clean())).ConfigureAwait(false);
 }
