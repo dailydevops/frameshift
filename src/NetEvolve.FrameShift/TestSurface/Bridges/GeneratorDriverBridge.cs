@@ -119,8 +119,13 @@ internal sealed class GeneratorDriverBridge : IInvocationBridge
             yield break;
         }
 
+        // Plain assigned local instead of a negated pattern variable: Stryker mutates the guard, and a
+        // pattern variable left unassigned afterwards fails to compile (CS0165), which discards the method.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var memberAccess = invocation.Expression as MemberAccessExpressionSyntax;
+#pragma warning restore IDE0019
         if (
-            invocation.Expression is not MemberAccessExpressionSyntax memberAccess
+            memberAccess is null
             || !DerivesFromGeneratorDriver(invokedMethod.ContainingType, context.GeneratorDriverType)
         )
         {
@@ -181,19 +186,21 @@ internal sealed class GeneratorDriverBridge : IInvocationBridge
     /// <param name="driverExpression">The expression the recognised <c>RunGenerators</c> call is on.</param>
     private static IEnumerable<ExpressionSyntax> FindGeneratorArguments(ExpressionSyntax driverExpression)
     {
+        // Plain assigned locals instead of a negated property pattern, see FindBridgedMembers.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var createCall = driverExpression as InvocationExpressionSyntax;
+        var createAccess = createCall?.Expression as MemberAccessExpressionSyntax;
+#pragma warning restore IDE0019
         if (
-            driverExpression
-            is not InvocationExpressionSyntax
-            {
-                Expression: MemberAccessExpressionSyntax { Name.Identifier.Text: CreateMethodName },
-                ArgumentList.Arguments: var arguments,
-            }
+            createCall is null
+            || createAccess is null
+            || !string.Equals(createAccess.Name.Identifier.Text, CreateMethodName, StringComparison.Ordinal)
         )
         {
             yield break;
         }
 
-        foreach (var argument in arguments)
+        foreach (var argument in createCall.ArgumentList.Arguments)
         {
             foreach (var generatorExpression in FlattenGeneratorExpression(argument.Expression))
             {
@@ -262,7 +269,11 @@ internal sealed class GeneratorDriverBridge : IInvocationBridge
         CancellationToken cancellationToken
     )
     {
-        if (semanticModel.GetTypeInfo(generatorExpression, cancellationToken).Type is not INamedTypeSymbol type)
+        // Plain assigned local instead of a negated pattern variable, see FindBridgedMembers.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var type = semanticModel.GetTypeInfo(generatorExpression, cancellationToken).Type as INamedTypeSymbol;
+#pragma warning restore IDE0019
+        if (type is null)
         {
             yield break;
         }

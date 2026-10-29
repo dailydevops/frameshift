@@ -46,7 +46,10 @@ internal static class RuntimeAssemblyReferences
 
     private static ImmutableArray<string> GetTrustedPlatformAssemblies()
     {
-        if (AppContext.GetData(TrustedPlatformAssembliesKey) is not string value || value.Length == 0)
+        // Plain assigned local instead of a negated pattern variable: Stryker mutates the guard, and a
+        // pattern variable left unassigned afterwards fails to compile (CS0165), which discards the method.
+        var value = AppContext.GetData(TrustedPlatformAssembliesKey) as string;
+        if (string.IsNullOrEmpty(value))
         {
             throw new InvalidOperationException(
                 $"The current process does not publish '{TrustedPlatformAssembliesKey}', "

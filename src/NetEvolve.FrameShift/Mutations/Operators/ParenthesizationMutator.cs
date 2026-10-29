@@ -61,12 +61,14 @@ internal sealed class ParenthesizationMutator : MutationOperatorBase
 
         var parenthesized = (ParenthesizedExpressionSyntax)node;
 
-        if (
-            parenthesized.Parent is not BinaryExpressionSyntax outer
-            || !IsMultiplicative(outer.Kind())
-            || parenthesized.Expression is not BinaryExpressionSyntax inner
-            || !IsAdditive(inner.Kind())
-        )
+        // Plain assigned locals instead of negated pattern variables: Stryker mutates the guard, and a
+        // pattern variable left unassigned afterwards fails to compile (CS0165), which discards the method.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var outer = parenthesized.Parent as BinaryExpressionSyntax;
+        var inner = parenthesized.Expression as BinaryExpressionSyntax;
+#pragma warning restore IDE0019
+
+        if (outer is null || !IsMultiplicative(outer.Kind()) || inner is null || !IsAdditive(inner.Kind()))
         {
             yield break;
         }

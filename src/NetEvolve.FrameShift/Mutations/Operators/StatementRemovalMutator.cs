@@ -186,12 +186,19 @@ internal sealed class StatementRemovalMutator : MutationOperatorBase
         CancellationToken cancellationToken
     )
     {
-        if (expressionStatement.Expression is not InvocationExpressionSyntax invocation)
+        // Plain assigned locals instead of negated pattern variables, see ParenthesizationMutator.
+#pragma warning disable IDE0019 // the pattern variable is the CS0165 problem being avoided
+        var invocation = expressionStatement.Expression as InvocationExpressionSyntax;
+#pragma warning restore IDE0019
+        if (invocation is null)
         {
             yield break;
         }
 
-        if (semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol is not IMethodSymbol method)
+#pragma warning disable IDE0019 // see above
+        var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+#pragma warning restore IDE0019
+        if (method is null)
         {
             yield break;
         }
