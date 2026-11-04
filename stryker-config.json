@@ -4,7 +4,7 @@
     "mutation-level": "Advanced",
     "reporters": ["html", "json", "dashboard", "progress"],
     "project-info": { "name": "github.com/dailydevops/frameshift" },
-    "thresholds": { "high": 80, "low": 60, "break": 0 },
+    "thresholds": { "high": 80, "low": 60, "break": 25 },
     "test-projects": [
       "tests/NetEvolve.FrameShift.Execution.Tests.Integration/NetEvolve.FrameShift.Execution.Tests.Integration.csproj",
       "tests/NetEvolve.FrameShift.Execution.Tests.Unit/NetEvolve.FrameShift.Execution.Tests.Unit.csproj",
