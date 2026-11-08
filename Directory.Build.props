@@ -39,6 +39,7 @@
     <CheckEolTargetFramework>false</CheckEolTargetFramework>
   </PropertyGroup>
   <PropertyGroup>
+    <DisableRecommendedPackage>NetEvolve.Analyzer</DisableRecommendedPackage>
     <!-- Workaround, until https://github.com/GitTools/GitVersion/pull/4206 is released -->
     <GitVersionTargetFramework>net10.0</GitVersionTargetFramework>
   </PropertyGroup>
