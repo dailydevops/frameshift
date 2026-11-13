@@ -1116,8 +1116,7 @@ public class TestMarkerRecognitionTests
     /// </remarks>
     private static string CreateManifest(Compilation test, ITestFrameworkProbe probe)
     {
-        var recognizer =
-            probe.TryCreateRecognizer(test)
+        var recognizer = probe.TryCreateRecognizer(test)
             ?? throw new InvalidOperationException(
                 $"The probe of '{probe.FrameworkName}' did not recognise the marker fixture."
             );

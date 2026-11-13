@@ -597,9 +597,8 @@ public class ReachabilityClosureMemberTests
     }
 
     private static LocalFunctionStatementSyntax LocalFunction(SyntaxTree tree, string name) =>
-        SyntaxNodeLocator.FindFirst<LocalFunctionStatementSyntax>(
-            tree,
-            localFunction => string.Equals(localFunction.Identifier.ValueText, name, StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<LocalFunctionStatementSyntax>(tree, localFunction =>
+            string.Equals(localFunction.Identifier.ValueText, name, StringComparison.Ordinal)
         );
 
     private static IMethodSymbol Method(Compilation compilation, string typeName, string methodName) =>

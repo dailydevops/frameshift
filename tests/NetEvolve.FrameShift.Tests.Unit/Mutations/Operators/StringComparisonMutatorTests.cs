@@ -707,21 +707,17 @@ public class StringComparisonMutatorTests
         ((MemberAccessExpressionSyntax)mutation.Replacement).Name.Identifier.ValueText;
 
     private static SyntaxNode FindComparisonAccess(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-            tree,
-            static access => _memberNames.Contains(access.Name.Identifier.ValueText, StringComparer.Ordinal)
+        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, static access =>
+            _memberNames.Contains(access.Name.Identifier.ValueText, StringComparer.Ordinal)
         );
 
     private static SyntaxNode FindTypeQualifier(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-            tree,
-            static access =>
-                string.Equals(access.Name.Identifier.ValueText, "StringComparison", StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, static access =>
+            string.Equals(access.Name.Identifier.ValueText, "StringComparison", StringComparison.Ordinal)
         );
 
     private static SyntaxNode FindImportedMember(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<IdentifierNameSyntax>(
-            tree,
-            static name => string.Equals(name.Identifier.ValueText, "Ordinal", StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<IdentifierNameSyntax>(tree, static name =>
+            string.Equals(name.Identifier.ValueText, "Ordinal", StringComparison.Ordinal)
         );
 }

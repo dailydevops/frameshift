@@ -350,8 +350,7 @@ public class MSTestSurfaceAnalyzerTests
     /// <exception cref="InvalidOperationException">The MSTest probe did not recognise the compilation.</exception>
     private static string CreateManifest(Compilation test)
     {
-        var recognizer =
-            MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(test)
+        var recognizer = MSTestTestFrameworkProbe.Instance.TryCreateRecognizer(test)
             ?? throw new InvalidOperationException(
                 "The MSTest probe did not recognise a compilation built against the real MSTest assemblies."
             );
@@ -360,9 +359,8 @@ public class MSTestSurfaceAnalyzerTests
     }
 
     private static MethodDeclarationSyntax FindMethod(Compilation compilation, string name) =>
-        SyntaxNodeLocator.FindFirst<MethodDeclarationSyntax>(
-            compilation.SyntaxTrees.First(),
-            method => string.Equals(method.Identifier.ValueText, name, StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<MethodDeclarationSyntax>(compilation.SyntaxTrees.First(), method =>
+            string.Equals(method.Identifier.ValueText, name, StringComparison.Ordinal)
         );
 
     private static Task<ImmutableArray<Diagnostic>> RunAsync(

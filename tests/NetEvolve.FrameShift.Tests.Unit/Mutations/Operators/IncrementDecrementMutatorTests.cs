@@ -552,8 +552,7 @@ public class IncrementDecrementMutatorTests
     public async Task HasCounterpart_MemberIsNoOperator_ReturnsFalse()
     {
         var (compilation, _, _) = CompilationFactory.CreateWithModel(BorrowedOperatorNameSource);
-        var ticks =
-            compilation.GetTypeByMetadataName("Fixtures.Ticks")
+        var ticks = compilation.GetTypeByMetadataName("Fixtures.Ticks")
             ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Ticks'.");
         var increment = ticks.GetMembers("op_Increment").OfType<IMethodSymbol>().Single();
 

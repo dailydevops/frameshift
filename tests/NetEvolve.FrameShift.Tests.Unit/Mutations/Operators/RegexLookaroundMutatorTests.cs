@@ -337,9 +337,10 @@ public class RegexLookaroundMutatorTests
     /// <exception cref="InvalidOperationException">The rewrite factory no longer exists.</exception>
     private static object? InvokeTryCreateRewrite(string pattern, RegexToken token)
     {
-        var method =
-            typeof(RegexLookaroundMutator).GetMethod("TryCreateRewrite", BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException("The rewrite factory 'TryCreateRewrite' no longer exists.");
+        var method = typeof(RegexLookaroundMutator).GetMethod(
+            "TryCreateRewrite",
+            BindingFlags.NonPublic | BindingFlags.Static
+        ) ?? throw new InvalidOperationException("The rewrite factory 'TryCreateRewrite' no longer exists.");
 
         return method.Invoke(null, [pattern, token]);
     }

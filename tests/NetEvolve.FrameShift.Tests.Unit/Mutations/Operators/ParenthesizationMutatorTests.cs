@@ -407,11 +407,10 @@ public class ParenthesizationMutatorTests
     /// <exception cref="InvalidOperationException">The guard no longer exists.</exception>
     private static bool InvokeIsGenuineArithmeticOperand(ExpressionSyntax expression, SemanticModel semanticModel)
     {
-        var guard =
-            typeof(ParenthesizationMutator).GetMethod(
-                "IsGenuineArithmeticOperand",
-                BindingFlags.NonPublic | BindingFlags.Static
-            ) ?? throw new InvalidOperationException("The operand guard no longer exists.");
+        var guard = typeof(ParenthesizationMutator).GetMethod(
+            "IsGenuineArithmeticOperand",
+            BindingFlags.NonPublic | BindingFlags.Static
+        ) ?? throw new InvalidOperationException("The operand guard no longer exists.");
 
         return (bool)guard.Invoke(null, [expression, semanticModel, CancellationToken.None])!;
     }

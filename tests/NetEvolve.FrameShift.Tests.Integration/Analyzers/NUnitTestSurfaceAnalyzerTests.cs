@@ -444,9 +444,8 @@ public class NUnitTestSurfaceAnalyzerTests
     }
 
     private static MethodDeclarationSyntax FindMethod(Compilation compilation, string name) =>
-        SyntaxNodeLocator.FindFirst<MethodDeclarationSyntax>(
-            compilation.SyntaxTrees.First(),
-            method => string.Equals(method.Identifier.ValueText, name, StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<MethodDeclarationSyntax>(compilation.SyntaxTrees.First(), method =>
+            string.Equals(method.Identifier.ValueText, name, StringComparison.Ordinal)
         );
 
     private static Task<ImmutableArray<Diagnostic>> RunAsync(

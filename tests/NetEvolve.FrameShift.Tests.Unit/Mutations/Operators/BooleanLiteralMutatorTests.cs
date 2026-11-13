@@ -288,15 +288,12 @@ public class BooleanLiteralMutatorTests
     private static string Rewrite(SyntaxTree tree, Mutation mutation) => mutation.ApplyTo(tree).ToString();
 
     private static SyntaxNode FindBooleanLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal =>
-                literal.IsKind(SyntaxKind.TrueLiteralExpression) || literal.IsKind(SyntaxKind.FalseLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.TrueLiteralExpression) || literal.IsKind(SyntaxKind.FalseLiteralExpression)
         );
 
     private static SyntaxNode FindNumericLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.NumericLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.NumericLiteralExpression)
         );
 }

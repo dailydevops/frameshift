@@ -129,9 +129,8 @@ public class IntegralTypeCheckTests
     private static ITypeSymbol GetParameterType(string parameterName)
     {
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(Source);
-        var parameter = SyntaxNodeLocator.FindFirst<ParameterSyntax>(
-            tree,
-            candidate => string.Equals(candidate.Identifier.ValueText, parameterName, StringComparison.Ordinal)
+        var parameter = SyntaxNodeLocator.FindFirst<ParameterSyntax>(tree, candidate =>
+            string.Equals(candidate.Identifier.ValueText, parameterName, StringComparison.Ordinal)
         );
 
         var symbol = semanticModel.GetDeclaredSymbol(parameter) as IParameterSymbol;

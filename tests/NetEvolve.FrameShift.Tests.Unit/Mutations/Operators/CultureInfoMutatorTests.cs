@@ -761,9 +761,8 @@ public class CultureInfoMutatorTests
         string.Join(", ", mutations.Select(mutation => mutation.OperatorId));
 
     private static SyntaxNode FindCultureAccess(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-            tree,
-            static access => IsCultureMemberName(access.Name.Identifier.ValueText)
+        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, static access =>
+            IsCultureMemberName(access.Name.Identifier.ValueText)
         );
 
     private static bool IsCultureMemberName(string name) =>
