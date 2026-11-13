@@ -674,44 +674,34 @@ public class NullableLiteralMutatorTests
     private static string Rewrite(SyntaxTree tree, Mutation mutation) => mutation.ApplyTo(tree).ToString();
 
     private static SyntaxNode FindBooleanOrNullLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal =>
-                literal.IsKind(SyntaxKind.TrueLiteralExpression)
-                || literal.IsKind(SyntaxKind.FalseLiteralExpression)
-                || literal.IsKind(SyntaxKind.NullLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.TrueLiteralExpression)
+            || literal.IsKind(SyntaxKind.FalseLiteralExpression)
+            || literal.IsKind(SyntaxKind.NullLiteralExpression)
         );
 
     private static SyntaxNode FindNumericOrNullLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal =>
-                literal.IsKind(SyntaxKind.NumericLiteralExpression) || literal.IsKind(SyntaxKind.NullLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.NumericLiteralExpression) || literal.IsKind(SyntaxKind.NullLiteralExpression)
         );
 
     private static SyntaxNode FindUnaryMinusExpression(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<PrefixUnaryExpressionSyntax>(
-            tree,
-            static unary => unary.IsKind(SyntaxKind.UnaryMinusExpression)
+        SyntaxNodeLocator.FindFirst<PrefixUnaryExpressionSyntax>(tree, static unary =>
+            unary.IsKind(SyntaxKind.UnaryMinusExpression)
         );
 
     private static SyntaxNode FindCharOrNullLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal =>
-                literal.IsKind(SyntaxKind.CharacterLiteralExpression)
-                || literal.IsKind(SyntaxKind.NullLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.CharacterLiteralExpression) || literal.IsKind(SyntaxKind.NullLiteralExpression)
         );
 
     private static SyntaxNode FindDefaultLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.DefaultLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.DefaultLiteralExpression)
         );
 
     private static SyntaxNode FindStringLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.StringLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.StringLiteralExpression)
         );
 }

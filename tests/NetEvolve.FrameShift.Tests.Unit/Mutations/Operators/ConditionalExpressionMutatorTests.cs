@@ -857,8 +857,7 @@ public class ConditionalExpressionMutatorTests
         SyntaxNodeLocator.FindFirst<ConditionalExpressionSyntax>(tree);
 
     private static SyntaxNode FindNumericLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.NumericLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.NumericLiteralExpression)
         );
 }

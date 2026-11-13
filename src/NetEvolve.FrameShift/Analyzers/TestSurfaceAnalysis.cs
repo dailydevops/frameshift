@@ -136,14 +136,13 @@ internal static class TestSurfaceAnalysis
         CancellationToken cancellationToken
     )
     {
-        var perCompilation = TestMethodDiscoveryCache.GetValue(
-            compilation,
-            static _ => new ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>()
-        );
+        var perCompilation = TestMethodDiscoveryCache.GetValue(compilation, static _ => new ConcurrentDictionary<
+            Type,
+            ImmutableArray<IMethodSymbol>
+        >());
 
-        return perCompilation.GetOrAdd(
-            probe.GetType(),
-            _ => TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken)
+        return perCompilation.GetOrAdd(probe.GetType(), _ =>
+            TestMethodDiscovery.FindTestMethods(compilation, recognizer, cancellationToken)
         );
     }
 
@@ -169,9 +168,8 @@ internal static class TestSurfaceAnalysis
             static _ => new ConcurrentDictionary<Type, ImmutableArray<IMethodSymbol>>()
         );
 
-        return perCompilation.GetOrAdd(
-            probe.GetType(),
-            _ => TestSurfaceCollector.FindTestsWithoutProductionReference(compilation, recognizer, cancellationToken)
+        return perCompilation.GetOrAdd(probe.GetType(), _ =>
+            TestSurfaceCollector.FindTestsWithoutProductionReference(compilation, recognizer, cancellationToken)
         );
     }
 

@@ -317,15 +317,13 @@ public class NullCoalescingMutatorTests
     private static string Rewrite(SyntaxTree tree, Mutation mutation) => mutation.ApplyTo(tree).ToString();
 
     private static SyntaxNode FindCoalesce(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<BinaryExpressionSyntax>(
-            tree,
-            static binary => binary.IsKind(SyntaxKind.CoalesceExpression)
+        SyntaxNodeLocator.FindFirst<BinaryExpressionSyntax>(tree, static binary =>
+            binary.IsKind(SyntaxKind.CoalesceExpression)
         );
 
     private static SyntaxNode FindAddition(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<BinaryExpressionSyntax>(
-            tree,
-            static binary => binary.IsKind(SyntaxKind.AddExpression)
+        SyntaxNodeLocator.FindFirst<BinaryExpressionSyntax>(tree, static binary =>
+            binary.IsKind(SyntaxKind.AddExpression)
         );
 
     private static SyntaxNode FindAssignment(SyntaxTree tree) =>

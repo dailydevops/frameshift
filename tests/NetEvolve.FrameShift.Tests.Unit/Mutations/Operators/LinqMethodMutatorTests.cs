@@ -396,11 +396,9 @@ public class LinqMethodMutatorTests
         QueryTemplate.Replace(CallPlaceholder, call, StringComparison.Ordinal);
 
     private static InvocationExpressionSyntax FindCall(SyntaxTree tree, string methodName) =>
-        SyntaxNodeLocator.FindFirst<InvocationExpressionSyntax>(
-            tree,
-            invocation =>
-                invocation.Expression is MemberAccessExpressionSyntax access
-                && string.Equals(access.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<InvocationExpressionSyntax>(tree, invocation =>
+            invocation.Expression is MemberAccessExpressionSyntax access
+            && string.Equals(access.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
         );
 
     private static string Join(IEnumerable<string> values) => string.Join(", ", values);
