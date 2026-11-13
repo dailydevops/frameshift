@@ -987,7 +987,10 @@ public class ReachabilityClosurePolymorphismTests
     }
 
     private static TestSurfaceManifest Manifest(params string[] referencedMemberIds) =>
-        new TestSurfaceManifest([], ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds));
+        new TestSurfaceManifest(
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds)
+        );
 
     private static ImmutableDictionary<string, ImmutableHashSet<string>> References(
         params (string TestId, string[] ReferencedMemberIds)[] tests

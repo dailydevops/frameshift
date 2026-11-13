@@ -593,7 +593,10 @@ public class ReachabilityClosureMemberTests
     {
         string[] referencedMemberIds = [.. seeds.Select(DeclarationId)];
 
-        return new TestSurfaceManifest([], ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds));
+        return new TestSurfaceManifest(
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds)
+        );
     }
 
     private static LocalFunctionStatementSyntax LocalFunction(SyntaxTree tree, string name) =>
