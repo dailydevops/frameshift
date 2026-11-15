@@ -218,19 +218,13 @@ tests/                                        # Test projects
 docs/
 └── rules/                                    # One document per diagnostic, target of the help links
 
-decisions/                                    # Architecture Decision Records (ADRs)
-templates/                                    # Documentation templates (READMEs, ADR)
+templates/                                    # Documentation templates (READMEs)
 .github/workflows/                            # CI, publishing and maintenance workflows
 ```
 
 ## Architecture
 
-The two decisions that define the shape of this repository are recorded as ADRs:
-
-- [Two-pass mutation analysis](decisions/2026-07-31-two-pass-mutation-analysis.md) — why the analysis is split across the test and production compilations, and why a manifest is the artifact between them.
-- [Pluggable test framework support](decisions/2026-07-31-pluggable-test-framework-support.md) — how probes and recognisers keep support for additional test frameworks additive, why the unit of the seam is a framework _version_ rather than a framework, and what adding the next one costs: three small files and one registry line.
-
-Beyond those, two principles run through the code and are worth knowing before changing anything:
+Two principles run through the code and are worth knowing before changing anything:
 
 - **Errors have a preferred direction.** A false "not trivial" verdict or a false "viable mutant" costs a diagnostic a reviewer can dismiss; a false "trivial" verdict silently hides a real testing gap. Every classification therefore only claims what it can prove.
 - **The analysis stays a pure compile-time operation.** No test execution, no file system access from the analyzers or the generator, no network. Anything that cannot be decided from the compilation is a documented limitation, not a workaround.
@@ -254,7 +248,6 @@ This project adheres to the Contributor Covenant [Code of Conduct](CODE_OF_CONDU
 
 - **[Package README](src/NetEvolve.FrameShift/README.md)** - Installation, setup and configuration for consumers
 - **[Rule Documentation](docs/rules/README.md)** - One document per diagnostic, with causes and remedies
-- **[Architecture Decision Records](decisions/)** - Detailed architectural decisions and rationale
 - **[Contributing Guidelines](CONTRIBUTING.md)** - How to contribute to this project
 - **[Code of Conduct](CODE_OF_CONDUCT.md)** - Community standards and expectations
 - **[License](LICENSE)** - Project licensing information
