@@ -292,9 +292,8 @@ public class ReachableSymbolSetTests
 
     private static ISymbol LocalFunction(SemanticModel semanticModel, SyntaxTree tree, string name)
     {
-        var declaration = SyntaxNodeLocator.FindFirst<LocalFunctionStatementSyntax>(
-            tree,
-            node => string.Equals(node.Identifier.ValueText, name, StringComparison.Ordinal)
+        var declaration = SyntaxNodeLocator.FindFirst<LocalFunctionStatementSyntax>(tree, node =>
+            string.Equals(node.Identifier.ValueText, name, StringComparison.Ordinal)
         );
 
         return semanticModel.GetDeclaredSymbol(declaration)!;

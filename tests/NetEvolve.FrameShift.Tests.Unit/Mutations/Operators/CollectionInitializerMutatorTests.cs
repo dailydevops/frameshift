@@ -443,9 +443,8 @@ public class CollectionInitializerMutatorTests
     {
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(ArrayInitializerSource);
         var mutator = new CollectionInitializerMutator();
-        var literal = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static candidate => candidate.IsKind(SyntaxKind.NumericLiteralExpression)
+        var literal = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static candidate =>
+            candidate.IsKind(SyntaxKind.NumericLiteralExpression)
         );
 
         Mutation[] mutations = [.. mutator.CreateMutations(literal, semanticModel, CancellationToken.None)];

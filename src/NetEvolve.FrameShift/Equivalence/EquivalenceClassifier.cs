@@ -613,13 +613,13 @@ internal static class EquivalenceClassifier
         }
 
         return ClassifyQuantifierCanonicalization(
-                originalPattern,
-                originalTokens,
-                mutatedPattern,
-                mutatedTokens,
-                CanonicalizeExactOne,
-                RegexExactOneQuantifierReason
-            )
+            originalPattern,
+            originalTokens,
+            mutatedPattern,
+            mutatedTokens,
+            CanonicalizeExactOne,
+            RegexExactOneQuantifierReason
+        )
             ?? ClassifyQuantifierCanonicalization(
                 originalPattern,
                 originalTokens,
@@ -1042,8 +1042,7 @@ internal static class EquivalenceClassifier
         }
 
         var scope = mutation.Original.FirstAncestorOrSelf<MemberDeclarationSyntax>();
-        var diagnostics =
-            unreachableCodeDiagnosticsCache?.GetDiagnostics(semanticModel, scope?.Span, cancellationToken)
+        var diagnostics = unreachableCodeDiagnosticsCache?.GetDiagnostics(semanticModel, scope?.Span, cancellationToken)
             ?? semanticModel.GetDiagnostics(scope?.Span, cancellationToken);
         var mutationSpan = mutation.Location.SourceSpan;
 

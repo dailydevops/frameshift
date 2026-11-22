@@ -271,16 +271,13 @@ public class MutantCompilerTests
         var mutations = CreateOperatorSwapMutations(tree);
         var results = new ConcurrentBag<MutantViability>();
 
-        _ = Parallel.ForEach(
-            Enumerable.Range(0, 32),
-            _ =>
+        _ = Parallel.ForEach(Enumerable.Range(0, 32), _ =>
+        {
+            foreach (var mutation in mutations)
             {
-                foreach (var mutation in mutations)
-                {
-                    results.Add(compiler.Verify(mutation, tree, CancellationToken.None));
-                }
+                results.Add(compiler.Verify(mutation, tree, CancellationToken.None));
             }
-        );
+        });
 
         using (Assert.Multiple())
         {
@@ -300,14 +297,11 @@ public class MutantCompilerTests
         var broken = CreateBrokenMutation(tree);
         var results = new ConcurrentBag<(string OperatorId, MutantViability Viability)>();
 
-        _ = Parallel.ForEach(
-            Enumerable.Range(0, 32),
-            _ =>
-            {
-                results.Add((ViableOperatorId, compiler.Verify(viable, tree, CancellationToken.None)));
-                results.Add((BrokenOperatorId, compiler.Verify(broken, tree, CancellationToken.None)));
-            }
-        );
+        _ = Parallel.ForEach(Enumerable.Range(0, 32), _ =>
+        {
+            results.Add((ViableOperatorId, compiler.Verify(viable, tree, CancellationToken.None)));
+            results.Add((BrokenOperatorId, compiler.Verify(broken, tree, CancellationToken.None)));
+        });
 
         using (Assert.Multiple())
         {
@@ -789,9 +783,8 @@ public class MutantCompilerTests
     /// <returns>The mutation.</returns>
     private static Mutation CreateBrokenMutation(SyntaxTree tree, string operatorId)
     {
-        var original = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            node => string.Equals(node.Token.ValueText, "7", StringComparison.Ordinal)
+        var original = SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, node =>
+            string.Equals(node.Token.ValueText, "7", StringComparison.Ordinal)
         );
         var replacement = SyntaxFactory.LiteralExpression(
             SyntaxKind.StringLiteralExpression,

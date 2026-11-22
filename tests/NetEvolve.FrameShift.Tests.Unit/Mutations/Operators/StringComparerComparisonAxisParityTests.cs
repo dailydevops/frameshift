@@ -77,9 +77,8 @@ public class StringComparerComparisonAxisParityTests
     {
         var fixture = template.Replace("MEMBER", source, StringComparison.Ordinal);
         var (_, semanticModel, tree) = CompilationFactory.CreateWithModel(fixture);
-        var node = SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-            tree,
-            access => _memberNames.Contains(access.Name.Identifier.ValueText, StringComparer.Ordinal)
+        var node = SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, access =>
+            _memberNames.Contains(access.Name.Identifier.ValueText, StringComparer.Ordinal)
         );
 
         var mutations = mutator.CreateMutations(node, semanticModel, CancellationToken.None).ToArray();

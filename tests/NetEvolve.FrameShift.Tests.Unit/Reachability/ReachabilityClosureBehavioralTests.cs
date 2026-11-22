@@ -294,7 +294,10 @@ public class ReachabilityClosureBehavioralTests
     }
 
     private static TestSurfaceManifest PlainManifest(params string[] referencedMemberIds) =>
-        new TestSurfaceManifest([], ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds));
+        new TestSurfaceManifest(
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet.Create(StringComparer.Ordinal, referencedMemberIds)
+        );
 
     private static TestSurfaceManifest BehavioralManifest(params string[] behavioralReferencedMemberIds) =>
         new TestSurfaceManifest(

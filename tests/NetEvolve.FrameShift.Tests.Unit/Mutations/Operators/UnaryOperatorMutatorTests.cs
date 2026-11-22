@@ -417,8 +417,7 @@ public class UnaryOperatorMutatorTests
     public async Task HasCounterpart_MemberIsNoOperator_ReturnsFalse()
     {
         var (compilation, _, _) = CompilationFactory.CreateWithModel(BorrowedOperatorNameSource);
-        var money =
-            compilation.GetTypeByMetadataName("Fixtures.Money")
+        var money = compilation.GetTypeByMetadataName("Fixtures.Money")
             ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Money'.");
         var negate = money.GetMembers("op_UnaryNegation").OfType<IMethodSymbol>().Single();
 

@@ -882,8 +882,7 @@ public class ArithmeticOperatorMutatorTests
     public async Task HasCounterpart_OperandCountDiffers_ReturnsFalse()
     {
         var (compilation, _, _) = CompilationFactory.CreateWithModel(UnaryAndBinaryMinusSource);
-        var money =
-            compilation.GetTypeByMetadataName("Fixtures.Money")
+        var money = compilation.GetTypeByMetadataName("Fixtures.Money")
             ?? throw new InvalidOperationException("The fixture does not declare 'Fixtures.Money'.");
         var unaryMinus = money.GetMembers("op_UnaryNegation").OfType<IMethodSymbol>().Single();
         var binaryMinus = money.GetMembers("op_Subtraction").OfType<IMethodSymbol>().Single();
@@ -978,9 +977,10 @@ public class ArithmeticOperatorMutatorTests
     /// </exception>
     private static ArgumentOutOfRangeException InvokeMapper(string mapperName, SyntaxKind expressionKind)
     {
-        var mapper =
-            typeof(ArithmeticOperatorMutator).GetMethod(mapperName, BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException($"The mapping method '{mapperName}' no longer exists.");
+        var mapper = typeof(ArithmeticOperatorMutator).GetMethod(
+            mapperName,
+            BindingFlags.NonPublic | BindingFlags.Static
+        ) ?? throw new InvalidOperationException($"The mapping method '{mapperName}' no longer exists.");
 
         try
         {

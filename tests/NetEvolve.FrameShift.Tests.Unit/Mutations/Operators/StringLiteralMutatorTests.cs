@@ -349,14 +349,12 @@ public class StringLiteralMutatorTests
     private static string Rewrite(SyntaxTree tree, Mutation mutation) => mutation.ApplyTo(tree).ToString();
 
     private static SyntaxNode FindStringLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.StringLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.StringLiteralExpression)
         );
 
     private static SyntaxNode FindNumericLiteral(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(
-            tree,
-            static literal => literal.IsKind(SyntaxKind.NumericLiteralExpression)
+        SyntaxNodeLocator.FindFirst<LiteralExpressionSyntax>(tree, static literal =>
+            literal.IsKind(SyntaxKind.NumericLiteralExpression)
         );
 }

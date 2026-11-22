@@ -115,9 +115,10 @@ public class TestSurfaceAnalysisDiscoveryTests
         );
 #pragma warning restore CS0618
 
-        var method =
-            typeof(TestSurfaceAnalysis).GetMethod("FindAwakeFrameworks", BindingFlags.NonPublic | BindingFlags.Static)
-            ?? throw new InvalidOperationException("TestSurfaceAnalysis.FindAwakeFrameworks was not found.");
+        var method = typeof(TestSurfaceAnalysis).GetMethod(
+            "FindAwakeFrameworks",
+            BindingFlags.NonPublic | BindingFlags.Static
+        ) ?? throw new InvalidOperationException("TestSurfaceAnalysis.FindAwakeFrameworks was not found.");
 
         var result = method.Invoke(null, [context, probe, recognizer, testMethods, FrameShiftOptions.Default]);
 

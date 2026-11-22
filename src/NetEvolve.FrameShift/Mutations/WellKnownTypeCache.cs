@@ -59,10 +59,10 @@ internal static class WellKnownTypeCache
             throw new ArgumentNullException(nameof(metadataName));
         }
 
-        var perCompilation = _cache.GetValue(
-            compilation,
-            static _ => new ConcurrentDictionary<string, INamedTypeSymbol?>(StringComparer.Ordinal)
-        );
+        var perCompilation = _cache.GetValue(compilation, static _ => new ConcurrentDictionary<
+            string,
+            INamedTypeSymbol?
+        >(StringComparer.Ordinal));
 
         return perCompilation.GetOrAdd(metadataName, name => compilation.GetTypeByMetadataName(name));
     }

@@ -87,9 +87,8 @@ public sealed class TestSurfaceManifestGenerator : IIncrementalGenerator
     {
         var provider = context.CompilationProvider.Combine(context.AnalyzerConfigOptionsProvider);
 
-        context.RegisterSourceOutput(
-            provider,
-            static (productionContext, source) => Execute(productionContext, source.Left, source.Right)
+        context.RegisterSourceOutput(provider, static (productionContext, source) =>
+            Execute(productionContext, source.Left, source.Right)
         );
     }
 

@@ -692,14 +692,12 @@ public class StringComparerMutatorTests
         _memberNames.Contains(access.Name.Identifier.ValueText, StringComparer.Ordinal);
 
     private static SyntaxNode FindTypeQualifier(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-            tree,
-            static access => string.Equals(access.Name.Identifier.ValueText, "StringComparer", StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, static access =>
+            string.Equals(access.Name.Identifier.ValueText, "StringComparer", StringComparison.Ordinal)
         );
 
     private static SyntaxNode FindImportedMember(SyntaxTree tree) =>
-        SyntaxNodeLocator.FindFirst<IdentifierNameSyntax>(
-            tree,
-            static name => string.Equals(name.Identifier.ValueText, "Ordinal", StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<IdentifierNameSyntax>(tree, static name =>
+            string.Equals(name.Identifier.ValueText, "Ordinal", StringComparison.Ordinal)
         );
 }

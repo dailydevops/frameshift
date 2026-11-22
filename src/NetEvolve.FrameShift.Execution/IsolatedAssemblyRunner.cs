@@ -74,14 +74,12 @@ internal static class IsolatedAssemblyRunner
         using var assemblyStream = new MemoryStream(assemblyBytes);
         var assembly = context.LoadFromStream(assemblyStream);
 
-        var type =
-            assembly.GetType(typeFullName, throwOnError: false)
+        var type = assembly.GetType(typeFullName, throwOnError: false)
             ?? throw new TypeLoadException($"The mutant assembly does not declare a type named '{typeFullName}'.");
 
         // Public only, deliberately: every mainstream test framework requires a public test method, so
         // reaching into non-public members here would recognise a shape none of them actually run.
-        var method =
-            type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+        var method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
             ?? throw new MissingMethodException(typeFullName, methodName);
 
         var instance = method.IsStatic ? null : Activator.CreateInstance(type);

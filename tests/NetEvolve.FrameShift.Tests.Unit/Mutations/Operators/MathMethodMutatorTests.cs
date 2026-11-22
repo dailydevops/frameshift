@@ -509,11 +509,9 @@ public class MathMethodMutatorTests
             .Replace(MethodPlaceholder, methodName, StringComparison.Ordinal);
 
     private static InvocationExpressionSyntax FindCall(SyntaxTree tree, string methodName) =>
-        SyntaxNodeLocator.FindFirst<InvocationExpressionSyntax>(
-            tree,
-            invocation =>
-                invocation.Expression is MemberAccessExpressionSyntax access
-                && string.Equals(access.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
+        SyntaxNodeLocator.FindFirst<InvocationExpressionSyntax>(tree, invocation =>
+            invocation.Expression is MemberAccessExpressionSyntax access
+            && string.Equals(access.Name.Identifier.ValueText, methodName, StringComparison.Ordinal)
         );
 
     private static string[] DisplayNames(ImmutableArray<Mutation> mutations) =>

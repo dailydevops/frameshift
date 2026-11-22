@@ -725,14 +725,10 @@ public class RegexOptionsMutatorTests
     [Test]
     public async Task CreateMutations_TypeQualifierOfAQualifiedFlag_ReturnsEmpty()
     {
-        var (_, mutations) = Mutate(
-            QualifiedSource,
-            static tree =>
-                SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(
-                    tree,
-                    static memberAccess =>
-                        string.Equals(memberAccess.Name.Identifier.ValueText, "RegexOptions", StringComparison.Ordinal)
-                )
+        var (_, mutations) = Mutate(QualifiedSource, static tree =>
+            SyntaxNodeLocator.FindFirst<MemberAccessExpressionSyntax>(tree, static memberAccess =>
+                string.Equals(memberAccess.Name.Identifier.ValueText, "RegexOptions", StringComparison.Ordinal)
+            )
         );
 
         _ = await Assert.That(mutations).IsEmpty();
